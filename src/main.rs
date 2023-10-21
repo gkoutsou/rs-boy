@@ -1,10 +1,19 @@
 use std::{fs::File, io::{Read, self}, str, default};
 
 struct Registers {
-    pc: u16
+    a: u8, f: u8,
+    b: u8, c: u8,
+    d: u8, e: u8,
+    h: u8, l: u8,
+    pc: u16,
+    sp: u16,
 }
 
 impl Registers {
+    fn get_hl(&self) -> u16 {
+        (self.h as u16) << 8 | self.l as u16
+    }
+
     fn step_pc(&mut self) -> usize{
         let current = self.pc;
         self.pc += 1;
@@ -38,10 +47,27 @@ impl <'a> Cpu <'a>{
 
         
         if location > 0x3FFF {
-            panic!("moving outside of bank 1??")
+            println!("moving outside of bank 1??")
+        }
+        if location > 0x7FFF {
+            panic!("moving outside of bank 2??")
         }
 
         self.find_operator(location);
+    }
+
+    fn get_memory_location(&self, location: usize) -> u8 {
+        if location<=0x7FFF {
+            self.rom[location as usize]
+        } else {
+            panic!("Location not in ROM: {:#x}", location)
+        }
+    }
+
+    fn get_u16(&self, location: usize) -> u16 {
+        let v1 = self.rom[location] as u16;
+        let v2 = self.rom[location+1] as u16;
+        v1  | v2 << 8
     }
     
     fn find_operator(&mut self, location: usize) {
@@ -50,11 +76,56 @@ impl <'a> Cpu <'a>{
             0x0 => println!("NOP"),
 
             0xc3 => {
-                let v1 = self.rom[location] as u16;
-                let v2 = self.rom[location+1] as u16;
-                self.registers.set_pc(v1  | v2 << 8);
-                println!("JP nn --> {:#x}-{:#x} -> {:#x}", v1, v2, v1  | v2 << 8);
+                let v = self.get_u16(location);
+                self.registers.set_pc(v);
+                println!("JP nn --> {:#x}", v);
             },
+
+            0x61 => {
+                println!("LD H,C");
+                self.registers.h = self.registers.c;
+            }
+
+            // LD x, A
+            0x47 => {
+                println!("LD B,A");
+                self.registers.b = self.registers.a;
+            }
+            0x4f => {
+                println!("LD C,A");
+                self.registers.c = self.registers.a;
+            }
+            0x57 => {
+                println!("LD D,A");
+                self.registers.d = self.registers.a;
+            }
+            0x5f => {
+                println!("LD E,A");
+                self.registers.e = self.registers.a;
+            }
+            0x67 => {
+                println!("LD H,A");
+                self.registers.h = self.registers.a;
+            }
+            0x6f => {
+                println!("LD L,A");
+                self.registers.l = self.registers.a;
+            }
+
+            // LD r1,r2
+            0xfa => {
+                println!("LD A, (HL)");
+                self.registers.a = self.get_memory_location(self.registers.get_hl() as usize);
+            }
+
+            // 
+            0xfa => {
+                println!("LD A, nn");
+                let source = self.get_u16(location);
+                self.registers.step_pc();
+                self.registers.step_pc();
+                self.registers.a = self.get_memory_location(source as usize);
+            }
 
             _ => panic!("missing operator {:#x}", op),
         };
@@ -95,7 +166,17 @@ fn main() {
     }
 
     let mut cpu = Cpu{
-        registers: &mut Registers { pc: 0x100 },
+        registers: &mut Registers {
+            pc: 0x100,
+            sp: 0xFFFE,
+            a: 0x11, // $01-GB/SGB, $FF-GBP, $11-GBC
+            l: 0x4d, 
+            f: 0xB0, 
+            b: 0x00, 
+            c: 0x13, 
+            d: 0x00, 
+            e: 0xd8,
+            h: 0x01 },
         rom: buffer,
     };
 
