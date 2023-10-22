@@ -1,4 +1,12 @@
-use std::{fs::File, io::{Read, self}, str, default};
+use std::{fs::File, io::{Read, self}, str};
+
+pub enum CpuFlag
+{
+    C = 0b00010000, // carry
+    H = 0b00100000, // half-carry
+    N = 0b01000000, // substraction
+    Z = 0b10000000, // zero - indicates that result was zero
+}
 
 struct Registers {
     a: u8, f: u8,
@@ -22,6 +30,14 @@ impl Registers {
 
     fn set_pc(&mut self, loc: u16){
         self.pc = loc;
+    }
+
+    fn set_flag(f:u8, flag: CpuFlag, value: bool) -> u8 {
+        if value {
+            f | flag as u8
+        } else {
+            f & !(flag as u8)
+        }
     }
 }
 
@@ -64,10 +80,18 @@ impl <'a> Cpu <'a>{
         }
     }
 
-    fn get_u16(&self, location: usize) -> u16 {
+    fn get_u16(&mut self, location: usize) -> u16 {
+        // todo location useless?
         let v1 = self.rom[location] as u16;
         let v2 = self.rom[location+1] as u16;
+        self.registers.step_pc();
+        self.registers.step_pc();
         v1  | v2 << 8
+    }
+
+    fn get_u8(&mut self) -> u8 {
+        let location = self.registers.step_pc();
+        self.rom[location]
     }
     
     fn find_operator(&mut self, location: usize) {
@@ -113,7 +137,7 @@ impl <'a> Cpu <'a>{
             }
 
             // LD r1,r2
-            0xfa => {
+            0x7e => {
                 println!("LD A, (HL)");
                 self.registers.a = self.get_memory_location(self.registers.get_hl() as usize);
             }
@@ -122,13 +146,63 @@ impl <'a> Cpu <'a>{
             0xfa => {
                 println!("LD A, nn");
                 let source = self.get_u16(location);
-                self.registers.step_pc();
-                self.registers.step_pc();
                 self.registers.a = self.get_memory_location(source as usize);
+            }
+
+            // SUB n
+            0x90 => {
+                println!("SUB B");
+                // TODO create macros?
+                if self.registers.a < self.registers.b{
+                    self.registers.f |= CpuFlag::C as u8;
+                } else {
+                    self.registers.f &= !(CpuFlag::C as u8);
+                }
+
+                if((self.registers.b & 0x0f) > (self.registers.a & 0x0f)) {
+                    self.registers.f |= CpuFlag::H as u8;
+                } else {
+                    self.registers.f &= !(CpuFlag::H as u8);
+                }
+
+                self.registers.a = self.registers.a.wrapping_sub(self.registers.b);
+                if self.registers.a == 0 {
+                    self.registers.f |= CpuFlag::Z as u8;
+                } else {
+                    self.registers.f &= !(CpuFlag::Z as u8);
+                }
+                self.registers.f |= CpuFlag::N as u8;
+            }
+
+            // 0xd6 => {
+
+            // }
+
+            // MISC
+
+            0xcb => {
+                self.do_cb();
             }
 
             _ => panic!("missing operator {:#x}", op),
         };
+    }
+
+    fn do_cb(&mut self) {
+        let op = self.get_u8();
+        match op {
+            0x37 => {
+                print!("SWAP nimble A");
+                self.registers.a = (self.registers.a >> 4) | (self.registers.a<< 4);
+                let mut f = Registers::set_flag(self.registers.f, CpuFlag::Z, self.registers.a==0);
+                f = Registers::set_flag(f, CpuFlag::N, false);
+                f = Registers::set_flag(f, CpuFlag::H, false);
+                f = Registers::set_flag(f, CpuFlag::C, false);
+                self.registers.f = f;
+            }
+
+            _ => panic!("Missing cb {:#x}", op),
+        }
     }
 }
 
@@ -169,7 +243,7 @@ fn main() {
         registers: &mut Registers {
             pc: 0x100,
             sp: 0xFFFE,
-            a: 0x11, // $01-GB/SGB, $FF-GBP, $11-GBC
+            a: 0x01, // $01-GB/SGB, $FF-GBP, $11-GBC
             l: 0x4d, 
             f: 0xB0, 
             b: 0x00, 
