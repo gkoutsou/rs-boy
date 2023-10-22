@@ -18,7 +18,14 @@ struct Registers {
 }
 
 impl Registers {
+    fn set_hl(&mut self, v: u16) {
+        self.h = (v >> 8) as u8;
+        self.l = (v & 0x00FF) as u8;
+    }
+
     fn get_hl(&self) -> u16 {
+        println!("H={:#x}, L={:#x}", self.h, self.l);
+        println!("HL={:#x}", (self.h as u16) << 8 | self.l as u16);
         (self.h as u16) << 8 | self.l as u16
     }
 
@@ -60,6 +67,7 @@ fn load_rom() -> io::Result<Vec<u8>> {
 impl <'a> Cpu <'a>{
     fn step(&mut self) {
         let location = self.registers.step_pc();
+        println!("Running location {}", location);
 
         
         if location > 0x3FFF {
@@ -80,13 +88,23 @@ impl <'a> Cpu <'a>{
         }
     }
 
-    fn get_u16(&mut self, location: usize) -> u16 {
-        // todo location useless?
+    fn write_memory_location(&self, location: usize, value: u8) -> u8 {
+        println!("Writing to Memory Location: {:#x}", location );
+        if location<=0x7FFF {
+            panic!("how can I write to ROM?! {:#x}", location)
+        } else {
+            panic!("Need to handle memory write to: {:#x}", location)
+        }
+    }
+
+    fn get_u16(&mut self) -> u16 {
+        let location = self.registers.step_pc();
+        println!("Reading location {}", location);
         let v1 = self.rom[location] as u16;
-        let v2 = self.rom[location+1] as u16;
-        self.registers.step_pc();
-        self.registers.step_pc();
-        v1  | v2 << 8
+        let location = self.registers.step_pc();
+        println!("Reading location 2 {}", location);
+        let v2 = self.rom[location] as u16;
+        v2 << 8 | v1
     }
 
     fn get_u8(&mut self) -> u8 {
@@ -100,7 +118,7 @@ impl <'a> Cpu <'a>{
             0x0 => println!("NOP"),
 
             0xc3 => {
-                let v = self.get_u16(location);
+                let v = self.get_u16();
                 self.registers.set_pc(v);
                 println!("JP nn --> {:#x}", v);
             },
@@ -142,41 +160,65 @@ impl <'a> Cpu <'a>{
                 self.registers.a = self.get_memory_location(self.registers.get_hl() as usize);
             }
 
+            // LDI (HL), A
+            0x22 => {
+                println!("LDI (HL), A");
+                self.write_memory_location(self.registers.get_hl() as usize, self.registers.a);
+                self.registers.set_hl(self.registers.get_hl()+1)
+            }
+
             // 
             0xfa => {
                 println!("LD A, nn");
-                let source = self.get_u16(location);
+                let source = self.get_u16();
                 self.registers.a = self.get_memory_location(source as usize);
             }
 
             // SUB n
             0x90 => {
                 println!("SUB B");
-                // TODO create macros?
-                if self.registers.a < self.registers.b{
-                    self.registers.f |= CpuFlag::C as u8;
-                } else {
-                    self.registers.f &= !(CpuFlag::C as u8);
-                }
-
-                if((self.registers.b & 0x0f) > (self.registers.a & 0x0f)) {
-                    self.registers.f |= CpuFlag::H as u8;
-                } else {
-                    self.registers.f &= !(CpuFlag::H as u8);
-                }
-
+                let mut f = Registers::set_flag(self.registers.f, CpuFlag::C, self.registers.a < self.registers.b);
+                f = Registers::set_flag(f, CpuFlag::H, (self.registers.b & 0x0f) > (self.registers.a & 0x0f));
                 self.registers.a = self.registers.a.wrapping_sub(self.registers.b);
-                if self.registers.a == 0 {
-                    self.registers.f |= CpuFlag::Z as u8;
-                } else {
-                    self.registers.f &= !(CpuFlag::Z as u8);
-                }
-                self.registers.f |= CpuFlag::N as u8;
+                f = Registers::set_flag(f, CpuFlag::Z, self.registers.a == 0);
+                f = Registers::set_flag(f, CpuFlag::N, true);
+                self.registers.f = f;
             }
 
-            // 0xd6 => {
+            0xd6 => {
+                println!("SUB #");
+                let b = self.get_u8();
+                let mut f = Registers::set_flag(self.registers.f, CpuFlag::C, self.registers.a < b);
+                f = Registers::set_flag(f, CpuFlag::H, (b & 0x0f) > (self.registers.a & 0x0f));
+                self.registers.a = self.registers.a.wrapping_sub(b);
+                f = Registers::set_flag(f, CpuFlag::Z, self.registers.a == 0);
+                f = Registers::set_flag(f, CpuFlag::N, true);
+                self.registers.f = f;
+            }
 
-            // }
+            // DEC
+            0x25 => {
+                println!("DEC H");
+                let mut f = self.registers.f;
+                f = Registers::set_flag(f, CpuFlag::H, (self.registers.a & 0x0f) == 0 );
+                self.registers.a = self.registers.a.wrapping_sub(1);
+                f = Registers::set_flag(f, CpuFlag::Z, self.registers.a == 0);
+                f = Registers::set_flag(f, CpuFlag::N, true);
+                self.registers.f = f;
+            }
+
+            // CP n
+            0xfe => {
+                let n = self.get_u8();
+                println!("CP # -> {}", n);
+                let mut f = Registers::set_flag(self.registers.f, CpuFlag::C, self.registers.a < n);
+                f = Registers::set_flag(f, CpuFlag::H, (n & 0x0f) > (self.registers.a & 0x0f));
+                f = Registers::set_flag(f, CpuFlag::Z, self.registers.a == 0);
+                f = Registers::set_flag(f, CpuFlag::N, true);
+                self.registers.f = f;
+            }
+
+            
 
             // MISC
 
@@ -192,13 +234,33 @@ impl <'a> Cpu <'a>{
         let op = self.get_u8();
         match op {
             0x37 => {
-                print!("SWAP nimble A");
+                println!("SWAP nimble A");
                 self.registers.a = (self.registers.a >> 4) | (self.registers.a<< 4);
                 let mut f = Registers::set_flag(self.registers.f, CpuFlag::Z, self.registers.a==0);
                 f = Registers::set_flag(f, CpuFlag::N, false);
                 f = Registers::set_flag(f, CpuFlag::H, false);
                 f = Registers::set_flag(f, CpuFlag::C, false);
                 self.registers.f = f;
+            }
+
+            // SRA n
+            0x28 => {
+                println!("SRA B");
+                let c = self.registers.b | 0x01;
+                let msb = self.registers.b | (1<<7);
+                let shifted = self.registers.b >> 1;
+
+                println!("FROM: {:#x}", self.registers.b);
+
+                let mut f = Registers::set_flag(self.registers.f, CpuFlag::C, c==1);
+                f = Registers::set_flag(f, CpuFlag::H, false);
+                f = Registers::set_flag(f, CpuFlag::Z, self.registers.b == 0);
+                f = Registers::set_flag(f, CpuFlag::N, false);
+                self.registers.f = f;
+                self.registers.b = shifted | msb;
+                println!("TO: {:#x}", self.registers.b);
+                panic!("not implememented SRA properly")
+
             }
 
             _ => panic!("Missing cb {:#x}", op),
@@ -254,7 +316,7 @@ fn main() {
         rom: buffer,
     };
 
-    for _i in 0..10{
+    for _i in 0..20{
         cpu.step();
     }
     
