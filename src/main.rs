@@ -70,6 +70,7 @@ impl Registers {
 struct Cpu <'a> {
     registers: &'a mut Registers,
     rom: Vec<u8>,
+    ram: &'a mut Vec<u8>,
 }
 
 fn load_rom() -> io::Result<Vec<u8>> {
@@ -107,11 +108,14 @@ impl <'a> Cpu <'a>{
         }
     }
 
-    fn write_memory_location(&self, location: usize, value: u8) -> u8 {
+    fn write_memory_location(&mut self, location: usize, value: u8) {
         println!("Writing to Memory Location: {:#x}", location );
         if location<=0x7FFF {
             panic!("how can I write to ROM?! {:#x}", location)
-        } else {
+        } else if location < 0xe0000 && location >= 0xc000 {
+            println!("Writting to internal RAM");
+            self.ram[location - 0xc000] = value;
+        }else {
             panic!("Need to handle memory write to: {:#x}", location)
         }
     }
@@ -388,7 +392,7 @@ fn main() {
     }
 
     let mut cpu = Cpu{
-        registers: &mut Registers {
+        registers: &mut Registers {  // Classic
             pc: 0x100,
             sp: 0xFFFE,
             a: 0x01, // $01-GB/SGB, $FF-GBP, $11-GBC
@@ -400,6 +404,7 @@ fn main() {
             e: 0xd8,
             h: 0x01 },
         rom: buffer,
+        ram: &mut vec![0; 8192],
     };
 
     for _i in 0..20{
