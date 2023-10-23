@@ -1,11 +1,16 @@
 use std::{fs::File, io::{Read, self}, str};
 
+#[derive(Copy, Clone)]
 pub enum CpuFlag
 {
-    C = 0b00010000, // carry
-    H = 0b00100000, // half-carry
-    N = 0b01000000, // substraction
-    Z = 0b10000000, // zero - indicates that result was zero
+    /// carry
+    C = 0b00010000,
+    /// half-carry
+    H = 0b00100000,
+    /// substraction
+    N = 0b01000000,
+    /// zero - indicates that result was zero
+    Z = 0b10000000,
 }
 
 struct Registers {
@@ -39,12 +44,26 @@ impl Registers {
         self.pc = loc;
     }
 
+    fn has_flag(f:u8, flag: CpuFlag) -> bool {
+        // println!("{:#b} - {:#b}", f, flag as u8);
+        (f & (flag as u8)) > 0
+    }
+
     fn set_flag(f:u8, flag: CpuFlag, value: bool) -> u8 {
         if value {
             f | flag as u8
         } else {
             f & !(flag as u8)
         }
+    }
+
+    fn xor(a:u8, b:u8) -> (u8, u8){
+        let result = a ^ b;
+        let mut f = Registers::set_flag(0x0, CpuFlag::Z, result == 0);
+        f = Registers::set_flag(f, CpuFlag::N, false);
+        f = Registers::set_flag(f, CpuFlag::H, false);
+        f = Registers::set_flag(f, CpuFlag::C, false);
+        (result, f)
     }
 }
 
@@ -123,6 +142,28 @@ impl <'a> Cpu <'a>{
                 println!("JP nn --> {:#x}", v);
             },
 
+            // JR n
+            0x18 => {
+                let steps = self.get_u8() as i16;
+                let new_location = self.registers.pc  as i32 + steps as i32;
+                self.registers.set_pc(new_location as u16);
+                println!("JR n (jump {} -> {:#x})", steps, new_location);
+            }
+
+            // JR cc,n
+            0x28 => {
+                println!("JR cc,n");
+                let steps = self.get_u8() as i16;
+                println!("{:#b}", self.registers.f);
+                if Registers::has_flag(self.registers.f, CpuFlag::Z) {
+                    let new_location = (self.registers.pc as i16 + steps) as u16;
+                    println!("Current location: {}, next: {}", self.registers.pc, new_location);
+                    self.registers.set_pc(new_location);
+                    panic!("untested jump");
+                }
+
+            }
+
             0x61 => {
                 println!("LD H,C");
                 self.registers.h = self.registers.c;
@@ -152,6 +193,12 @@ impl <'a> Cpu <'a>{
             0x6f => {
                 println!("LD L,A");
                 self.registers.l = self.registers.a;
+            }
+
+            0xea => {
+                println!("LD (nn),A");
+                let target = self.get_u16();
+                self.write_memory_location(target as usize, self.registers.a);
             }
 
             // LD r1,r2
@@ -207,6 +254,42 @@ impl <'a> Cpu <'a>{
                 self.registers.f = f;
             }
 
+            // XOR n
+            0xaf => {
+                println!("XOR A");
+                (self.registers.a, self.registers.f) = Registers::xor(self.registers.a, self.registers.a);
+            }
+
+            0xa8 => {
+                println!("XOR B");
+                (self.registers.a, self.registers.f) = Registers::xor(self.registers.a, self.registers.b);
+            }
+
+            0xa9 => {
+                println!("XOR C");
+                (self.registers.a, self.registers.f) = Registers::xor(self.registers.a, self.registers.c);
+            }
+
+            0xaa => {
+                println!("XOR D");
+                (self.registers.a, self.registers.f) = Registers::xor(self.registers.a, self.registers.d);
+            }
+
+            0xab => {
+                println!("XOR E");
+                (self.registers.a, self.registers.f) = Registers::xor(self.registers.a, self.registers.e);
+            }
+
+            0xac => {
+                println!("XOR H");
+                (self.registers.a, self.registers.f) = Registers::xor(self.registers.a, self.registers.h);
+            }
+
+            0xad => {
+                println!("XOR L");
+                (self.registers.a, self.registers.f) = Registers::xor(self.registers.a, self.registers.l);
+            }
+
             // CP n
             0xfe => {
                 let n = self.get_u8();
@@ -228,7 +311,10 @@ impl <'a> Cpu <'a>{
 
             _ => panic!("missing operator {:#x}", op),
         };
+
+
     }
+
 
     fn do_cb(&mut self) {
         let op = self.get_u8();
