@@ -122,6 +122,15 @@ impl <'a> Cpu <'a>{
         }
     }
 
+    fn get_ffxx_memory_location(&self, location: usize) -> u8 {
+        // todo this is here for now, just until I ensure I don't get any weird jumps
+        if location==0xffff {
+            self.interrupt_enable
+        } else {
+            panic!("Weird Location: {:#x}", location)
+        }
+    }
+
     fn push_stack(&mut self, value: u16){
         let (hs, ls) = u16_to_u8s(value);
         self.registers.sp -= 1;
@@ -242,6 +251,13 @@ impl <'a> Cpu <'a>{
                 let steps = self.get_u8();
                 println!("LDH (n),A --> {}", steps);
                 self.write_memory_location(0xff00+steps as usize, self.registers.a);
+            }
+
+            // LDH A,(n)
+            0xf0 => {
+                let steps = self.get_u8();
+                println!("LDH A,(n) --> {}", steps);
+                self.registers.a = self.get_ffxx_memory_location(0xff00 + steps as usize);
             }
 
             // LDI (HL), A
@@ -479,7 +495,7 @@ fn main() {
         io_registers: &mut vec![0; 0xFF7F - 0xFF00 + 1]
     };
 
-    for _i in 0..30{
+    for _i in 0..40{
         cpu.step();
     }
     
