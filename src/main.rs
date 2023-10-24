@@ -71,6 +71,13 @@ struct Cpu <'a> {
     registers: &'a mut Registers,
     rom: Vec<u8>,
     ram: &'a mut Vec<u8>,
+
+    /// Interrupt Master Enable
+    ime: bool,
+    interrupt_enable: u8,
+
+    /// I/O registers
+    io_registers: &'a mut Vec<u8>,
 }
 
 fn load_rom() -> io::Result<Vec<u8>> {
@@ -110,12 +117,19 @@ impl <'a> Cpu <'a>{
 
     fn write_memory_location(&mut self, location: usize, value: u8) {
         println!("Writing to Memory Location: {:#x}", location );
-        if location<=0x7FFF {
+        if location <= 0x7FFF {
             panic!("how can I write to ROM?! {:#x}", location)
-        } else if location < 0xe0000 && location >= 0xc000 {
+        } else if location <= 0xdfff && location >= 0xc000 {
+            // in CGB mode, the 2nd 4k are rotatable
             println!("Writting to internal RAM");
             self.ram[location - 0xc000] = value;
-        }else {
+        } else if location <= 0xFF7F && location >= 0xFF00 {
+            println!("Writting to I/O Register: {:#x}: {:#b}", location, value);
+            self.io_registers[location - 0xFF00] = value;
+        } else if location == 0xffff {
+            println!("Writting to Interrupt Enable Register");
+            self.interrupt_enable = value;
+        } else {
             panic!("Need to handle memory write to: {:#x}", location)
         }
     }
@@ -209,6 +223,13 @@ impl <'a> Cpu <'a>{
             0x7e => {
                 println!("LD A, (HL)");
                 self.registers.a = self.get_memory_location(self.registers.get_hl() as usize);
+            }
+
+            // LDH (n),A
+            0xe0 => {
+                let steps = self.get_u8();
+                println!("LDH (n),A --> {}", steps);
+                self.write_memory_location(0xff00+steps as usize, self.registers.a);
             }
 
             // LDI (HL), A
@@ -305,7 +326,23 @@ impl <'a> Cpu <'a>{
                 self.registers.f = f;
             }
 
+            // Interrupts
+
+            0xf3 => {
+                // This instruction disables interrupts but not
+                // immediately. Interrupts are disabled after
+                // instruction after DI is executed.
+                println!("Warning: DI");
+                self.ime = false;
+            }
             
+            0xfb => {
+                // This instruction disables interrupts but not
+                // immediately. Interrupts are enabled after
+                // instruction after DI is executed.
+                println!("Warning: EI");
+                self.ime = true;
+            }
 
             // MISC
 
@@ -405,9 +442,12 @@ fn main() {
             h: 0x01 },
         rom: buffer,
         ram: &mut vec![0; 8192],
+        ime: false,
+        interrupt_enable: 0,
+        io_registers: &mut vec![0; 0xFF7F - 0xFF00]
     };
 
-    for _i in 0..20{
+    for _i in 0..30{
         cpu.step();
     }
     
