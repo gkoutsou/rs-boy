@@ -13,6 +13,12 @@ pub enum CpuFlag
     Z = 0b10000000,
 }
 
+fn u16_to_u8s(input: u16) -> (u8, u8){
+    let hs = (input >> 8) as u8;
+    let ls= (input & 0x00FF) as u8;
+    (hs, ls)
+}
+
 struct Registers {
     a: u8, f: u8,
     b: u8, c: u8,
@@ -71,6 +77,7 @@ struct Cpu <'a> {
     registers: &'a mut Registers,
     rom: Vec<u8>,
     ram: &'a mut Vec<u8>,
+    high_ram: &'a mut Vec<u8>,
 
     /// Interrupt Master Enable
     ime: bool,
@@ -94,7 +101,7 @@ fn load_rom() -> io::Result<Vec<u8>> {
 impl <'a> Cpu <'a>{
     fn step(&mut self) {
         let location = self.registers.step_pc();
-        println!("Running location {}", location);
+        println!("Running location {:#x}", location);
 
         
         if location > 0x3FFF {
@@ -115,6 +122,14 @@ impl <'a> Cpu <'a>{
         }
     }
 
+    fn push_stack(&mut self, value: u16){
+        let (hs, ls) = u16_to_u8s(value);
+        self.registers.sp -= 1;
+        self.write_memory_location(self.registers.sp as usize, hs);
+        self.registers.sp -= 1;
+        self.write_memory_location(self.registers.sp as usize, ls);
+    }
+
     fn write_memory_location(&mut self, location: usize, value: u8) {
         println!("Writing to Memory Location: {:#x}", location );
         if location <= 0x7FFF {
@@ -123,9 +138,12 @@ impl <'a> Cpu <'a>{
             // in CGB mode, the 2nd 4k are rotatable
             println!("Writting to internal RAM");
             self.ram[location - 0xc000] = value;
-        } else if location <= 0xFF7F && location >= 0xFF00 {
+        } else if location <= 0xff7f && location >= 0xff00 {
             println!("Writting to I/O Register: {:#x}: {:#b}", location, value);
-            self.io_registers[location - 0xFF00] = value;
+            self.io_registers[location - 0xff00] = value;
+        } else if location <= 0xfffe && location >= 0xff80 {
+            println!("Writting to High RAM");
+            self.high_ram[location - 0xff80] = value;
         } else if location == 0xffff {
             println!("Writting to Interrupt Enable Register");
             self.interrupt_enable = value;
@@ -219,12 +237,6 @@ impl <'a> Cpu <'a>{
                 self.write_memory_location(target as usize, self.registers.a);
             }
 
-            // LD r1,r2
-            0x7e => {
-                println!("LD A, (HL)");
-                self.registers.a = self.get_memory_location(self.registers.get_hl() as usize);
-            }
-
             // LDH (n),A
             0xe0 => {
                 let steps = self.get_u8();
@@ -239,11 +251,22 @@ impl <'a> Cpu <'a>{
                 self.registers.set_hl(self.registers.get_hl()+1)
             }
 
-            // 
+            // LD A,n
+            0x7e => {
+                println!("LD A, (HL)");
+                self.registers.a = self.get_memory_location(self.registers.get_hl() as usize);
+            }
+
             0xfa => {
                 println!("LD A, nn");
                 let source = self.get_u16();
                 self.registers.a = self.get_memory_location(source as usize);
+            }
+
+            0x3e => {
+                let value = self.get_u8();
+                println!("LD A,  -> {}", value);
+                self.registers.a = value;
             }
 
             // SUB n
@@ -344,6 +367,14 @@ impl <'a> Cpu <'a>{
                 self.ime = true;
             }
 
+            // Calls
+            0xcd => {
+                let new_location = self.get_u16();
+                println!("Call nn (from {:#x} to {:#x})", self.registers.pc, new_location);
+                self.push_stack(self.registers.pc);
+                self.registers.set_pc(new_location);
+            }
+
             // MISC
 
             0xcb => {
@@ -442,9 +473,10 @@ fn main() {
             h: 0x01 },
         rom: buffer,
         ram: &mut vec![0; 8192],
+        high_ram: &mut vec![0; 0xfffe - 0xff80 + 1],
         ime: false,
         interrupt_enable: 0,
-        io_registers: &mut vec![0; 0xFF7F - 0xFF00]
+        io_registers: &mut vec![0; 0xFF7F - 0xFF00 + 1]
     };
 
     for _i in 0..30{
