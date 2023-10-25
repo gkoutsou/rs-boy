@@ -40,6 +40,14 @@ impl Registers {
         (self.h as u16) << 8 | self.l as u16
     }
 
+    fn get_bc(&self) -> u16 {
+        (self.b as u16) << 8 | self.c as u16
+    }
+
+    fn get_de(&self) -> u16 {
+        (self.d as u16) << 8 | self.e as u16
+    }
+
     fn step_pc(&mut self) -> usize{
         let current = self.pc;
         self.pc += 1;
@@ -63,11 +71,28 @@ impl Registers {
         }
     }
 
+    fn set_bit(f:u8, bit: u8, value: bool) -> u8 {
+        if value {
+            f | 1 << bit as u8
+        } else {
+            f & !(1 << bit as u8)
+        }
+    }
+
     fn xor(a:u8, b:u8) -> (u8, u8){
         let result = a ^ b;
         let mut f = Registers::set_flag(0x0, CpuFlag::Z, result == 0);
         f = Registers::set_flag(f, CpuFlag::N, false);
         f = Registers::set_flag(f, CpuFlag::H, false);
+        f = Registers::set_flag(f, CpuFlag::C, false);
+        (result, f)
+    }
+
+    fn and(a:u8, b:u8) -> (u8, u8){
+        let result = a & b;
+        let mut f = Registers::set_flag(0x0, CpuFlag::Z, result == 0);
+        f = Registers::set_flag(f, CpuFlag::N, false);
+        f = Registers::set_flag(f, CpuFlag::H, true);
         f = Registers::set_flag(f, CpuFlag::C, false);
         (result, f)
     }
@@ -126,6 +151,10 @@ impl <'a> Cpu <'a>{
         // todo this is here for now, just until I ensure I don't get any weird jumps
         if location==0xffff {
             self.interrupt_enable
+        } else if location == 0xff44 {
+            self.io_registers[location - 0xff00]
+        } else if location == 0xff40 {
+            self.io_registers[location - 0xff00]
         } else {
             panic!("Weird Location: {:#x}", location)
         }
@@ -196,8 +225,19 @@ impl <'a> Cpu <'a>{
             }
 
             // JR cc,n
+            0x20 => {
+                println!("JR NZ,n");
+                let steps = self.get_u8() as i16;
+                if !Registers::has_flag(self.registers.f, CpuFlag::Z) {
+                    let new_location = (self.registers.pc as i16 + steps) as u16;
+                    println!("Current location: {}, next: {}", self.registers.pc, new_location);
+                    self.registers.set_pc(new_location);
+                    panic!("untested jump");
+                }
+
+            }
             0x28 => {
-                println!("JR cc,n");
+                println!("JR Z,n");
                 let steps = self.get_u8() as i16;
                 println!("{:#b}", self.registers.f);
                 if Registers::has_flag(self.registers.f, CpuFlag::Z) {
@@ -249,7 +289,7 @@ impl <'a> Cpu <'a>{
             // LDH (n),A
             0xe0 => {
                 let steps = self.get_u8();
-                println!("LDH (n),A --> {}", steps);
+                println!("LDH (n),A --> {} value: {}", steps, self.registers.a);
                 self.write_memory_location(0xff00+steps as usize, self.registers.a);
             }
 
@@ -268,6 +308,21 @@ impl <'a> Cpu <'a>{
             }
 
             // LD A,n
+            0x7f => {}
+            0x78 => {println!("LD A, B");self.registers.a = self.registers.b}
+            0x79 => {println!("LD A, C");self.registers.a = self.registers.c}
+            0x7a => {println!("LD A, D");self.registers.a = self.registers.d}
+            0x7b => {println!("LD A, E");self.registers.a = self.registers.e}
+            0x7c => {println!("LD A, H");self.registers.a = self.registers.h}
+            0x7d => {println!("LD A, L");self.registers.a = self.registers.l}
+            0x0a => {
+                println!("LD A, (BC)");
+                self.registers.a = self.get_memory_location(self.registers.get_bc() as usize);
+            }
+            0x1a => {
+                println!("LD A, (DE)");
+                self.registers.a = self.get_memory_location(self.registers.get_de() as usize);
+            }
             0x7e => {
                 println!("LD A, (HL)");
                 self.registers.a = self.get_memory_location(self.registers.get_hl() as usize);
@@ -318,41 +373,30 @@ impl <'a> Cpu <'a>{
                 self.registers.f = f;
             }
 
+            // AND n
+            0xa7 => {println!("AND A");(self.registers.a, self.registers.f) = Registers::and(self.registers.a, self.registers.a);}
+            0xa0 => {println!("AND B");(self.registers.a, self.registers.f) = Registers::and(self.registers.a, self.registers.b);}
+            0xa1 => {println!("AND C");(self.registers.a, self.registers.f) = Registers::and(self.registers.a, self.registers.c);}
+            0xa2 => {println!("AND D");(self.registers.a, self.registers.f) = Registers::and(self.registers.a, self.registers.d);}
+            0xa3 => {println!("AND E");(self.registers.a, self.registers.f) = Registers::and(self.registers.a, self.registers.e);}
+            0xa4 => {println!("AND H");(self.registers.a, self.registers.f) = Registers::and(self.registers.a, self.registers.h);}
+            0xa5 => {println!("AND L");(self.registers.a, self.registers.f) = Registers::and(self.registers.a, self.registers.l);}
+            0xe6 => {
+                let n = self.get_u8();
+                println!("AND # -> {}", n);
+                (self.registers.a, self.registers.f) = Registers::and(self.registers.a, n);
+            }
+
+            
+
             // XOR n
-            0xaf => {
-                println!("XOR A");
-                (self.registers.a, self.registers.f) = Registers::xor(self.registers.a, self.registers.a);
-            }
-
-            0xa8 => {
-                println!("XOR B");
-                (self.registers.a, self.registers.f) = Registers::xor(self.registers.a, self.registers.b);
-            }
-
-            0xa9 => {
-                println!("XOR C");
-                (self.registers.a, self.registers.f) = Registers::xor(self.registers.a, self.registers.c);
-            }
-
-            0xaa => {
-                println!("XOR D");
-                (self.registers.a, self.registers.f) = Registers::xor(self.registers.a, self.registers.d);
-            }
-
-            0xab => {
-                println!("XOR E");
-                (self.registers.a, self.registers.f) = Registers::xor(self.registers.a, self.registers.e);
-            }
-
-            0xac => {
-                println!("XOR H");
-                (self.registers.a, self.registers.f) = Registers::xor(self.registers.a, self.registers.h);
-            }
-
-            0xad => {
-                println!("XOR L");
-                (self.registers.a, self.registers.f) = Registers::xor(self.registers.a, self.registers.l);
-            }
+            0xaf => {println!("XOR A");(self.registers.a, self.registers.f) = Registers::xor(self.registers.a, self.registers.a);}
+            0xa8 => {println!("XOR B");(self.registers.a, self.registers.f) = Registers::xor(self.registers.a, self.registers.b);}
+            0xa9 => {println!("XOR C");(self.registers.a, self.registers.f) = Registers::xor(self.registers.a, self.registers.c);}
+            0xaa => {println!("XOR D");(self.registers.a, self.registers.f) = Registers::xor(self.registers.a, self.registers.d);}
+            0xab => {println!("XOR E");(self.registers.a, self.registers.f) = Registers::xor(self.registers.a, self.registers.e);}
+            0xac => {println!("XOR H");(self.registers.a, self.registers.f) = Registers::xor(self.registers.a, self.registers.h);}
+            0xad => {println!("XOR L");(self.registers.a, self.registers.f) = Registers::xor(self.registers.a, self.registers.l);}
 
             // CP n
             0xfe => {
@@ -436,6 +480,16 @@ impl <'a> Cpu <'a>{
                 panic!("not implememented SRA properly")
 
             }
+
+            // RES
+            // 0 byte
+            0x87=> {self.registers.a = Registers::set_bit(self.registers.a, 0, false);}
+            0x80=> {self.registers.b = Registers::set_bit(self.registers.b, 0, false);}
+            0x81=> {self.registers.c = Registers::set_bit(self.registers.c, 0, false);}
+            0x82=> {self.registers.d = Registers::set_bit(self.registers.d, 0, false);}
+            0x83=> {self.registers.e = Registers::set_bit(self.registers.e, 0, false);}
+            0x84=> {self.registers.h = Registers::set_bit(self.registers.h, 0, false);}
+            0x85=> {self.registers.l = Registers::set_bit(self.registers.l, 0, false);}
 
             _ => panic!("Missing cb {:#x}", op),
         }
