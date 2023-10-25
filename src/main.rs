@@ -19,6 +19,11 @@ fn u16_to_u8s(input: u16) -> (u8, u8){
     (hs, ls)
 }
 
+
+fn u8s_to_u16(ls: u8, hs: u8) -> u16 {
+    ( hs as u16 ) << 8 | ls as u16
+}
+
 struct Registers {
     a: u8, f: u8,
     b: u8, c: u8,
@@ -142,6 +147,9 @@ impl <'a> Cpu <'a>{
     fn get_memory_location(&self, location: usize) -> u8 {
         if location<=0x7FFF {
             self.rom[location as usize]
+        } else if location <= 0xfffe && location >= 0xff80 {
+            println!("High RAM Read");
+            self.high_ram[location - 0xff80]
         } else {
             panic!("Location not in ROM: {:#x}", location)
         }
@@ -158,6 +166,14 @@ impl <'a> Cpu <'a>{
         } else {
             panic!("Weird Location: {:#x}", location)
         }
+    }
+
+    fn pop_stack(&mut self) -> u16 {
+        let ls = self.get_memory_location(self.registers.sp as usize);
+        self.registers.sp += 1;
+        let hs = self.get_memory_location(self.registers.sp as usize);
+        self.registers.sp += 1;
+        return u8s_to_u16(ls, hs);
     }
 
     fn push_stack(&mut self, value: u16){
@@ -435,6 +451,13 @@ impl <'a> Cpu <'a>{
                 self.registers.set_pc(new_location);
             }
 
+            // RET
+            0xc9 => {
+                let new_loc = self.pop_stack();
+                println!("RET to: {:#x}", new_loc);
+                self.registers.set_pc(new_loc);
+            }
+
             // MISC
 
             0xcb => {
@@ -549,7 +572,7 @@ fn main() {
         io_registers: &mut vec![0; 0xFF7F - 0xFF00 + 1]
     };
 
-    for _i in 0..40{
+    for _i in 0..50{
         cpu.step();
     }
     
