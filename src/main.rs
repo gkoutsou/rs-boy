@@ -94,6 +94,15 @@ impl Registers {
         }
     }
 
+    fn or(a:u8, b:u8) -> (u8, u8){
+        let result = a | b;
+        let mut f = Registers::set_flag(0x0, CpuFlag::Z, result == 0);
+        f = Registers::set_flag(f, CpuFlag::N, false);
+        f = Registers::set_flag(f, CpuFlag::H, false);
+        f = Registers::set_flag(f, CpuFlag::C, false);
+        (result, f)
+    }
+
     fn xor(a:u8, b:u8) -> (u8, u8){
         let result = a ^ b;
         let mut f = Registers::set_flag(0x0, CpuFlag::Z, result == 0);
@@ -480,7 +489,14 @@ impl <'a> Cpu <'a>{
                 (self.registers.a, self.registers.f) = Registers::and(self.registers.a, n);
             }
 
-            
+            // OR n
+            0xb7 => {println!("OR A");(self.registers.a, self.registers.f) = Registers::xor(self.registers.a, self.registers.a);}
+            0xb0 => {println!("OR B");(self.registers.a, self.registers.f) = Registers::xor(self.registers.a, self.registers.b);}
+            0xb1 => {println!("OR C");(self.registers.a, self.registers.f) = Registers::xor(self.registers.a, self.registers.c);}
+            0xb2 => {println!("OR D");(self.registers.a, self.registers.f) = Registers::xor(self.registers.a, self.registers.d);}
+            0xb3 => {println!("OR E");(self.registers.a, self.registers.f) = Registers::xor(self.registers.a, self.registers.e);}
+            0xb4 => {println!("OR H");(self.registers.a, self.registers.f) = Registers::xor(self.registers.a, self.registers.h);}
+            0xb5 => {println!("OR L");(self.registers.a, self.registers.f) = Registers::xor(self.registers.a, self.registers.l);}
 
             // XOR n
             0xaf => {println!("XOR A");(self.registers.a, self.registers.f) = Registers::xor(self.registers.a, self.registers.a);}
