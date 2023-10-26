@@ -45,8 +45,18 @@ impl Registers {
         (self.h as u16) << 8 | self.l as u16
     }
 
+    fn set_bc(&mut self, v: u16) {
+        self.b = (v >> 8) as u8;
+        self.c = (v & 0x00FF) as u8;
+    }
+
     fn get_bc(&self) -> u16 {
         (self.b as u16) << 8 | self.c as u16
+    }
+
+    fn set_de(&mut self, v: u16) {
+        self.d = (v >> 8) as u8;
+        self.e = (v & 0x00FF) as u8;
     }
 
     fn get_de(&self) -> u16 {
@@ -265,10 +275,11 @@ impl <'a> Cpu <'a>{
 
             }
 
-            0x61 => {
-                println!("LD H,C");
-                self.registers.h = self.registers.c;
-            }
+            // LD n,nn
+            0x01 => {let v = self.get_u16(); self.registers.set_bc(v)}
+            0x11 => {let v = self.get_u16(); self.registers.set_de(v)}
+            0x21 => {let v = self.get_u16(); self.registers.set_hl(v)}
+            0x31 => {let v = self.get_u16(); self.registers.sp = v}
 
             // LD x, A
             0x47 => {
@@ -331,18 +342,72 @@ impl <'a> Cpu <'a>{
             0x7b => {println!("LD A, E");self.registers.a = self.registers.e}
             0x7c => {println!("LD A, H");self.registers.a = self.registers.h}
             0x7d => {println!("LD A, L");self.registers.a = self.registers.l}
-            0x0a => {
-                println!("LD A, (BC)");
-                self.registers.a = self.get_memory_location(self.registers.get_bc() as usize);
-            }
-            0x1a => {
-                println!("LD A, (DE)");
-                self.registers.a = self.get_memory_location(self.registers.get_de() as usize);
-            }
-            0x7e => {
-                println!("LD A, (HL)");
-                self.registers.a = self.get_memory_location(self.registers.get_hl() as usize);
-            }
+            0x0a => {println!("LD A, (BC)");self.registers.a = self.get_memory_location(self.registers.get_bc() as usize);}
+            0x1a => {println!("LD A, (DE)");self.registers.a = self.get_memory_location(self.registers.get_de() as usize);}
+            0x7e => {println!("LD A, (HL)");self.registers.a = self.get_memory_location(self.registers.get_hl() as usize);}
+
+            // B
+            0x40 => {}
+            0x41 => {println!("LD B, C");self.registers.b = self.registers.c}
+            0x42 => {println!("LD B, D");self.registers.b = self.registers.d}
+            0x43 => {println!("LD B, E");self.registers.b = self.registers.e}
+            0x44 => {println!("LD B, H");self.registers.b = self.registers.h}
+            0x45 => {println!("LD B, L");self.registers.b = self.registers.l}
+            0x46 => {println!("LD B, (HL)");self.registers.b = self.get_memory_location(self.registers.get_hl() as usize);}
+
+            // C
+            0x48 => {println!("LD C, B");self.registers.c = self.registers.b}
+            0x49 => {}
+            0x4a => {println!("LD C, D");self.registers.c = self.registers.d}
+            0x4b => {println!("LD C, E");self.registers.c = self.registers.e}
+            0x4c => {println!("LD C, H");self.registers.c = self.registers.h}
+            0x4d => {println!("LD C, L");self.registers.c = self.registers.l}
+            0x4e => {println!("LD C, (HL)");self.registers.c = self.get_memory_location(self.registers.get_hl() as usize);}
+
+            // D
+            0x50 => {println!("LD D, B");self.registers.d = self.registers.b}
+            0x51 => {println!("LD D, C");self.registers.d = self.registers.c}
+            0x52 => {}
+            0x53 => {println!("LD D, E");self.registers.d = self.registers.e}
+            0x54 => {println!("LD D, H");self.registers.d = self.registers.h}
+            0x55 => {println!("LD D, L");self.registers.d = self.registers.l}
+            0x56 => {println!("LD D, (HL)");self.registers.d = self.get_memory_location(self.registers.get_hl() as usize);}
+
+            // E
+            0x58 => {println!("LD E, B");self.registers.e = self.registers.b}
+            0x59 => {println!("LD E, C");self.registers.e = self.registers.c}
+            0x5a => {println!("LD E, D");self.registers.e = self.registers.d}
+            0x5b => {}
+            0x5c => {println!("LD E, H");self.registers.e = self.registers.h}
+            0x5d => {println!("LD E, L");self.registers.e = self.registers.l}
+            0x5e => {println!("LD E, (HL)");self.registers.e = self.get_memory_location(self.registers.get_hl() as usize);}
+
+            // H
+            0x60 => {println!("LD H, B");self.registers.h = self.registers.b}
+            0x61 => {println!("LD H, C");self.registers.h = self.registers.c}
+            0x62 => {println!("LD H, D");self.registers.h = self.registers.d}
+            0x63 => {println!("LD H, E");self.registers.h = self.registers.e}
+            0x64 => {}
+            0x65 => {println!("LD H, L");self.registers.h = self.registers.l}
+            0x66 => {println!("LD H, (HL)");self.registers.h = self.get_memory_location(self.registers.get_hl() as usize);}
+
+            // L
+            0x68 => {println!("LD L, B");self.registers.l = self.registers.b}
+            0x69 => {println!("LD L, C");self.registers.l = self.registers.c}
+            0x6A => {println!("LD L, D");self.registers.l = self.registers.d}
+            0x6B => {println!("LD L, E");self.registers.l = self.registers.e}
+            0x6C => {println!("LD L, H");self.registers.l = self.registers.h}
+            0x6D => {}
+            0x6E => {println!("LD L, (HL)");self.registers.l = self.get_memory_location(self.registers.get_hl() as usize);}
+
+            // (HL)
+            0x70 => {println!("LD (HL), B");self.write_memory_location(self.registers.get_hl() as usize, self.registers.b);}
+            0x71 => {println!("LD (HL), C");self.write_memory_location(self.registers.get_hl() as usize, self.registers.c);}
+            0x72 => {println!("LD (HL), D");self.write_memory_location(self.registers.get_hl() as usize, self.registers.d);}
+            0x73 => {println!("LD (HL), E");self.write_memory_location(self.registers.get_hl() as usize, self.registers.e);}
+            0x74 => {println!("LD (HL), H");self.write_memory_location(self.registers.get_hl() as usize, self.registers.h);}
+            0x75 => {println!("LD (HL), L");self.write_memory_location(self.registers.get_hl() as usize, self.registers.l);}
+            0x36 => {println!("LD (HL), n");let v = self.get_u8(); self.write_memory_location(self.registers.get_hl() as usize, v);}
 
             0xfa => {
                 println!("LD A, nn");
@@ -377,6 +442,18 @@ impl <'a> Cpu <'a>{
                 f = Registers::set_flag(f, CpuFlag::N, true);
                 self.registers.f = f;
             }
+
+            // INC nn
+            0x03=>{self.registers.set_bc(self.registers.get_bc()+1);}
+            0x13=>{self.registers.set_de(self.registers.get_de()+1);}
+            0x23=>{self.registers.set_hl(self.registers.get_hl()+1);}
+            0x33=>{self.registers.sp += 1;}
+
+            // DEC nn
+            0x0B=>{self.registers.set_bc(self.registers.get_bc()-1);}
+            0x1B=>{self.registers.set_de(self.registers.get_de()-1);}
+            0x2B=>{self.registers.set_hl(self.registers.get_hl()-1);}
+            0x3B=>{self.registers.sp -= 1;}
 
             // DEC
             0x25 => {
