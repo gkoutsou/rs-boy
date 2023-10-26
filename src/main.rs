@@ -40,8 +40,8 @@ impl Registers {
     }
 
     fn get_hl(&self) -> u16 {
-        println!("H={:#x}, L={:#x}", self.h, self.l);
-        println!("HL={:#x}", (self.h as u16) << 8 | self.l as u16);
+        // println!("H={:#x}, L={:#x}", self.h, self.l);
+        // println!("HL={:#x}", (self.h as u16) << 8 | self.l as u16);
         (self.h as u16) << 8 | self.l as u16
     }
 
@@ -94,6 +94,7 @@ impl Registers {
         }
     }
 
+    // todo move these to own module
     fn or(a:u8, b:u8) -> (u8, u8){
         let result = a | b;
         let mut f = Registers::set_flag(0x0, CpuFlag::Z, result == 0);
@@ -120,6 +121,23 @@ impl Registers {
         f = Registers::set_flag(f, CpuFlag::C, false);
         (result, f)
     }
+
+    fn compare(a:u8, b:u8) -> u8 {
+        let mut f = Registers::set_flag(0, CpuFlag::C, a < b);
+        f = Registers::set_flag(f, CpuFlag::H, (b & 0x0f) > (a & 0x0f));
+        f = Registers::set_flag(f, CpuFlag::Z, a == 0);
+        f = Registers::set_flag(f, CpuFlag::N, true);
+        f
+    }
+
+    fn inc(&mut self, a:u8) -> u8{
+        let inc = a + 1;
+        self.f = Registers::set_flag(self.f, CpuFlag::H, (a & 0x0F) + 1 > 0x0F);
+        self.f = Registers::set_flag(self.f, CpuFlag::Z, inc == 0);
+        self.f = Registers::set_flag(self.f, CpuFlag::N, false);
+        inc
+    }
+
 }
 
 struct Cpu <'a> {
@@ -227,10 +245,8 @@ impl <'a> Cpu <'a>{
 
     fn get_u16(&mut self) -> u16 {
         let location = self.registers.step_pc();
-        println!("Reading location {}", location);
         let v1 = self.rom[location] as u16;
         let location = self.registers.step_pc();
-        println!("Reading location 2 {}", location);
         let v2 = self.rom[location] as u16;
         v2 << 8 | v1
     }
@@ -242,6 +258,7 @@ impl <'a> Cpu <'a>{
     
     fn find_operator(&mut self, location: usize) {
         let op = self.rom[location];
+        println!("operator: {:#x}", op);
         match op {
             0x0 => println!("NOP"),
 
@@ -265,9 +282,9 @@ impl <'a> Cpu <'a>{
                 let steps = self.get_u8() as i16;
                 if !Registers::has_flag(self.registers.f, CpuFlag::Z) {
                     let new_location = (self.registers.pc as i16 + steps) as u16;
-                    println!("Current location: {}, next: {}", self.registers.pc, new_location);
+                    println!("Current location: {:#x}, next: {:#x}", self.registers.pc, new_location);
                     self.registers.set_pc(new_location);
-                    panic!("untested jump");
+                    // panic!("untested jump");
                 }
 
             }
@@ -281,13 +298,33 @@ impl <'a> Cpu <'a>{
                     self.registers.set_pc(new_location);
                     panic!("untested jump");
                 }
+            }
+            0x30 => {
+                println!("JR NC,n");
+                let steps = self.get_u8() as i16;
+                if !Registers::has_flag(self.registers.f, CpuFlag::C) {
+                    let new_location = (self.registers.pc as i16 + steps) as u16;
+                    println!("Current location: {:#x}, next: {:#x}", self.registers.pc, new_location);
+                    self.registers.set_pc(new_location);
+                    panic!("untested jump NC");
+                }
+            }
 
+            0x38 => {
+                println!("JR C,n");
+                let steps = self.get_u8() as i16;
+                if Registers::has_flag(self.registers.f, CpuFlag::C) {
+                    let new_location = (self.registers.pc as i16 + steps) as u16;
+                    println!("Current location: {:#x}, next: {:#x}", self.registers.pc, new_location);
+                    self.registers.set_pc(new_location);
+                    panic!("untested jump C");
+                }
             }
 
             // LD n,nn
             0x01 => {let v = self.get_u16(); self.registers.set_bc(v)}
             0x11 => {let v = self.get_u16(); self.registers.set_de(v)}
-            0x21 => {let v = self.get_u16(); self.registers.set_hl(v)}
+            0x21 => {println!("LD n,HL"); let v = self.get_u16(); self.registers.set_hl(v)}
             0x31 => {let v = self.get_u16(); self.registers.sp = v}
 
             // LD x, A
@@ -455,14 +492,30 @@ impl <'a> Cpu <'a>{
             // INC nn
             0x03=>{self.registers.set_bc(self.registers.get_bc()+1);}
             0x13=>{self.registers.set_de(self.registers.get_de()+1);}
-            0x23=>{self.registers.set_hl(self.registers.get_hl()+1);}
+            0x23=>{println!("INC HL"); self.registers.set_hl(self.registers.get_hl()+1);}
             0x33=>{self.registers.sp += 1;}
 
             // DEC nn
             0x0B=>{self.registers.set_bc(self.registers.get_bc()-1);}
             0x1B=>{self.registers.set_de(self.registers.get_de()-1);}
-            0x2B=>{self.registers.set_hl(self.registers.get_hl()-1);}
+            0x2B=>{println!("DEC HL"); self.registers.set_hl(self.registers.get_hl()-1);}
             0x3B=>{self.registers.sp -= 1;}
+
+            // INC n
+            0x3c => {println!("INC A"); self.registers.a = self.registers.inc(self.registers.a);}
+            0x04 => {println!("INC B"); self.registers.b = self.registers.inc(self.registers.b);}
+            0x0c => {println!("INC C"); self.registers.c = self.registers.inc(self.registers.c);}
+            0x14 => {println!("INC D"); self.registers.d = self.registers.inc(self.registers.d);}
+            0x1c => {println!("INC E"); self.registers.e = self.registers.inc(self.registers.e);}
+            0x24 => {println!("INC H"); self.registers.h = self.registers.inc(self.registers.h);}
+            0x2c => {println!("INC L"); self.registers.l = self.registers.inc(self.registers.l);}
+            0x34 => {
+                println!("INC (HL)");
+                let location = self.registers.get_hl() as usize;
+                let value = self.get_memory_location(location);
+                let new_value = self.registers.inc(value);
+                self.write_memory_location(location, new_value);
+            }
 
             // DEC
             0x25 => {
@@ -490,13 +543,13 @@ impl <'a> Cpu <'a>{
             }
 
             // OR n
-            0xb7 => {println!("OR A");(self.registers.a, self.registers.f) = Registers::xor(self.registers.a, self.registers.a);}
-            0xb0 => {println!("OR B");(self.registers.a, self.registers.f) = Registers::xor(self.registers.a, self.registers.b);}
-            0xb1 => {println!("OR C");(self.registers.a, self.registers.f) = Registers::xor(self.registers.a, self.registers.c);}
-            0xb2 => {println!("OR D");(self.registers.a, self.registers.f) = Registers::xor(self.registers.a, self.registers.d);}
-            0xb3 => {println!("OR E");(self.registers.a, self.registers.f) = Registers::xor(self.registers.a, self.registers.e);}
-            0xb4 => {println!("OR H");(self.registers.a, self.registers.f) = Registers::xor(self.registers.a, self.registers.h);}
-            0xb5 => {println!("OR L");(self.registers.a, self.registers.f) = Registers::xor(self.registers.a, self.registers.l);}
+            0xb7 => {println!("OR A");(self.registers.a, self.registers.f) = Registers::or(self.registers.a, self.registers.a);}
+            0xb0 => {println!("OR B");(self.registers.a, self.registers.f) = Registers::or(self.registers.a, self.registers.b);}
+            0xb1 => {println!("OR C");(self.registers.a, self.registers.f) = Registers::or(self.registers.a, self.registers.c);}
+            0xb2 => {println!("OR D");(self.registers.a, self.registers.f) = Registers::or(self.registers.a, self.registers.d);}
+            0xb3 => {println!("OR E");(self.registers.a, self.registers.f) = Registers::or(self.registers.a, self.registers.e);}
+            0xb4 => {println!("OR H");(self.registers.a, self.registers.f) = Registers::or(self.registers.a, self.registers.h);}
+            0xb5 => {println!("OR L");(self.registers.a, self.registers.f) = Registers::or(self.registers.a, self.registers.l);}
 
             // XOR n
             0xaf => {println!("XOR A");(self.registers.a, self.registers.f) = Registers::xor(self.registers.a, self.registers.a);}
@@ -508,15 +561,17 @@ impl <'a> Cpu <'a>{
             0xad => {println!("XOR L");(self.registers.a, self.registers.f) = Registers::xor(self.registers.a, self.registers.l);}
 
             // CP n
-            0xfe => {
-                let n = self.get_u8();
-                println!("CP # -> {}", n);
-                let mut f = Registers::set_flag(self.registers.f, CpuFlag::C, self.registers.a < n);
-                f = Registers::set_flag(f, CpuFlag::H, (n & 0x0f) > (self.registers.a & 0x0f));
-                f = Registers::set_flag(f, CpuFlag::Z, self.registers.a == 0);
-                f = Registers::set_flag(f, CpuFlag::N, true);
-                self.registers.f = f;
-            }
+            0xbf => {println!("CP A");self.registers.f = Registers::compare(self.registers.a, self.registers.a);}
+            0xb8 => {println!("CP B");self.registers.f = Registers::compare(self.registers.a, self.registers.b);}
+            0xb9 => {println!("CP C");self.registers.f = Registers::compare(self.registers.a, self.registers.c);}
+            0xba => {println!("CP D");self.registers.f = Registers::compare(self.registers.a, self.registers.d);}
+            0xbb => {println!("CP E");self.registers.f = Registers::compare(self.registers.a, self.registers.e);}
+            0xbc => {println!("CP H");self.registers.f = Registers::compare(self.registers.a, self.registers.h);}
+            0xbd => {println!("CP L");self.registers.f = Registers::compare(self.registers.a, self.registers.l);}
+
+            0xbe => {println!("CP (HL)");self.registers.f = Registers::compare(self.registers.a, self.get_memory_location(self.registers.get_hl() as usize));}
+
+            0xfe => {println!("CP #");let v = self.get_u8();self.registers.f = Registers::compare(self.registers.a, v);}
 
             // Interrupts
 
@@ -665,7 +720,7 @@ fn main() {
         io_registers: &mut vec![0; 0xFF7F - 0xFF00 + 1]
     };
 
-    for _i in 0..50{
+    for _i in 0..60{
         cpu.step();
     }
     
