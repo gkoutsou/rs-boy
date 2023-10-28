@@ -145,6 +145,7 @@ struct Cpu <'a> {
     rom: Vec<u8>,
     ram: &'a mut Vec<u8>,
     high_ram: &'a mut Vec<u8>,
+    work_ram: &'a mut Vec<u8>,
 
     /// Interrupt Master Enable
     ime: bool,
@@ -187,6 +188,9 @@ impl <'a> Cpu <'a>{
         } else if location <= 0xfffe && location >= 0xff80 {
             println!("High RAM Read");
             self.high_ram[location - 0xff80]
+        } else if location <= 0xdfff && location >= 0xc000 {
+            println!("Work RAM Read");
+            self.work_ram[location - 0xc000]
         } else {
             panic!("Location not in ROM: {:#x}", location)
         }
@@ -278,8 +282,9 @@ impl <'a> Cpu <'a>{
 
             // JR cc,n
             0x20 => {
-                println!("JR NZ,n");
                 let steps = self.get_u8() as i16;
+                println!("JR NZ,n --> {} - {:#x}", steps, self.registers.pc as i16 + steps);
+                println!("############");
                 if !Registers::has_flag(self.registers.f, CpuFlag::Z) {
                     let new_location = (self.registers.pc as i16 + steps) as u16;
                     println!("Current location: {:#x}, next: {:#x}", self.registers.pc, new_location);
@@ -296,7 +301,6 @@ impl <'a> Cpu <'a>{
                     let new_location = (self.registers.pc as i16 + steps) as u16;
                     println!("Current location: {}, next: {}", self.registers.pc, new_location);
                     self.registers.set_pc(new_location);
-                    panic!("untested jump");
                 }
             }
             0x30 => {
@@ -322,36 +326,10 @@ impl <'a> Cpu <'a>{
             }
 
             // LD n,nn
-            0x01 => {let v = self.get_u16(); self.registers.set_bc(v)}
-            0x11 => {let v = self.get_u16(); self.registers.set_de(v)}
+            0x01 => {println!("LD n,BC"); let v = self.get_u16(); self.registers.set_bc(v)}
+            0x11 => {println!("LD n,DE"); let v = self.get_u16(); self.registers.set_de(v)}
             0x21 => {println!("LD n,HL"); let v = self.get_u16(); self.registers.set_hl(v)}
-            0x31 => {let v = self.get_u16(); self.registers.sp = v}
-
-            // LD x, A
-            0x47 => {
-                println!("LD B,A");
-                self.registers.b = self.registers.a;
-            }
-            0x4f => {
-                println!("LD C,A");
-                self.registers.c = self.registers.a;
-            }
-            0x57 => {
-                println!("LD D,A");
-                self.registers.d = self.registers.a;
-            }
-            0x5f => {
-                println!("LD E,A");
-                self.registers.e = self.registers.a;
-            }
-            0x67 => {
-                println!("LD H,A");
-                self.registers.h = self.registers.a;
-            }
-            0x6f => {
-                println!("LD L,A");
-                self.registers.l = self.registers.a;
-            }
+            0x31 => {println!("LD n,SP"); let v = self.get_u16(); self.registers.sp = v}
 
             0xea => {
                 println!("LD (nn),A");
@@ -391,8 +369,10 @@ impl <'a> Cpu <'a>{
             0x0a => {println!("LD A, (BC)");self.registers.a = self.get_memory_location(self.registers.get_bc() as usize);}
             0x1a => {println!("LD A, (DE)");self.registers.a = self.get_memory_location(self.registers.get_de() as usize);}
             0x7e => {println!("LD A, (HL)");self.registers.a = self.get_memory_location(self.registers.get_hl() as usize);}
+            0x3e => {let value = self.get_u8();println!("LD A, n -> {}", value);self.registers.a = value;}
 
             // B
+            0x47 => {println!("LD B, A");self.registers.b = self.registers.a;}
             0x40 => {}
             0x41 => {println!("LD B, C");self.registers.b = self.registers.c}
             0x42 => {println!("LD B, D");self.registers.b = self.registers.d}
@@ -400,8 +380,10 @@ impl <'a> Cpu <'a>{
             0x44 => {println!("LD B, H");self.registers.b = self.registers.h}
             0x45 => {println!("LD B, L");self.registers.b = self.registers.l}
             0x46 => {println!("LD B, (HL)");self.registers.b = self.get_memory_location(self.registers.get_hl() as usize);}
+            0x06 => {let value = self.get_u8();println!("LD B, n -> {}", value);self.registers.b = value;}
 
             // C
+            0x4f => {println!("LD C, A");self.registers.c = self.registers.a;}
             0x48 => {println!("LD C, B");self.registers.c = self.registers.b}
             0x49 => {}
             0x4a => {println!("LD C, D");self.registers.c = self.registers.d}
@@ -409,8 +391,10 @@ impl <'a> Cpu <'a>{
             0x4c => {println!("LD C, H");self.registers.c = self.registers.h}
             0x4d => {println!("LD C, L");self.registers.c = self.registers.l}
             0x4e => {println!("LD C, (HL)");self.registers.c = self.get_memory_location(self.registers.get_hl() as usize);}
+            0x0e => {let value = self.get_u8();println!("LD C, n -> {}", value);self.registers.c = value;}
 
             // D
+            0x57 => {println!("LD D, A");self.registers.d = self.registers.a;}
             0x50 => {println!("LD D, B");self.registers.d = self.registers.b}
             0x51 => {println!("LD D, C");self.registers.d = self.registers.c}
             0x52 => {}
@@ -418,8 +402,10 @@ impl <'a> Cpu <'a>{
             0x54 => {println!("LD D, H");self.registers.d = self.registers.h}
             0x55 => {println!("LD D, L");self.registers.d = self.registers.l}
             0x56 => {println!("LD D, (HL)");self.registers.d = self.get_memory_location(self.registers.get_hl() as usize);}
+            0x16 => {let value = self.get_u8();println!("LD D, n -> {}", value);self.registers.d = value;}
 
             // E
+            0x5f => {println!("LD E, A");self.registers.e = self.registers.a;}
             0x58 => {println!("LD E, B");self.registers.e = self.registers.b}
             0x59 => {println!("LD E, C");self.registers.e = self.registers.c}
             0x5a => {println!("LD E, D");self.registers.e = self.registers.d}
@@ -427,8 +413,10 @@ impl <'a> Cpu <'a>{
             0x5c => {println!("LD E, H");self.registers.e = self.registers.h}
             0x5d => {println!("LD E, L");self.registers.e = self.registers.l}
             0x5e => {println!("LD E, (HL)");self.registers.e = self.get_memory_location(self.registers.get_hl() as usize);}
+            0x1e => {let value = self.get_u8();println!("LD E, n -> {}", value);self.registers.e = value;}
 
             // H
+            0x67 => {println!("LD H, A");self.registers.h = self.registers.a;}
             0x60 => {println!("LD H, B");self.registers.h = self.registers.b}
             0x61 => {println!("LD H, C");self.registers.h = self.registers.c}
             0x62 => {println!("LD H, D");self.registers.h = self.registers.d}
@@ -436,8 +424,10 @@ impl <'a> Cpu <'a>{
             0x64 => {}
             0x65 => {println!("LD H, L");self.registers.h = self.registers.l}
             0x66 => {println!("LD H, (HL)");self.registers.h = self.get_memory_location(self.registers.get_hl() as usize);}
+            0x26 => {let value = self.get_u8();println!("LD H, n -> {}", value);self.registers.h = value;}
 
             // L
+            0x6f => {println!("LD L, A");self.registers.l = self.registers.a;}
             0x68 => {println!("LD L, B");self.registers.l = self.registers.b}
             0x69 => {println!("LD L, C");self.registers.l = self.registers.c}
             0x6A => {println!("LD L, D");self.registers.l = self.registers.d}
@@ -445,6 +435,7 @@ impl <'a> Cpu <'a>{
             0x6C => {println!("LD L, H");self.registers.l = self.registers.h}
             0x6D => {}
             0x6E => {println!("LD L, (HL)");self.registers.l = self.get_memory_location(self.registers.get_hl() as usize);}
+            0x2e => {let value = self.get_u8();println!("LD L, n -> {}", value);self.registers.l = value;}
 
             // (HL)
             0x70 => {println!("LD (HL), B");self.write_memory_location(self.registers.get_hl() as usize, self.registers.b);}
@@ -459,12 +450,6 @@ impl <'a> Cpu <'a>{
                 println!("LD A, nn");
                 let source = self.get_u16();
                 self.registers.a = self.get_memory_location(source as usize);
-            }
-
-            0x3e => {
-                let value = self.get_u8();
-                println!("LD A,  -> {}", value);
-                self.registers.a = value;
             }
 
             // SUB n
@@ -715,12 +700,13 @@ fn main() {
         rom: buffer,
         ram: &mut vec![0; 8192],
         high_ram: &mut vec![0; 0xfffe - 0xff80 + 1],
+        work_ram: &mut vec![0; 0xdfff - 0xc000 + 1], // 4+4 but half could be rotatable..
         ime: false,
         interrupt_enable: 0,
         io_registers: &mut vec![0; 0xFF7F - 0xFF00 + 1]
     };
 
-    for _i in 0..60{
+    for _i in 0..70{
         cpu.step();
     }
     
