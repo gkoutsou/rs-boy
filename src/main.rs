@@ -138,6 +138,14 @@ impl Registers {
         inc
     }
 
+    fn dec(&mut self, a:u8) -> u8 {
+        self.f = Registers::set_flag(self.f, CpuFlag::H, (a & 0x0f) == 0 );
+        let dec = a.wrapping_sub(1);
+        self.f = Registers::set_flag(self.f, CpuFlag::Z, dec == 0);
+        self.f = Registers::set_flag(self.f, CpuFlag::N, true);
+        dec
+    }
+
 }
 
 struct Cpu <'a> {
@@ -534,15 +542,13 @@ impl <'a> Cpu <'a>{
             }
 
             // DEC
-            0x25 => {
-                println!("DEC H");
-                let mut f = self.registers.f;
-                f = Registers::set_flag(f, CpuFlag::H, (self.registers.a & 0x0f) == 0 );
-                self.registers.a = self.registers.a.wrapping_sub(1);
-                f = Registers::set_flag(f, CpuFlag::Z, self.registers.a == 0);
-                f = Registers::set_flag(f, CpuFlag::N, true);
-                self.registers.f = f;
-            }
+            0x3d => {println!("DEC A");self.registers.a = self.registers.dec(self.registers.a);}
+            0x05 => {println!("DEC B");self.registers.b = self.registers.dec(self.registers.b);}
+            0x0d => {println!("DEC C");self.registers.c = self.registers.dec(self.registers.c);}
+            0x15 => {println!("DEC D");self.registers.d = self.registers.dec(self.registers.d);}
+            0x1d => {println!("DEC E");self.registers.e = self.registers.dec(self.registers.e);}
+            0x25 => {println!("DEC H");self.registers.h = self.registers.dec(self.registers.h);}
+            0x2d => {println!("DEC L");self.registers.l = self.registers.dec(self.registers.l);}
 
             // AND n
             0xa7 => {println!("AND A");(self.registers.a, self.registers.f) = Registers::and(self.registers.a, self.registers.a);}
