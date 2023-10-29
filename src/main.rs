@@ -157,7 +157,7 @@ struct Cpu <'a> {
 
 fn load_rom() -> io::Result<Vec<u8>> {
 
-    let mut f = File::open("PokemonRed.gb")?;
+    let mut f = File::open("Adventure Island II - Aliens in Paradise (USA, Europe).gb")?;
     let mut buffer = Vec::new();
 
     // read the whole file
@@ -191,12 +191,25 @@ impl <'a> Cpu <'a>{
         } else if location <= 0xdfff && location >= 0xc000 {
             println!("Work RAM Read");
             self.work_ram[location - 0xc000]
+        } else if location <= 0xff77 && location >= 0xff00 {
+            println!("I/O Registers");
+            self.io_registers[location - 0xff00]
+        } else if location == 0xffff {
+            println!("IME");
+            self.interrupt_enable
         } else {
             panic!("Location not in ROM: {:#x}", location)
         }
     }
 
-    fn get_ffxx_memory_location(&self, location: usize) -> u8 {
+    fn write_ffxx_memory_location(&mut self, steps: u8, value: u8) {
+        let location = 0xff00 + steps as usize;
+        // self.io_registers[steps as usize] = value;
+        self.write_memory_location(location, value);
+    }
+
+    fn get_ffxx_memory_location(&self, steps: usize) -> u8 {
+        let location = 0xff00 + steps as usize;
         // todo this is here for now, just until I ensure I don't get any weird jumps
         if location==0xffff {
             self.interrupt_enable
@@ -348,13 +361,19 @@ impl <'a> Cpu <'a>{
             0xf0 => {
                 let steps = self.get_u8();
                 println!("LDH A,(n) --> {}", steps);
-                self.registers.a = self.get_ffxx_memory_location(0xff00 + steps as usize);
+                self.registers.a = self.get_ffxx_memory_location(steps as usize);
             }
 
             // LDI (HL), A
             0x22 => {
                 println!("LDI (HL), A");
                 self.write_memory_location(self.registers.get_hl() as usize, self.registers.a);
+                self.registers.set_hl(self.registers.get_hl()+1)
+            }
+            // LDI A, (HL)
+            0x2a => {
+                println!("LDI A, (HL)");
+                self.registers.a = self.get_memory_location(self.registers.get_hl() as usize);
                 self.registers.set_hl(self.registers.get_hl()+1)
             }
 
@@ -452,6 +471,18 @@ impl <'a> Cpu <'a>{
                 self.registers.a = self.get_memory_location(source as usize);
             }
 
+            // LD A, (C)
+            0xf2 => {
+                println!("LD A, (C)");
+                self.registers.a = self.get_ffxx_memory_location(self.registers.c as usize);
+            }
+
+            // LD (C), A
+            0xe2 => {
+                println!("LD (C), A");
+                self.write_ffxx_memory_location(self.registers.c, self.registers.a);
+            }
+
             // SUB n
             0x90 => {
                 println!("SUB B");
@@ -535,6 +566,8 @@ impl <'a> Cpu <'a>{
             0xb3 => {println!("OR E");(self.registers.a, self.registers.f) = Registers::or(self.registers.a, self.registers.e);}
             0xb4 => {println!("OR H");(self.registers.a, self.registers.f) = Registers::or(self.registers.a, self.registers.h);}
             0xb5 => {println!("OR L");(self.registers.a, self.registers.f) = Registers::or(self.registers.a, self.registers.l);}
+
+            0xf6 => {println!("OR #");(self.registers.a, self.registers.f) = Registers::or(self.registers.a, self.get_u8());}
 
             // XOR n
             0xaf => {println!("XOR A");(self.registers.a, self.registers.f) = Registers::xor(self.registers.a, self.registers.a);}
@@ -670,12 +703,12 @@ fn main() {
 
     println!("Title = {}", title);
 
-    println!("Type = {}", buffer[0x143]);
-    println!("GB/SGB Indicator = {}", buffer[0x146]);
-    println!("Cartridge type = {}", buffer[0x147]);
+    println!("Type = {:#x}", buffer[0x143]);
+    println!("GB/SGB Indicator = {:#x}", buffer[0x146]);
+    println!("Cartridge type = {:#x}", buffer[0x147]);
     let rom_size = buffer[0x148];
-    println!("ROM size = {}", rom_size);
-    println!("RAM size = {}", buffer[0x149]);
+    println!("ROM size = {:#x}", rom_size);
+    println!("RAM size = {:#x}", buffer[0x149]);
 
     let expected_rom_size = 32 * (2u32.pow(rom_size as u32) )* 1024u32;
 
