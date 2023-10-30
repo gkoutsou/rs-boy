@@ -51,6 +51,11 @@ impl Registers {
         (self.h as u16) << 8 | self.l as u16
     }
 
+    fn set_af(&mut self, v: u16) {
+        self.a = (v >> 8) as u8;
+        self.f = (v & 0x00FF) as u8;
+    }
+
     fn set_bc(&mut self, v: u16) {
         self.b = (v >> 8) as u8;
         self.c = (v & 0x00FF) as u8;
@@ -1110,6 +1115,28 @@ impl<'a> Cpu<'a> {
                 let new_loc = self.pop_stack();
                 println!("RET to: {:#x}", new_loc);
                 self.registers.set_pc(new_loc);
+            }
+            // POP
+            0xf1 => {
+                println!("POP AF");
+                let v = self.pop_stack();
+                self.registers.set_af(v);
+            }
+
+            0xc1 => {
+                println!("POP BC");
+                let v = self.pop_stack();
+                self.registers.set_bc(v);
+            }
+            0xd1 => {
+                println!("POP DE");
+                let v = self.pop_stack();
+                self.registers.set_de(v);
+            }
+            0xe1 => {
+                println!("POP HL");
+                let v = self.pop_stack();
+                self.registers.set_hl(v);
             }
 
             // MISC
