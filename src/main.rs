@@ -157,7 +157,7 @@ struct Cpu<'a> {
     registers: &'a mut Registers,
     rom: Vec<u8>,
     rom_bank: u8,
-    ram: &'a mut Vec<u8>,
+    // ram: &'a mut Vec<u8>,
     high_ram: &'a mut Vec<u8>,
     work_ram: &'a mut Vec<u8>,
 
@@ -211,13 +211,13 @@ impl<'a> Cpu<'a> {
         if location <= 0x7fff {
             self.get_rom(location)
         } else if location <= 0xfffe && location >= 0xff80 {
-            println!("High RAM Read");
+            println!("HRAM Read: {:#x}", location);
             self.high_ram[location - 0xff80]
         } else if location <= 0xdfff && location >= 0xc000 {
-            println!("Work RAM Read");
+            println!("WRAM Read: {:#x}", location);
             self.work_ram[location - 0xc000]
         } else if location <= 0xff77 && location >= 0xff00 {
-            println!("I/O Registers");
+            println!("I/O Registers: {:#x}", location);
             self.io_registers[location - 0xff00]
         } else if location == 0xffff {
             println!("IME");
@@ -229,7 +229,6 @@ impl<'a> Cpu<'a> {
 
     fn write_ffxx_memory_location(&mut self, steps: u8, value: u8) {
         let location = 0xff00 + steps as usize;
-        // self.io_registers[steps as usize] = value;
         self.write_memory_location(location, value);
     }
 
@@ -264,7 +263,6 @@ impl<'a> Cpu<'a> {
     }
 
     fn write_memory_location(&mut self, location: usize, value: u8) {
-        println!("Writing to Memory Location: {:#x}", location);
         if location <= 0x3fff && location >= 0x2000 {
             println!("###### Changing to bank: {}", value & 0b11111);
             self.rom_bank = value & 0b11111;
@@ -276,13 +274,13 @@ impl<'a> Cpu<'a> {
             panic!("how can I write to ROM?! {:#x}:{:0b}", location, value)
         } else if location <= 0xdfff && location >= 0xc000 {
             // in CGB mode, the 2nd 4k are rotatable
-            println!("Writting to internal RAM");
-            self.ram[location - 0xc000] = value;
+            println!("Writting to WRAM: {:#x}", location);
+            self.work_ram[location - 0xc000] = value;
         } else if location <= 0xff7f && location >= 0xff00 {
             println!("Writting to I/O Register: {:#x}: {:#b}", location, value);
             self.io_registers[location - 0xff00] = value;
         } else if location <= 0xfffe && location >= 0xff80 {
-            println!("Writting to High RAM");
+            println!("Writting to HRAM: {:#x}", location);
             self.high_ram[location - 0xff80] = value;
         } else if location == 0xffff {
             println!("Writting to Interrupt Enable Register");
@@ -323,6 +321,43 @@ impl<'a> Cpu<'a> {
                 let new_location = self.registers.pc as i32 + steps as i32;
                 self.registers.set_pc(new_location as u16);
                 println!("JR n (jump {} -> {:#x})", steps, new_location);
+            }
+
+            // JP NZ,nn
+            0xc2 => {
+                let new_loc = self.get_u16();
+                println!("JP NZ,nn --> {:#x}", new_loc);
+                if !Registers::has_flag(self.registers.f, CpuFlag::Z) {
+                    println!("Making the jump!");
+                    self.registers.set_pc(new_loc);
+                }
+            }
+            // JP Z,nn CA 12
+            0xca => {
+                let new_loc = self.get_u16();
+                println!("JP Z,nn --> {:#x}", new_loc);
+                if Registers::has_flag(self.registers.f, CpuFlag::Z) {
+                    println!("Making the jump!");
+                    self.registers.set_pc(new_loc);
+                }
+            }
+            // JP NC,nn
+            0xd2 => {
+                let new_loc = self.get_u16();
+                println!("JP NC,nn --> {:#x}", new_loc);
+                if !Registers::has_flag(self.registers.f, CpuFlag::C) {
+                    println!("Making the jump!");
+                    self.registers.set_pc(new_loc);
+                }
+            }
+            // JP C,nn
+            0xda => {
+                let new_loc = self.get_u16();
+                println!("JP C,nn --> {:#x}", new_loc);
+                if Registers::has_flag(self.registers.f, CpuFlag::C) {
+                    println!("Making the jump!");
+                    self.registers.set_pc(new_loc);
+                }
             }
 
             // JR cc,n
@@ -402,8 +437,8 @@ impl<'a> Cpu<'a> {
                 self.registers.set_hl(v)
             }
             0x31 => {
-                println!("LD n,SP");
                 let v = self.get_u16();
+                println!("LD n,SP -> {:#x}", v);
                 self.registers.sp = v
             }
 
@@ -1203,7 +1238,7 @@ fn main() {
         },
         rom: buffer,
         rom_bank: 1,
-        ram: &mut vec![0; 8192],
+        // ram: &mut vec![0; 8192],
         high_ram: &mut vec![0; 0xfffe - 0xff80 + 1],
         work_ram: &mut vec![0; 0xdfff - 0xc000 + 1], // 4+4 but half could be rotatable..
         ime: false,
