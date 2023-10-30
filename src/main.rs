@@ -151,6 +151,7 @@ impl Registers {
 struct Cpu <'a> {
     registers: &'a mut Registers,
     rom: Vec<u8>,
+    rom_bank: u8,
     ram: &'a mut Vec<u8>,
     high_ram: &'a mut Vec<u8>,
     work_ram: &'a mut Vec<u8>,
@@ -179,20 +180,29 @@ impl <'a> Cpu <'a>{
         let location = self.registers.step_pc();
         println!("Running location {:#x}", location);
 
-        
-        if location > 0x3FFF {
-            println!("moving outside of bank 1??")
-        }
         if location > 0x7FFF {
-            panic!("moving outside of bank 2??")
+            panic!("moving outside of bank 2")
         }
 
         self.find_operator(location);
     }
 
-    fn get_memory_location(&self, location: usize) -> u8 {
-        if location<=0x7FFF {
+    fn get_rom(&self, location: usize) -> u8 {
+        if location <= 0x3fff {
             self.rom[location as usize]
+        } else if location <= 0x7fff && location >= 0x4000{
+            let relative_loc = location - 0x4000;
+            let actual_loc = relative_loc + (self.rom_bank as usize)*0x4000;
+            println!("Read from bank {} - location: {:#x}", self.rom_bank, actual_loc);
+            self.rom[actual_loc]
+        } else {
+            panic!("not a rom location! {:#x}", location)
+        }
+    }
+
+    fn get_memory_location(&self, location: usize) -> u8 {
+        if location <= 0x7fff {
+            self.get_rom(location)
         } else if location <= 0xfffe && location >= 0xff80 {
             println!("High RAM Read");
             self.high_ram[location - 0xff80]
@@ -206,7 +216,7 @@ impl <'a> Cpu <'a>{
             println!("IME");
             self.interrupt_enable
         } else {
-            panic!("Location not in ROM: {:#x}", location)
+            panic!("Unknown location: {:#x}", location)
         }
     }
 
@@ -248,8 +258,15 @@ impl <'a> Cpu <'a>{
 
     fn write_memory_location(&mut self, location: usize, value: u8) {
         println!("Writing to Memory Location: {:#x}", location );
-        if location <= 0x7FFF {
-            panic!("how can I write to ROM?! {:#x}", location)
+        if location <= 0x3fff && location >= 0x2000 {
+            println!("###### Changing to bank: {}", value & 0b11111);
+            self.rom_bank = value & 0b11111;
+            if self.rom_bank == 0 { // todo 20, 40 etc also step
+                self.rom_bank = 1;
+            }
+
+        } else if location <= 0x7FFF {
+            panic!("how can I write to ROM?! {:#x}:{:0b}", location, value)
         } else if location <= 0xdfff && location >= 0xc000 {
             // in CGB mode, the 2nd 4k are rotatable
             println!("Writting to internal RAM");
@@ -270,19 +287,19 @@ impl <'a> Cpu <'a>{
 
     fn get_u16(&mut self) -> u16 {
         let location = self.registers.step_pc();
-        let v1 = self.rom[location] as u16;
+        let v1 = self.get_rom(location) as u16;
         let location = self.registers.step_pc();
-        let v2 = self.rom[location] as u16;
+        let v2 = self.get_rom(location) as u16;
         v2 << 8 | v1
     }
 
     fn get_u8(&mut self) -> u8 {
         let location = self.registers.step_pc();
-        self.rom[location]
+        self.get_rom(location)
     }
     
     fn find_operator(&mut self, location: usize) {
-        let op = self.rom[location];
+        let op = self.get_rom(location);
         println!("operator: {:#x}", op);
         match op {
             0x0 => println!("NOP"),
@@ -737,6 +754,7 @@ fn main() {
             e: 0xd8,
             h: 0x01 },
         rom: buffer,
+        rom_bank: 1,
         ram: &mut vec![0; 8192],
         high_ram: &mut vec![0; 0xfffe - 0xff80 + 1],
         work_ram: &mut vec![0; 0xdfff - 0xc000 + 1], // 4+4 but half could be rotatable..
