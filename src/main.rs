@@ -26,6 +26,15 @@ fn u8s_to_u16(ls: u8, hs: u8) -> u16 {
     (hs as u16) << 8 | ls as u16
 }
 
+fn add(a: u8, b: u8) -> (u8, u8) {
+    let result = a.wrapping_add(b);
+    let mut f = Registers::set_flag(0x0, CpuFlag::Z, result == 0);
+    f = Registers::set_flag(f, CpuFlag::N, false);
+    f = Registers::set_flag(f, CpuFlag::H, (a & 0xF) + (b & 0xF) > 0xF);
+    f = Registers::set_flag(f, CpuFlag::C, (a as u16) + (b as u16) > 0xFF);
+    (result, f)
+}
+
 struct Registers {
     a: u8,
     f: u8,
@@ -175,7 +184,8 @@ struct Cpu<'a> {
 }
 
 fn load_rom() -> io::Result<Vec<u8>> {
-    let mut f = File::open("Adventure Island II - Aliens in Paradise (USA, Europe).gb")?;
+    // let mut f = File::open("Adventure Island II - Aliens in Paradise (USA, Europe).gb")?;
+    let mut f = File::open("PokemonRed.gb")?;
     let mut buffer = Vec::new();
 
     // read the whole file
@@ -239,16 +249,19 @@ impl<'a> Cpu<'a> {
 
     fn get_ffxx_memory_location(&self, steps: usize) -> u8 {
         let location = 0xff00 + steps as usize;
+        self.get_memory_location(location)
         // todo this is here for now, just until I ensure I don't get any weird jumps
-        if location == 0xffff {
-            self.interrupt_enable
-        } else if location == 0xff44 {
-            self.io_registers[location - 0xff00]
-        } else if location == 0xff40 {
-            self.io_registers[location - 0xff00]
-        } else {
-            panic!("Weird Location: {:#x}", location)
-        }
+        // if location == 0xffff {
+        //     self.interrupt_enable
+        // } else if location == 0xff44 {
+        //     self.io_registers[location - 0xff00]
+        // } else if location == 0xff40 {
+        //     self.io_registers[location - 0xff00]
+        // } else if location == 0xffda {
+        //     self.io_registers[location - 0xff00]
+        // } else {
+        //     panic!("Weird Location: {:#x}", location)
+        // }
     }
 
     fn pop_stack(&mut self) -> u16 {
@@ -789,6 +802,45 @@ impl<'a> Cpu<'a> {
                 self.write_ffxx_memory_location(self.registers.c, self.registers.a);
             }
 
+            // ADD
+            0x87 => {
+                println!("ADD A, A");
+                (self.registers.a, self.registers.f) = add(self.registers.a, self.registers.a)
+            }
+            0x80 => {
+                println!("ADD A, B");
+                (self.registers.a, self.registers.f) = add(self.registers.a, self.registers.b)
+            }
+            0x81 => {
+                println!("ADD A, C");
+                (self.registers.a, self.registers.f) = add(self.registers.a, self.registers.c)
+            }
+            0x82 => {
+                println!("ADD A, D");
+                (self.registers.a, self.registers.f) = add(self.registers.a, self.registers.d)
+            }
+            0x83 => {
+                println!("ADD A, E");
+                (self.registers.a, self.registers.f) = add(self.registers.a, self.registers.e)
+            }
+            0x84 => {
+                println!("ADD A, H");
+                (self.registers.a, self.registers.f) = add(self.registers.a, self.registers.h)
+            }
+            0x85 => {
+                println!("ADD A, L");
+                (self.registers.a, self.registers.f) = add(self.registers.a, self.registers.l)
+            }
+            0x86 => {
+                println!("ADD A, (HL)");
+                let v = self.get_memory_location(self.registers.get_hl() as usize);
+                (self.registers.a, self.registers.f) = add(self.registers.a, v);
+            }
+            0xc6 => {
+                println!("ADD A, #");
+                (self.registers.a, self.registers.f) = add(self.registers.a, self.get_u8())
+            }
+
             // SUB n
             0x90 => {
                 println!("SUB B");
@@ -1165,7 +1217,7 @@ impl<'a> Cpu<'a> {
             // SRA n
             0x28 => {
                 println!("SRA B");
-                let c = self.registers.b | 0x01;
+                let c = self.registers.b & 0x01;
                 let msb = self.registers.b | (1 << 7);
                 let shifted = self.registers.b >> 1;
 
@@ -1179,6 +1231,23 @@ impl<'a> Cpu<'a> {
                 self.registers.b = shifted | msb;
                 println!("TO: {:#x}", self.registers.b);
                 panic!("not implememented SRA properly")
+            }
+
+            // SRL n
+            0x3f => {
+                println!("SRL A");
+                let c = self.registers.a & 0x01;
+                let shifted = self.registers.a >> 1;
+
+                println!("FROM: {:#b}", self.registers.a);
+
+                let mut f = Registers::set_flag(0x0, CpuFlag::C, c == 1);
+                f = Registers::set_flag(f, CpuFlag::H, false);
+                f = Registers::set_flag(f, CpuFlag::Z, self.registers.a == 0);
+                f = Registers::set_flag(f, CpuFlag::N, false);
+                self.registers.f = f;
+                self.registers.a = shifted;
+                println!("TO: {:#b} F: {:#b}", self.registers.a, self.registers.f);
             }
 
             // RES
@@ -1273,7 +1342,7 @@ fn main() {
         io_registers: &mut vec![0; 0xFF7F - 0xFF00 + 1],
     };
 
-    for _i in 0..70 {
+    for _i in 0..80 {
         cpu.step();
     }
 }
