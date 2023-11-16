@@ -288,8 +288,14 @@ impl<'a> Cpu<'a> {
                         self.registers.pc, new_location
                     );
                     self.registers.set_pc(new_location);
-                    panic!("untested jump C");
+                    // panic!("untested jump C");
                 }
+            }
+
+            // JP (HL)
+            0xe9 => {
+                println!("JP (HL)");
+                self.registers.set_pc(self.registers.get_hl());
             }
 
             // LD n,nn
@@ -314,6 +320,15 @@ impl<'a> Cpu<'a> {
                 self.registers.sp = v
             }
 
+            // LD NN, A
+            0x02 => {
+                println!("LD (BC), A");
+                self.write_memory_location(self.registers.get_bc() as usize, self.registers.a);
+            }
+            0x12 => {
+                println!("LD (DE), A");
+                self.write_memory_location(self.registers.get_de() as usize, self.registers.a);
+            }
             0xea => {
                 println!("LD (nn),A");
                 let target = self.get_u16();
@@ -339,6 +354,13 @@ impl<'a> Cpu<'a> {
                 println!("LDI (HL), A");
                 self.write_memory_location(self.registers.get_hl() as usize, self.registers.a);
                 self.registers.set_hl(self.registers.get_hl() + 1)
+            }
+
+            // LDD A, (HL)
+            0x3a => {
+                println!("LDD A, (HL)");
+                self.registers.a = self.get_memory_location(self.registers.get_hl() as usize);
+                self.registers.set_hl(self.registers.get_hl() - 1)
             }
             // LDI A, (HL)
             0x2a => {
@@ -608,6 +630,10 @@ impl<'a> Cpu<'a> {
             }
 
             // (HL)
+            0x77 => {
+                println!("LD (HL), A");
+                self.write_memory_location(self.registers.get_hl() as usize, self.registers.a);
+            }
             0x70 => {
                 println!("LD (HL), B");
                 self.write_memory_location(self.registers.get_hl() as usize, self.registers.b);
@@ -694,6 +720,44 @@ impl<'a> Cpu<'a> {
                 println!("ADD A, #");
                 let v = self.get_u8();
                 self.registers.f = self.registers.a.add(v);
+            }
+
+            0x09 => {
+                println!("ADD HL, BC");
+                let hl;
+                (hl, self.registers.f) = Registers::add(
+                    self.registers.get_hl(),
+                    self.registers.get_bc(),
+                    self.registers.f,
+                );
+                self.registers.set_hl(hl);
+            }
+            0x19 => {
+                println!("ADD HL, DE");
+                let hl;
+                (hl, self.registers.f) = Registers::add(
+                    self.registers.get_hl(),
+                    self.registers.get_de(),
+                    self.registers.f,
+                );
+                self.registers.set_hl(hl);
+            }
+            0x29 => {
+                println!("ADD HL, HL");
+                let hl;
+                (hl, self.registers.f) = Registers::add(
+                    self.registers.get_hl(),
+                    self.registers.get_hl(),
+                    self.registers.f,
+                );
+                self.registers.set_hl(hl);
+            }
+            0x39 => {
+                println!("ADD HL, SP");
+                let hl;
+                (hl, self.registers.f) =
+                    Registers::add(self.registers.get_hl(), self.registers.sp, self.registers.f);
+                self.registers.set_hl(hl);
             }
 
             // SUB n
@@ -1000,6 +1064,58 @@ impl<'a> Cpu<'a> {
                 println!("RET to: {:#x}", new_loc);
                 self.registers.set_pc(new_loc);
             }
+
+            0xc0 => {
+                println!("RET NZ");
+                if !self.registers.f.has_flag(registers::Flag::Z) {
+                    let new_loc = self.pop_stack();
+                    println!("Made the jump");
+                    self.registers.set_pc(new_loc);
+                }
+            }
+            0xc8 => {
+                println!("RET Z");
+                if self.registers.f.has_flag(registers::Flag::Z) {
+                    let new_loc = self.pop_stack();
+                    println!("Made the jump");
+                    self.registers.set_pc(new_loc);
+                }
+            }
+            0xd0 => {
+                println!("RET NC");
+                if !self.registers.f.has_flag(registers::Flag::C) {
+                    let new_loc = self.pop_stack();
+                    println!("Made the jump");
+                    self.registers.set_pc(new_loc);
+                }
+            }
+            0xd8 => {
+                println!("RET C");
+                if self.registers.f.has_flag(registers::Flag::C) {
+                    let new_loc = self.pop_stack();
+                    println!("Made the jump");
+                    self.registers.set_pc(new_loc);
+                }
+            }
+
+            // PUSH
+            0xf5 => {
+                println!("PUSH AF");
+                self.push_stack(self.registers.get_af());
+            }
+            0xc5 => {
+                println!("PUSH BC");
+                self.push_stack(self.registers.get_bc());
+            }
+            0xd5 => {
+                println!("PUSH DE");
+                self.push_stack(self.registers.get_de());
+            }
+            0xe5 => {
+                println!("PUSH HL");
+                self.push_stack(self.registers.get_hl());
+            }
+
             // POP
             0xf1 => {
                 println!("POP AF");
@@ -1173,7 +1289,7 @@ fn main() {
         io_registers: &mut vec![0; 0xFF7F - 0xFF00 + 1],
     };
 
-    for _i in 0..80 {
+    for _i in 0..160 {
         cpu.step();
     }
 }

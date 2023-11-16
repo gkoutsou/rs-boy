@@ -141,6 +141,10 @@ impl Registers {
         self.f = (v & 0x00FF) as u8;
     }
 
+    pub fn get_af(&self) -> u16 {
+        (self.a as u16) << 8 | self.f as u16
+    }
+
     pub fn set_bc(&mut self, v: u16) {
         self.b = (v >> 8) as u8;
         self.c = (v & 0x00FF) as u8;
@@ -167,5 +171,14 @@ impl Registers {
 
     pub fn set_pc(&mut self, loc: u16) {
         self.pc = loc;
+    }
+
+    pub fn add(a: u16, b: u16, f: u8) -> (u16, u8) {
+        let result = a.wrapping_add(b);
+
+        let mut f = set_flag(f, Flag::H, (a & 0x07FF) + (b & 0x07FF) > 0x07FF);
+        f = set_flag(f, Flag::C, a > 0xFFFF - b);
+        f = set_flag(f, Flag::N, false);
+        (result, f)
     }
 }
