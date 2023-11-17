@@ -16,9 +16,11 @@ pub trait RegisterOperation {
     fn or(&mut self, b: u8) -> u8;
     fn and(&mut self, b: u8) -> u8;
     fn add(&mut self, b: u8) -> u8;
+    fn cp(self, b: u8) -> u8;
+
     fn inc(&mut self, f: u8) -> u8;
     fn dec(&mut self, f: u8) -> u8;
-    fn cp(self, b: u8) -> u8;
+    fn complement(&mut self, f: u8) -> u8;
 
     fn set_bit(&mut self, bit: u8, value: bool);
     fn has_flag(self, flag: Flag) -> bool;
@@ -70,6 +72,13 @@ impl RegisterOperation for u8 {
         f = set_flag(f, Flag::Z, dec == 0);
         f = set_flag(f, Flag::N, true);
         *self = dec;
+        f
+    }
+
+    fn complement(&mut self, f: u8) -> u8 {
+        *self = !*self;
+        let mut f = set_flag(f, Flag::H, true);
+        f = set_flag(f, Flag::N, true);
         f
     }
 

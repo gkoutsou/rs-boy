@@ -1058,6 +1058,43 @@ impl<'a> Cpu<'a> {
                 self.registers.set_pc(new_location);
             }
 
+            0xc4 => {
+                let new_location = self.get_u16();
+                println!("CALL NZ,nn --> {:#x}", new_location);
+                if !self.registers.f.has_flag(registers::Flag::Z) {
+                    println!("Making the jump!");
+                    self.push_stack(self.registers.pc);
+                    self.registers.set_pc(new_location);
+                }
+            }
+            0xcc => {
+                let new_location = self.get_u16();
+                println!("CALL Z,nn --> {:#x}", new_location);
+                if self.registers.f.has_flag(registers::Flag::Z) {
+                    println!("Making the jump!");
+                    self.push_stack(self.registers.pc);
+                    self.registers.set_pc(new_location);
+                }
+            }
+            0xd4 => {
+                let new_location = self.get_u16();
+                println!("CALL NC,nn --> {:#x}", new_location);
+                if !self.registers.f.has_flag(registers::Flag::C) {
+                    println!("Making the jump!");
+                    self.push_stack(self.registers.pc);
+                    self.registers.set_pc(new_location);
+                }
+            }
+            0xdc => {
+                let new_location = self.get_u16();
+                println!("CALL C,nn --> {:#x}", new_location);
+                if self.registers.f.has_flag(registers::Flag::C) {
+                    println!("Making the jump!");
+                    self.push_stack(self.registers.pc);
+                    self.registers.set_pc(new_location);
+                }
+            }
+
             // RET
             0xc9 => {
                 let new_loc = self.pop_stack();
@@ -1137,6 +1174,12 @@ impl<'a> Cpu<'a> {
                 println!("POP HL");
                 let v = self.pop_stack();
                 self.registers.set_hl(v);
+            }
+
+            // CPL
+            0x2f => {
+                println!("CPL");
+                self.registers.f = self.registers.a.complement(self.registers.f);
             }
 
             // MISC
@@ -1298,7 +1341,7 @@ fn main() {
         io_registers: &mut vec![0; 0xFF7F - 0xFF00 + 1],
     };
 
-    for _i in 0..170 {
+    for _i in 0..290 {
         cpu.step();
     }
 }
