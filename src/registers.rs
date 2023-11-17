@@ -22,6 +22,9 @@ pub trait RegisterOperation {
 
     fn set_bit(&mut self, bit: u8, value: bool);
     fn has_flag(self, flag: Flag) -> bool;
+
+    // cb operations
+    fn bit(self, bit: u8, f: u8) -> u8;
 }
 
 impl RegisterOperation for u8 {
@@ -100,6 +103,14 @@ impl RegisterOperation for u8 {
 
     fn has_flag(self, flag: Flag) -> bool {
         (self & (flag as u8)) > 0
+    }
+
+    fn bit(self, bit: u8, f: u8) -> u8 {
+        let res = (1 << bit) & self;
+        let mut f = set_flag(f, Flag::Z, res == 0);
+        f = set_flag(f, Flag::N, false);
+        f = set_flag(f, Flag::H, true);
+        f
     }
 }
 

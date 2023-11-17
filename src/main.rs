@@ -1221,6 +1221,15 @@ impl<'a> Cpu<'a> {
                 self.registers.l.set_bit(0, false);
             }
 
+            // BIT b,r
+            0x47 => self.registers.f = self.registers.a.bit(0, self.registers.f),
+            0x40 => self.registers.f = self.registers.b.bit(0, self.registers.f),
+            0x41 => self.registers.f = self.registers.c.bit(0, self.registers.f),
+            0x42 => self.registers.f = self.registers.d.bit(0, self.registers.f),
+            0x43 => self.registers.f = self.registers.e.bit(0, self.registers.f),
+            0x44 => self.registers.f = self.registers.h.bit(0, self.registers.f),
+            0x45 => self.registers.f = self.registers.l.bit(0, self.registers.f),
+
             _ => panic!("Missing cb {:#x}", op),
         }
     }
@@ -1289,7 +1298,7 @@ fn main() {
         io_registers: &mut vec![0; 0xFF7F - 0xFF00 + 1],
     };
 
-    for _i in 0..160 {
+    for _i in 0..170 {
         cpu.step();
     }
 }
