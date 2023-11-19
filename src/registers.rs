@@ -86,7 +86,7 @@ impl RegisterOperation for u8 {
         let a = self;
         let mut f = set_flag(0, Flag::C, a < b);
         f = set_flag(f, Flag::H, (b & 0x0f) > (a & 0x0f));
-        f = set_flag(f, Flag::Z, a == 0);
+        f = set_flag(f, Flag::Z, a == b);
         f = set_flag(f, Flag::N, true);
         f
     }

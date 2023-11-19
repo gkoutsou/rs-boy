@@ -136,12 +136,16 @@ impl<'a> Cpu<'a> {
 
     fn write_memory_location(&mut self, location: usize, value: u8) {
         if location <= 0x3fff && location >= 0x2000 {
-            println!("###### Changing to bank: {}", value & 0b11111);
             self.rom_bank = value & 0b11111;
             if self.rom_bank == 0 {
                 // todo 20, 40 etc also step
                 self.rom_bank = 1;
             }
+            println!(
+                "###### Changing to bank: {} (value: {})",
+                self.rom_bank,
+                value & 0b11111
+            );
         } else if location <= 0x7FFF {
             panic!("how can I write to ROM?! {:#x}:{:0b}", location, value)
         } else if location <= 0xdfff && location >= 0xc000 {
@@ -234,15 +238,15 @@ impl<'a> Cpu<'a> {
 
             // JR cc,n
             0x20 => {
-                let steps = self.get_u8() as i16;
+                let steps = self.get_u8() as i8 as i32;
                 println!(
                     "JR NZ,n --> {} - {:#x}",
                     steps,
-                    self.registers.pc as i16 + steps
+                    self.registers.pc as i32 + steps
                 );
                 println!("############");
                 if !self.registers.f.has_flag(registers::Flag::Z) {
-                    let new_location = (self.registers.pc as i16 + steps) as u16;
+                    let new_location = (self.registers.pc as i32 + steps) as u16;
                     println!(
                         "Current location: {:#x}, next: {:#x}",
                         self.registers.pc, new_location
@@ -253,10 +257,10 @@ impl<'a> Cpu<'a> {
             }
             0x28 => {
                 println!("JR Z,n");
-                let steps = self.get_u8() as i16;
+                let steps = self.get_u8() as i8 as i32;
                 println!("{:#b}", self.registers.f);
                 if self.registers.f.has_flag(registers::Flag::Z) {
-                    let new_location = (self.registers.pc as i16 + steps) as u16;
+                    let new_location = (self.registers.pc as i32 + steps) as u16;
                     println!(
                         "Current location: {}, next: {}",
                         self.registers.pc, new_location
@@ -266,9 +270,9 @@ impl<'a> Cpu<'a> {
             }
             0x30 => {
                 println!("JR NC,n");
-                let steps = self.get_u8() as i16;
+                let steps = self.get_u8() as i8 as i32;
                 if !self.registers.f.has_flag(registers::Flag::C) {
-                    let new_location = (self.registers.pc as i16 + steps) as u16;
+                    let new_location = (self.registers.pc as i32 + steps) as u16;
                     println!(
                         "Current location: {:#x}, next: {:#x}",
                         self.registers.pc, new_location
@@ -280,9 +284,9 @@ impl<'a> Cpu<'a> {
 
             0x38 => {
                 println!("JR C,n");
-                let steps = self.get_u8() as i16;
+                let steps = self.get_u8() as i8 as i32;
                 if self.registers.f.has_flag(registers::Flag::C) {
-                    let new_location = (self.registers.pc as i16 + steps) as u16;
+                    let new_location = (self.registers.pc as i32 + steps) as u16;
                     println!(
                         "Current location: {:#x}, next: {:#x}",
                         self.registers.pc, new_location
@@ -802,6 +806,7 @@ impl<'a> Cpu<'a> {
                 self.registers.set_hl(self.registers.get_hl() + 1);
             }
             0x33 => {
+                println!("INC SP");
                 self.registers.sp += 1;
             }
 
@@ -1341,7 +1346,7 @@ fn main() {
         io_registers: &mut vec![0; 0xFF7F - 0xFF00 + 1],
     };
 
-    for _i in 0..290 {
+    for _i in 0..3000 {
         cpu.step();
     }
 }
