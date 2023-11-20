@@ -35,6 +35,7 @@ struct Cpu<'a> {
 
     /// I/O registers
     io_registers: &'a mut Vec<u8>,
+    scanline: u8, // TODO this is duplicated in the io_registers
 }
 
 fn load_rom() -> io::Result<Vec<u8>> {
@@ -58,6 +59,12 @@ impl<'a> Cpu<'a> {
         }
 
         self.find_operator(location);
+
+        // todo this is not CPU steps but w/e for now
+        self.scanline += 1;
+        if self.scanline > 153 {
+            self.scanline = 0;
+        }
     }
 
     fn get_rom(&self, location: usize) -> u8 {
@@ -76,6 +83,15 @@ impl<'a> Cpu<'a> {
         }
     }
 
+    fn get_io_register(&self, location: usize) -> u8 {
+        println!("I/O Registers: {:#x}", location);
+        if location == 0xff44 {
+            return self.scanline;
+        }
+
+        self.io_registers[location - 0xff00]
+    }
+
     fn get_memory_location(&self, location: usize) -> u8 {
         if location <= 0x7fff {
             self.get_rom(location)
@@ -86,8 +102,7 @@ impl<'a> Cpu<'a> {
             println!("WRAM Read: {:#x}", location);
             self.work_ram[location - 0xc000]
         } else if location <= 0xff77 && location >= 0xff00 {
-            println!("I/O Registers: {:#x}", location);
-            self.io_registers[location - 0xff00]
+            self.get_io_register(location)
         } else if location == 0xffff {
             println!("IME");
             self.interrupt_enable
@@ -154,6 +169,9 @@ impl<'a> Cpu<'a> {
             self.work_ram[location - 0xc000] = value;
         } else if location <= 0xff7f && location >= 0xff00 {
             println!("Writting to I/O Register: {:#x}: {:#b}", location, value);
+            if location == 0xff44 {
+                panic!("writing to scanline");
+            }
             self.io_registers[location - 0xff00] = value;
         } else if location <= 0xfffe && location >= 0xff80 {
             println!("Writting to HRAM: {:#x}", location);
@@ -812,9 +830,11 @@ impl<'a> Cpu<'a> {
 
             // DEC nn
             0x0B => {
+                println!("DEC BC");
                 self.registers.set_bc(self.registers.get_bc() - 1);
             }
             0x1B => {
+                println!("DEC DE");
                 self.registers.set_de(self.registers.get_de() - 1);
             }
             0x2B => {
@@ -822,6 +842,7 @@ impl<'a> Cpu<'a> {
                 self.registers.set_hl(self.registers.get_hl() - 1);
             }
             0x3B => {
+                println!("DEC SP");
                 self.registers.sp -= 1;
             }
 
@@ -1344,9 +1365,10 @@ fn main() {
         ime: false,
         interrupt_enable: 0,
         io_registers: &mut vec![0; 0xFF7F - 0xFF00 + 1],
+        scanline: 0,
     };
 
-    for _i in 0..3000 {
+    for _i in 0..80000 {
         cpu.step();
     }
 }
