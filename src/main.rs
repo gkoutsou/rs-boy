@@ -36,6 +36,10 @@ struct Cpu<'a> {
     /// I/O registers
     io_registers: &'a mut Vec<u8>,
     scanline: u8, // TODO this is duplicated in the io_registers
+
+    // This section is totally GPU.. need to restructure
+    tile_data: &'a mut Vec<u8>,
+    tile_maps: &'a mut Vec<u8>,
 }
 
 fn load_rom() -> io::Result<Vec<u8>> {
@@ -179,6 +183,29 @@ impl<'a> Cpu<'a> {
         } else if location == 0xffff {
             println!("Writting to Interrupt Enable Register");
             self.interrupt_enable = value;
+        } else if location <= 0x97FF && location >= 0x8000 {
+            println!("Writting to Tile Data");
+            // panic!("Wrote: {:#x}", value);
+            if value != 0 {
+                panic!(
+                    "finally! non empty in Tile Data: {:#x} - {:#b}",
+                    location, value
+                )
+            }
+            self.tile_data[location - 0x8000] = value
+
+            // Starts writing here in location: 0x36e3
+        } else if location <= 0x9FFF && location >= 0x9800 {
+            println!("Writting to Tile Map");
+            // panic!("ASDD");
+            // if value != 0 {
+            //     panic!(
+            //         "finally! non empty in TileMaps: {:#x} - {:#b}",
+            //         location, value
+            //     )
+            // }
+            self.tile_maps[location - 0x9800] = value
+            // Starts writing here in location: 36e3
         } else {
             panic!("Need to handle memory write to: {:#x}", location)
         }
@@ -296,7 +323,7 @@ impl<'a> Cpu<'a> {
                         self.registers.pc, new_location
                     );
                     self.registers.set_pc(new_location);
-                    panic!("untested jump NC");
+                    // panic!("untested jump NC");
                 }
             }
 
@@ -373,7 +400,14 @@ impl<'a> Cpu<'a> {
 
             // LDI (HL), A
             0x22 => {
-                println!("LDI (HL), A");
+                println!(
+                    "LDI (HL), A {:#x} => {:#x}",
+                    self.registers.get_hl(),
+                    self.registers.a
+                );
+                // if self.registers.get_hl() == 0xc300 {
+                //     panic!("tmp")
+                // }
                 self.write_memory_location(self.registers.get_hl() as usize, self.registers.a);
                 self.registers.set_hl(self.registers.get_hl() + 1)
             }
@@ -1366,9 +1400,13 @@ fn main() {
         interrupt_enable: 0,
         io_registers: &mut vec![0; 0xFF7F - 0xFF00 + 1],
         scanline: 0,
+
+        tile_data: &mut vec![0; 0x97FF - 0x8000 + 1],
+        tile_maps: &mut vec![0; 0x9FFF - 0x9800 + 1],
     };
 
-    for _i in 0..80000 {
+    for _i in 0..280000 {
+        println!("Iteration {}", _i);
         cpu.step();
     }
 }
