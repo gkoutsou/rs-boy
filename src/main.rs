@@ -40,6 +40,9 @@ struct Cpu<'a> {
     // This section is totally GPU.. need to restructure
     tile_data: &'a mut Vec<u8>,
     tile_maps: &'a mut Vec<u8>,
+
+    // debug stuff
+    debug_counter: i32,
 }
 
 fn load_rom() -> io::Result<Vec<u8>> {
@@ -77,10 +80,10 @@ impl<'a> Cpu<'a> {
         } else if location <= 0x7fff && location >= 0x4000 {
             let relative_loc = location - 0x4000;
             let actual_loc = relative_loc + (self.rom_bank as usize) * 0x4000;
-            println!(
-                "Read from bank {} - location: {:#x}",
-                self.rom_bank, actual_loc
-            );
+            // println!(
+            // "Read from bank {} - location: {:#x}",
+            // self.rom_bank, actual_loc
+            // );
             self.rom[actual_loc]
         } else {
             panic!("not a rom location! {:#x}", location)
@@ -105,6 +108,9 @@ impl<'a> Cpu<'a> {
         } else if location <= 0xdfff && location >= 0xc000 {
             println!("WRAM Read: {:#x}", location);
             self.work_ram[location - 0xc000]
+        } else if location <= 0x97FF && location >= 0x8000 {
+            // println!("Getting Tile Data: {:#x}", location);
+            self.tile_data[location - 0x8000]
         } else if location <= 0xff77 && location >= 0xff00 {
             self.get_io_register(location)
         } else if location == 0xffff {
@@ -186,12 +192,17 @@ impl<'a> Cpu<'a> {
         } else if location <= 0x97FF && location >= 0x8000 {
             println!("Writting to Tile Data");
             // panic!("Wrote: {:#x}", value);
-            if value != 0 {
-                panic!(
-                    "finally! non empty in Tile Data: {:#x} - {:#b}",
-                    location, value
-                )
-            }
+            // if value != 0 {
+            //     println!(
+            //         "finally! non empty in Tile Data: {:#x} - {:#b} = {:#x}",
+            //         location, value, value
+            //     );
+            //     if self.debug_counter == 128 {
+            //         self.dump_tile_data();
+            //         panic!("reached counter")
+            //     }
+            //     self.debug_counter += 1;
+            // }
             self.tile_data[location - 0x8000] = value
 
             // Starts writing here in location: 0x36e3
@@ -1242,18 +1253,50 @@ impl<'a> Cpu<'a> {
                 self.registers.f = self.registers.a.complement(self.registers.f);
             }
 
+            // SCF
+            0x37 => {
+                println!("SCF");
+                let mut f = cpu_ops::set_flag(self.registers.f, CpuFlag::C, true);
+                f = cpu_ops::set_flag(f, CpuFlag::H, false);
+                f = cpu_ops::set_flag(f, CpuFlag::N, false);
+                self.registers.f = f;
+            }
+
             // MISC
             0xcb => {
                 self.do_cb();
             }
 
-            _ => panic!("missing operator {:#x}", op),
+            _ => {
+                println!("Info for debugging");
+                self.dump_tile_data();
+
+                panic!("missing operator {:#x}", op);
+            }
         };
     }
 
     fn do_cb(&mut self) {
         let op = self.get_u8();
         match op {
+            0x1a => {
+                println!("RR");
+                let new_c = self.registers.d & 0x01;
+                let msb = (self.registers.f.has_flag(registers::Flag::C) as u8) << 7;
+                let shifted = self.registers.d >> 1;
+
+                println!("FROM: {:#b} - {:#b}", self.registers.d, self.registers.f);
+                self.registers.d = shifted | msb;
+
+                let mut f = cpu_ops::set_flag(self.registers.f, CpuFlag::C, new_c == 1); //
+                f = cpu_ops::set_flag(f, CpuFlag::H, false);
+                f = cpu_ops::set_flag(f, CpuFlag::Z, self.registers.d == 0);
+                f = cpu_ops::set_flag(f, CpuFlag::N, false);
+                self.registers.f = f;
+                println!("  TO: {:#b} - {:#b}", self.registers.d, self.registers.f);
+                // panic!("TEST RR")
+            }
+
             0x37 => {
                 println!("SWAP nimble A");
                 self.registers.a = (self.registers.a >> 4) | (self.registers.a << 4);
@@ -1336,6 +1379,21 @@ impl<'a> Cpu<'a> {
             _ => panic!("Missing cb {:#x}", op),
         }
     }
+
+    fn dump_tile_data(&self) {
+        for tile in 0..384 {
+            let mut sum = 0i32;
+            for i in 0..16 {
+                sum += self.tile_data[tile * 16 + i] as i32;
+            }
+            if sum > 0 {
+                for i in 0..16 {
+                    print!("{:#04x} ", self.tile_data[tile * 16 + i]);
+                }
+                println!()
+            }
+        }
+    }
 }
 
 fn main() {
@@ -1403,10 +1461,12 @@ fn main() {
 
         tile_data: &mut vec![0; 0x97FF - 0x8000 + 1],
         tile_maps: &mut vec![0; 0x9FFF - 0x9800 + 1],
+
+        debug_counter: 0,
     };
 
-    for _i in 0..280000 {
-        println!("Iteration {}", _i);
+    for _i in 0..1000000 {
+        // println!("Iteration {}", _i);
         cpu.step();
     }
 }
