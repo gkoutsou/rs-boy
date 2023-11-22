@@ -58,7 +58,8 @@ impl RegisterOperation for u8 {
     }
 
     fn inc(&mut self, f: u8) -> u8 {
-        let inc = *self + 1;
+        // let inc = *self + 1;
+        let inc = (*self).wrapping_add(1);
         let mut f = set_flag(f, Flag::H, (*self & 0x0F) + 1 > 0x0F);
         f = set_flag(f, Flag::Z, inc == 0);
         f = set_flag(f, Flag::N, false);

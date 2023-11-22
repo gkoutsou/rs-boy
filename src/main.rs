@@ -5,6 +5,8 @@ use std::{
 };
 
 mod cpu_ops;
+mod io_registers;
+pub use io_registers::IORegisters;
 mod registers;
 use cpu_ops::CpuFlag;
 pub use registers::Registers;
@@ -29,13 +31,14 @@ struct Cpu<'a> {
     high_ram: &'a mut Vec<u8>,
     work_ram: &'a mut Vec<u8>,
 
+    halt: bool,
+
     /// Interrupt Master Enable
     ime: bool,
     interrupt_enable: u8,
 
     /// I/O registers
-    io_registers: &'a mut Vec<u8>,
-    scanline: u8, // TODO this is duplicated in the io_registers
+    io_registers: &'a mut IORegisters,
 
     // This section is totally GPU.. need to restructure
     tile_data: &'a mut Vec<u8>,
@@ -58,8 +61,12 @@ fn load_rom() -> io::Result<Vec<u8>> {
 
 impl<'a> Cpu<'a> {
     fn step(&mut self) {
+        if self.halt {
+            return;
+        }
+
         let location = self.registers.step_pc();
-        println!("Running location {:#x}", location);
+        // println!("Running location {:#x}", location);
 
         if location > 0x7FFF {
             panic!("moving outside of bank 2")
@@ -68,9 +75,9 @@ impl<'a> Cpu<'a> {
         self.find_operator(location);
 
         // todo this is not CPU steps but w/e for now
-        self.scanline += 1;
-        if self.scanline > 153 {
-            self.scanline = 0;
+        self.io_registers.scanline += 1;
+        if self.io_registers.scanline > 153 {
+            self.io_registers.scanline = 0;
         }
     }
 
@@ -90,14 +97,15 @@ impl<'a> Cpu<'a> {
         }
     }
 
-    fn get_io_register(&self, location: usize) -> u8 {
-        println!("I/O Registers: {:#x}", location);
-        if location == 0xff44 {
-            return self.scanline;
-        }
+    // fn get_io_register(&self, location: usize) -> u8 {
+    //     println!("I/O Registers: {:#x}", location);
+    //     if location == 0xff44 {
+    //         return self.scanline;
+    //     }
+    //     panic!("i/o register location read: {:#x}", location);
 
-        self.io_registers[location - 0xff00]
-    }
+    //     self.io_registers[location - 0xff00]
+    // }
 
     fn get_memory_location(&self, location: usize) -> u8 {
         if location <= 0x7fff {
@@ -112,7 +120,7 @@ impl<'a> Cpu<'a> {
             // println!("Getting Tile Data: {:#x}", location);
             self.tile_data[location - 0x8000]
         } else if location <= 0xff77 && location >= 0xff00 {
-            self.get_io_register(location)
+            self.io_registers.get(location)
         } else if location == 0xffff {
             println!("IME");
             self.interrupt_enable
@@ -178,11 +186,7 @@ impl<'a> Cpu<'a> {
             println!("Writting to WRAM: {:#x}", location);
             self.work_ram[location - 0xc000] = value;
         } else if location <= 0xff7f && location >= 0xff00 {
-            println!("Writting to I/O Register: {:#x}: {:#b}", location, value);
-            if location == 0xff44 {
-                panic!("writing to scanline");
-            }
-            self.io_registers[location - 0xff00] = value;
+            self.io_registers.write(location, value);
         } else if location <= 0xfffe && location >= 0xff80 {
             println!("Writting to HRAM: {:#x}", location);
             self.high_ram[location - 0xff80] = value;
@@ -1263,6 +1267,12 @@ impl<'a> Cpu<'a> {
             }
 
             // MISC
+            0x76 => {
+                self.halt = true;
+                println!("HALT");
+                println!("Interrupt enable: {:#8b}", self.interrupt_enable)
+            }
+
             0xcb => {
                 self.do_cb();
             }
@@ -1381,7 +1391,24 @@ impl<'a> Cpu<'a> {
     }
 
     fn dump_tile_data(&self) {
+        println!("DUMPING TILE DATA");
         for tile in 0..384 {
+            let mut sum = 0i32;
+            for i in 0..16 {
+                sum += self.tile_data[tile * 16 + i] as i32;
+            }
+            if sum > 0 {
+                for i in 0..16 {
+                    print!("{:#04x} ", self.tile_data[tile * 16 + i]);
+                }
+                println!()
+            }
+        }
+        println!("DUMPING TILE DATA COMPLETED");
+    }
+
+    fn dump_tile_map(&self) {
+        for tile in 0..32 {
             let mut sum = 0i32;
             for i in 0..16 {
                 sum += self.tile_data[tile * 16 + i] as i32;
@@ -1456,8 +1483,9 @@ fn main() {
         work_ram: &mut vec![0; 0xdfff - 0xc000 + 1], // 4+4 but half could be rotatable..
         ime: false,
         interrupt_enable: 0,
-        io_registers: &mut vec![0; 0xFF7F - 0xFF00 + 1],
-        scanline: 0,
+        io_registers: &mut IORegisters::default(),
+
+        halt: false,
 
         tile_data: &mut vec![0; 0x97FF - 0x8000 + 1],
         tile_maps: &mut vec![0; 0x9FFF - 0x9800 + 1],
@@ -1465,8 +1493,9 @@ fn main() {
         debug_counter: 0,
     };
 
-    for _i in 0..1000000 {
+    for _i in 0..2000000 {
         // println!("Iteration {}", _i);
         cpu.step();
     }
+    cpu.dump_tile_data();
 }
