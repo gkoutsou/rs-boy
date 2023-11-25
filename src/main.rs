@@ -43,6 +43,7 @@ struct Cpu<'a> {
     // This section is totally GPU.. need to restructure
     tile_data: &'a mut Vec<u8>,
     tile_maps: &'a mut Vec<u8>,
+    oam: &'a mut Vec<u8>,
 
     // debug stuff
     debug_counter: i32,
@@ -61,14 +62,35 @@ fn load_rom() -> io::Result<Vec<u8>> {
 
 impl<'a> Cpu<'a> {
     fn step(&mut self) {
+        if self.ime != false && self.interrupt_enable & self.io_registers.interrupt_flag > 0 {
+            let interrupts = self.interrupt_enable & self.io_registers.interrupt_flag;
+            if interrupts & 0x1 > 0 {
+                // vblank interrupt
+                self.ime = false;
+                self.io_registers.interrupt_flag &= 0b11111110;
+                self.push_stack(self.registers.pc);
+                self.registers.set_pc(0x40);
+                println!("VBlank Interrupt Handler");
+                // panic!("asd");
+                return;
+            }
+
+            println!("Interrupt enable: {:#8b}", self.interrupt_enable);
+            println!("Interrupt flag: {:#8b}", self.io_registers.interrupt_flag);
+            self.dump_tile_data();
+            panic!("found interrupt")
+        }
+
         if self.halt {
             return;
         }
 
         let location = self.registers.step_pc();
-        // println!("Running location {:#x}", location);
+        println!("Running location {:#x}", location);
 
-        if location > 0x7FFF {
+        if location >= 0xFF80 && location <= 0xFFFE {
+            println!("Running code in HRAM!")
+        } else if location > 0x7FFF {
             panic!("moving outside of bank 2")
         }
 
@@ -76,6 +98,9 @@ impl<'a> Cpu<'a> {
 
         // todo this is not CPU steps but w/e for now
         self.io_registers.scanline += 1;
+        if self.io_registers.scanline == 144 {
+            self.io_registers.enable_video_interrupt();
+        }
         if self.io_registers.scanline > 153 {
             self.io_registers.scanline = 0;
         }
@@ -92,6 +117,8 @@ impl<'a> Cpu<'a> {
             // self.rom_bank, actual_loc
             // );
             self.rom[actual_loc]
+        } else if location >= 0xff80 && location <= 0xfffe {
+            self.high_ram[location - 0xff80]
         } else {
             panic!("not a rom location! {:#x}", location)
         }
@@ -185,6 +212,12 @@ impl<'a> Cpu<'a> {
             // in CGB mode, the 2nd 4k are rotatable
             println!("Writting to WRAM: {:#x}", location);
             self.work_ram[location - 0xc000] = value;
+        } else if location == 0xff46 {
+            println!("Triggering DMA transfter to OAM!");
+            let location = (value as u16) << 8;
+            for i in 0..0xA0 {
+                self.oam[i] = self.get_memory_location(location as usize);
+            }
         } else if location <= 0xff7f && location >= 0xff00 {
             self.io_registers.write(location, value);
         } else if location <= 0xfffe && location >= 0xff80 {
@@ -1489,6 +1522,7 @@ fn main() {
 
         tile_data: &mut vec![0; 0x97FF - 0x8000 + 1],
         tile_maps: &mut vec![0; 0x9FFF - 0x9800 + 1],
+        oam: &mut vec![0; 0xFE9F - 0xFE00 + 1],
 
         debug_counter: 0,
     };

@@ -2,7 +2,7 @@ pub struct IORegisters {
     // ime: bool,
     // interrupt_enable: u8,
     pub scanline: u8,
-    interupt_flag: u8,
+    pub interrupt_flag: u8,
 
     /// ff00
     joypad: u8,
@@ -66,7 +66,7 @@ impl IORegisters {
             0xff4a => self.wy,
             0xff4b => self.wx,
 
-            0xff0f => self.interupt_flag,
+            0xff0f => self.interrupt_flag,
 
             // ignore
             // 0xFF4D => _
@@ -94,23 +94,27 @@ impl IORegisters {
             0xff4a => self.wy = value,
             0xff4b => self.wx = value,
             0xff44 => panic!("writing to scanline"),
-            0xff0f => self.interupt_flag = value,
+            0xff0f => self.interrupt_flag = value,
 
             // ignore
             0xFF4D => (),
             // sound
             0xFF10..=0xFF26 => (),
 
-            // 0xff0f => self.interupt_flag,
+            // 0xff0f => self.interrupt_flag,
             _ => panic!("i/o register location write: {:#x}", location),
         }
+    }
+
+    pub fn enable_video_interrupt(&mut self) {
+        self.interrupt_flag |= 0x1;
     }
 
     pub fn default() -> IORegisters {
         IORegisters {
             joypad: 0,
             scanline: 0,
-            interupt_flag: 0,
+            interrupt_flag: 0,
             lcd_control: 0x91,
             lcd_status: 0,
             scy: 0,
