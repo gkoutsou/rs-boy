@@ -25,9 +25,9 @@ fn u8s_to_u16(ls: u8, hs: u8) -> u16 {
     (hs as u16) << 8 | ls as u16
 }
 
-struct Cpu<'a> {
-    registers: &'a mut Registers,
-    memory: &'a mut Memory,
+struct Cpu {
+    registers: Registers,
+    memory: Memory,
 
     halt: bool,
 
@@ -49,7 +49,7 @@ fn load_rom() -> io::Result<Vec<u8>> {
     Ok(buffer)
 }
 
-impl<'a> Cpu<'a> {
+impl Cpu {
     fn step(&mut self) {
         if self.ime != false
             && self.memory.interrupt_enable & self.memory.io_registers.interrupt_flag > 0
@@ -1346,7 +1346,7 @@ fn main() {
     }
 
     let mut cpu = Cpu {
-        registers: &mut Registers {
+        registers: Registers {
             // Classic
             pc: 0x100,
             sp: 0xFFFE,
@@ -1359,7 +1359,7 @@ fn main() {
             e: 0xd8,
             h: 0x01,
         },
-        memory: &mut Memory::default_with_rom(buffer),
+        memory: Memory::default_with_rom(buffer),
 
         ime: false,
 
