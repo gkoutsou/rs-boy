@@ -27,7 +27,7 @@ fn u8s_to_u16(ls: u8, hs: u8) -> u16 {
 
 struct Cpu<'a> {
     registers: &'a mut Registers,
-    memory: &'a mut Memory<'a>,
+    memory: &'a mut Memory,
 
     halt: bool,
 

@@ -1,26 +1,26 @@
 mod io_registers;
 pub use io_registers::IORegisters;
 
-pub struct Memory<'a> {
+pub struct Memory {
     rom: Vec<u8>,
     rom_bank: u8,
     // ram: &'a mut Vec<u8>,
-    high_ram: &'a mut Vec<u8>,
-    work_ram: &'a mut Vec<u8>,
+    high_ram: Vec<u8>,
+    work_ram: Vec<u8>,
 
-    tile_data: &'a mut Vec<u8>,
-    tile_maps: &'a mut Vec<u8>,
+    tile_data: Vec<u8>,
+    tile_maps: Vec<u8>,
 
     /// OAM
-    oam: &'a mut Vec<u8>,
+    oam: Vec<u8>,
 
     /// I/O registers
-    pub io_registers: &'a mut IORegisters,
+    pub io_registers: IORegisters,
 
     pub interrupt_enable: u8,
 }
 
-impl<'a> Memory<'a> {
+impl Memory {
     pub fn get(&self, location: usize) -> u8 {
         if location <= 0x7fff {
             self.get_rom(location)
@@ -153,21 +153,21 @@ impl<'a> Memory<'a> {
         println!("DUMPING TILE DATA COMPLETED");
     }
 
-    pub fn default_with_rom(buffer: Vec<u8>) -> Memory<'a> {
+    pub fn default_with_rom(buffer: Vec<u8>) -> Memory {
         Memory {
             rom: buffer,
             rom_bank: 1,
 
-            high_ram: &mut vec![0; 0xfffe - 0xff80 + 1],
-            work_ram: &mut vec![0; 0xdfff - 0xc000 + 1], // 4+4 but half could be rotatable..
+            high_ram: vec![0; 0xfffe - 0xff80 + 1],
+            work_ram: vec![0; 0xdfff - 0xc000 + 1], // 4+4 but half could be rotatable..
 
-            io_registers: &mut IORegisters::default(),
+            io_registers: IORegisters::default(),
 
             interrupt_enable: 0,
 
-            tile_data: &mut vec![0; 0x97FF - 0x8000 + 1],
-            tile_maps: &mut vec![0; 0x9FFF - 0x9800 + 1],
-            oam: &mut vec![0; 0xFE9F - 0xFE00 + 1],
+            tile_data: vec![0; 0x97FF - 0x8000 + 1],
+            tile_maps: vec![0; 0x9FFF - 0x9800 + 1],
+            oam: vec![0; 0xFE9F - 0xFE00 + 1],
         }
     }
 }
