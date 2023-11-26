@@ -5,11 +5,13 @@ use std::{
 };
 
 mod cpu_ops;
-mod io_registers;
-pub use io_registers::IORegisters;
 mod registers;
 use cpu_ops::CpuFlag;
 pub use registers::Registers;
+// mod gpu;
+// pub use gpu::GPU;
+mod memory;
+pub use memory::Memory;
 
 use crate::registers::RegisterOperation;
 
@@ -25,25 +27,12 @@ fn u8s_to_u16(ls: u8, hs: u8) -> u16 {
 
 struct Cpu<'a> {
     registers: &'a mut Registers,
-    rom: Vec<u8>,
-    rom_bank: u8,
-    // ram: &'a mut Vec<u8>,
-    high_ram: &'a mut Vec<u8>,
-    work_ram: &'a mut Vec<u8>,
+    memory: &'a mut Memory<'a>,
 
     halt: bool,
 
     /// Interrupt Master Enable
     ime: bool,
-    interrupt_enable: u8,
-
-    /// I/O registers
-    io_registers: &'a mut IORegisters,
-
-    // This section is totally GPU.. need to restructure
-    tile_data: &'a mut Vec<u8>,
-    tile_maps: &'a mut Vec<u8>,
-    oam: &'a mut Vec<u8>,
 
     // debug stuff
     debug_counter: i32,
@@ -62,12 +51,14 @@ fn load_rom() -> io::Result<Vec<u8>> {
 
 impl<'a> Cpu<'a> {
     fn step(&mut self) {
-        if self.ime != false && self.interrupt_enable & self.io_registers.interrupt_flag > 0 {
-            let interrupts = self.interrupt_enable & self.io_registers.interrupt_flag;
+        if self.ime != false
+            && self.memory.interrupt_enable & self.memory.io_registers.interrupt_flag > 0
+        {
+            let interrupts = self.memory.interrupt_enable & self.memory.io_registers.interrupt_flag;
             if interrupts & 0x1 > 0 {
                 // vblank interrupt
                 self.ime = false;
-                self.io_registers.interrupt_flag &= 0b11111110;
+                self.memory.io_registers.interrupt_flag &= 0b11111110;
                 self.push_stack(self.registers.pc);
                 self.registers.set_pc(0x40);
                 println!("VBlank Interrupt Handler");
@@ -75,9 +66,12 @@ impl<'a> Cpu<'a> {
                 return;
             }
 
-            println!("Interrupt enable: {:#8b}", self.interrupt_enable);
-            println!("Interrupt flag: {:#8b}", self.io_registers.interrupt_flag);
-            self.dump_tile_data();
+            println!("Interrupt enable: {:#8b}", self.memory.interrupt_enable);
+            println!(
+                "Interrupt flag: {:#8b}",
+                self.memory.io_registers.interrupt_flag
+            );
+            self.memory.dump_tile_data();
             panic!("found interrupt")
         }
 
@@ -97,91 +91,19 @@ impl<'a> Cpu<'a> {
         self.find_operator(location);
 
         // todo this is not CPU steps but w/e for now
-        self.io_registers.scanline += 1;
-        if self.io_registers.scanline == 144 {
-            self.io_registers.enable_video_interrupt();
+        self.memory.io_registers.scanline += 1;
+        if self.memory.io_registers.scanline == 144 {
+            self.memory.io_registers.enable_video_interrupt();
         }
-        if self.io_registers.scanline > 153 {
-            self.io_registers.scanline = 0;
+        if self.memory.io_registers.scanline > 153 {
+            self.memory.io_registers.scanline = 0;
         }
-    }
-
-    fn get_rom(&self, location: usize) -> u8 {
-        if location <= 0x3fff {
-            self.rom[location as usize]
-        } else if location <= 0x7fff && location >= 0x4000 {
-            let relative_loc = location - 0x4000;
-            let actual_loc = relative_loc + (self.rom_bank as usize) * 0x4000;
-            // println!(
-            // "Read from bank {} - location: {:#x}",
-            // self.rom_bank, actual_loc
-            // );
-            self.rom[actual_loc]
-        } else if location >= 0xff80 && location <= 0xfffe {
-            self.high_ram[location - 0xff80]
-        } else {
-            panic!("not a rom location! {:#x}", location)
-        }
-    }
-
-    // fn get_io_register(&self, location: usize) -> u8 {
-    //     println!("I/O Registers: {:#x}", location);
-    //     if location == 0xff44 {
-    //         return self.scanline;
-    //     }
-    //     panic!("i/o register location read: {:#x}", location);
-
-    //     self.io_registers[location - 0xff00]
-    // }
-
-    fn get_memory_location(&self, location: usize) -> u8 {
-        if location <= 0x7fff {
-            self.get_rom(location)
-        } else if location <= 0xfffe && location >= 0xff80 {
-            println!("HRAM Read: {:#x}", location);
-            self.high_ram[location - 0xff80]
-        } else if location <= 0xdfff && location >= 0xc000 {
-            println!("WRAM Read: {:#x}", location);
-            self.work_ram[location - 0xc000]
-        } else if location <= 0x97FF && location >= 0x8000 {
-            // println!("Getting Tile Data: {:#x}", location);
-            self.tile_data[location - 0x8000]
-        } else if location <= 0xff77 && location >= 0xff00 {
-            self.io_registers.get(location)
-        } else if location == 0xffff {
-            println!("IME");
-            self.interrupt_enable
-        } else {
-            panic!("Unknown location: {:#x}", location)
-        }
-    }
-
-    fn write_ffxx_memory_location(&mut self, steps: u8, value: u8) {
-        let location = 0xff00 + steps as usize;
-        self.write_memory_location(location, value);
-    }
-
-    fn get_ffxx_memory_location(&self, steps: usize) -> u8 {
-        let location = 0xff00 + steps as usize;
-        self.get_memory_location(location)
-        // todo this is here for now, just until I ensure I don't get any weird jumps
-        // if location == 0xffff {
-        //     self.interrupt_enable
-        // } else if location == 0xff44 {
-        //     self.io_registers[location - 0xff00]
-        // } else if location == 0xff40 {
-        //     self.io_registers[location - 0xff00]
-        // } else if location == 0xffda {
-        //     self.io_registers[location - 0xff00]
-        // } else {
-        //     panic!("Weird Location: {:#x}", location)
-        // }
     }
 
     fn pop_stack(&mut self) -> u16 {
-        let ls = self.get_memory_location(self.registers.sp as usize);
+        let ls = self.memory.get(self.registers.sp as usize);
         self.registers.sp += 1;
-        let hs = self.get_memory_location(self.registers.sp as usize);
+        let hs = self.memory.get(self.registers.sp as usize);
         self.registers.sp += 1;
         return u8s_to_u16(ls, hs);
     }
@@ -189,91 +111,26 @@ impl<'a> Cpu<'a> {
     fn push_stack(&mut self, value: u16) {
         let (hs, ls) = u16_to_u8s(value);
         self.registers.sp -= 1;
-        self.write_memory_location(self.registers.sp as usize, hs);
+        self.memory.write(self.registers.sp as usize, hs);
         self.registers.sp -= 1;
-        self.write_memory_location(self.registers.sp as usize, ls);
-    }
-
-    fn write_memory_location(&mut self, location: usize, value: u8) {
-        if location <= 0x3fff && location >= 0x2000 {
-            self.rom_bank = value & 0b11111;
-            if self.rom_bank == 0 {
-                // todo 20, 40 etc also step
-                self.rom_bank = 1;
-            }
-            println!(
-                "###### Changing to bank: {} (value: {})",
-                self.rom_bank,
-                value & 0b11111
-            );
-        } else if location <= 0x7FFF {
-            panic!("how can I write to ROM?! {:#x}:{:0b}", location, value)
-        } else if location <= 0xdfff && location >= 0xc000 {
-            // in CGB mode, the 2nd 4k are rotatable
-            println!("Writting to WRAM: {:#x}", location);
-            self.work_ram[location - 0xc000] = value;
-        } else if location == 0xff46 {
-            println!("Triggering DMA transfter to OAM!");
-            let location = (value as u16) << 8;
-            for i in 0..0xA0 {
-                self.oam[i] = self.get_memory_location(location as usize);
-            }
-        } else if location <= 0xff7f && location >= 0xff00 {
-            self.io_registers.write(location, value);
-        } else if location <= 0xfffe && location >= 0xff80 {
-            println!("Writting to HRAM: {:#x}", location);
-            self.high_ram[location - 0xff80] = value;
-        } else if location == 0xffff {
-            println!("Writting to Interrupt Enable Register");
-            self.interrupt_enable = value;
-        } else if location <= 0x97FF && location >= 0x8000 {
-            println!("Writting to Tile Data");
-            // panic!("Wrote: {:#x}", value);
-            // if value != 0 {
-            //     println!(
-            //         "finally! non empty in Tile Data: {:#x} - {:#b} = {:#x}",
-            //         location, value, value
-            //     );
-            //     if self.debug_counter == 128 {
-            //         self.dump_tile_data();
-            //         panic!("reached counter")
-            //     }
-            //     self.debug_counter += 1;
-            // }
-            self.tile_data[location - 0x8000] = value
-
-            // Starts writing here in location: 0x36e3
-        } else if location <= 0x9FFF && location >= 0x9800 {
-            println!("Writting to Tile Map");
-            // panic!("ASDD");
-            // if value != 0 {
-            //     panic!(
-            //         "finally! non empty in TileMaps: {:#x} - {:#b}",
-            //         location, value
-            //     )
-            // }
-            self.tile_maps[location - 0x9800] = value
-            // Starts writing here in location: 36e3
-        } else {
-            panic!("Need to handle memory write to: {:#x}", location)
-        }
+        self.memory.write(self.registers.sp as usize, ls);
     }
 
     fn get_u16(&mut self) -> u16 {
         let location = self.registers.step_pc();
-        let v1 = self.get_rom(location) as u16;
+        let v1 = self.memory.get_rom(location) as u16;
         let location = self.registers.step_pc();
-        let v2 = self.get_rom(location) as u16;
+        let v2 = self.memory.get_rom(location) as u16;
         v2 << 8 | v1
     }
 
     fn get_u8(&mut self) -> u8 {
         let location = self.registers.step_pc();
-        self.get_rom(location)
+        self.memory.get_rom(location)
     }
 
     fn find_operator(&mut self, location: usize) {
-        let op = self.get_rom(location);
+        let op = self.memory.get_rom(location);
         println!("operator: {:#x}", op);
         match op {
             0x0 => println!("NOP"),
@@ -420,30 +277,32 @@ impl<'a> Cpu<'a> {
             // LD NN, A
             0x02 => {
                 println!("LD (BC), A");
-                self.write_memory_location(self.registers.get_bc() as usize, self.registers.a);
+                self.memory
+                    .write(self.registers.get_bc() as usize, self.registers.a);
             }
             0x12 => {
                 println!("LD (DE), A");
-                self.write_memory_location(self.registers.get_de() as usize, self.registers.a);
+                self.memory
+                    .write(self.registers.get_de() as usize, self.registers.a);
             }
             0xea => {
                 println!("LD (nn),A");
                 let target = self.get_u16();
-                self.write_memory_location(target as usize, self.registers.a);
+                self.memory.write(target as usize, self.registers.a);
             }
 
             // LDH (n),A
             0xe0 => {
                 let steps = self.get_u8();
                 println!("LDH (n),A --> {} value: {}", steps, self.registers.a);
-                self.write_memory_location(0xff00 + steps as usize, self.registers.a);
+                self.memory.write(0xff00 + steps as usize, self.registers.a);
             }
 
             // LDH A,(n)
             0xf0 => {
                 let steps = self.get_u8();
                 println!("LDH A,(n) --> {}", steps);
-                self.registers.a = self.get_ffxx_memory_location(steps as usize);
+                self.registers.a = self.memory.get_ffxx(steps as usize);
             }
 
             // LDI (HL), A
@@ -456,20 +315,21 @@ impl<'a> Cpu<'a> {
                 // if self.registers.get_hl() == 0xc300 {
                 //     panic!("tmp")
                 // }
-                self.write_memory_location(self.registers.get_hl() as usize, self.registers.a);
+                self.memory
+                    .write(self.registers.get_hl() as usize, self.registers.a);
                 self.registers.set_hl(self.registers.get_hl() + 1)
             }
 
             // LDD A, (HL)
             0x3a => {
                 println!("LDD A, (HL)");
-                self.registers.a = self.get_memory_location(self.registers.get_hl() as usize);
+                self.registers.a = self.memory.get(self.registers.get_hl() as usize);
                 self.registers.set_hl(self.registers.get_hl() - 1)
             }
             // LDI A, (HL)
             0x2a => {
                 println!("LDI A, (HL)");
-                self.registers.a = self.get_memory_location(self.registers.get_hl() as usize);
+                self.registers.a = self.memory.get(self.registers.get_hl() as usize);
                 self.registers.set_hl(self.registers.get_hl() + 1)
             }
 
@@ -501,15 +361,15 @@ impl<'a> Cpu<'a> {
             }
             0x0a => {
                 println!("LD A, (BC)");
-                self.registers.a = self.get_memory_location(self.registers.get_bc() as usize);
+                self.registers.a = self.memory.get(self.registers.get_bc() as usize);
             }
             0x1a => {
                 println!("LD A, (DE)");
-                self.registers.a = self.get_memory_location(self.registers.get_de() as usize);
+                self.registers.a = self.memory.get(self.registers.get_de() as usize);
             }
             0x7e => {
                 println!("LD A, (HL)");
-                self.registers.a = self.get_memory_location(self.registers.get_hl() as usize);
+                self.registers.a = self.memory.get(self.registers.get_hl() as usize);
             }
             0x3e => {
                 let value = self.get_u8();
@@ -545,7 +405,7 @@ impl<'a> Cpu<'a> {
             }
             0x46 => {
                 println!("LD B, (HL)");
-                self.registers.b = self.get_memory_location(self.registers.get_hl() as usize);
+                self.registers.b = self.memory.get(self.registers.get_hl() as usize);
             }
             0x06 => {
                 let value = self.get_u8();
@@ -581,7 +441,7 @@ impl<'a> Cpu<'a> {
             }
             0x4e => {
                 println!("LD C, (HL)");
-                self.registers.c = self.get_memory_location(self.registers.get_hl() as usize);
+                self.registers.c = self.memory.get(self.registers.get_hl() as usize);
             }
             0x0e => {
                 let value = self.get_u8();
@@ -617,7 +477,7 @@ impl<'a> Cpu<'a> {
             }
             0x56 => {
                 println!("LD D, (HL)");
-                self.registers.d = self.get_memory_location(self.registers.get_hl() as usize);
+                self.registers.d = self.memory.get(self.registers.get_hl() as usize);
             }
             0x16 => {
                 let value = self.get_u8();
@@ -653,7 +513,7 @@ impl<'a> Cpu<'a> {
             }
             0x5e => {
                 println!("LD E, (HL)");
-                self.registers.e = self.get_memory_location(self.registers.get_hl() as usize);
+                self.registers.e = self.memory.get(self.registers.get_hl() as usize);
             }
             0x1e => {
                 let value = self.get_u8();
@@ -689,7 +549,7 @@ impl<'a> Cpu<'a> {
             }
             0x66 => {
                 println!("LD H, (HL)");
-                self.registers.h = self.get_memory_location(self.registers.get_hl() as usize);
+                self.registers.h = self.memory.get(self.registers.get_hl() as usize);
             }
             0x26 => {
                 let value = self.get_u8();
@@ -725,7 +585,7 @@ impl<'a> Cpu<'a> {
             0x6D => {}
             0x6E => {
                 println!("LD L, (HL)");
-                self.registers.l = self.get_memory_location(self.registers.get_hl() as usize);
+                self.registers.l = self.memory.get(self.registers.get_hl() as usize);
             }
             0x2e => {
                 let value = self.get_u8();
@@ -736,54 +596,61 @@ impl<'a> Cpu<'a> {
             // (HL)
             0x77 => {
                 println!("LD (HL), A");
-                self.write_memory_location(self.registers.get_hl() as usize, self.registers.a);
+                self.memory
+                    .write(self.registers.get_hl() as usize, self.registers.a);
             }
             0x70 => {
                 println!("LD (HL), B");
-                self.write_memory_location(self.registers.get_hl() as usize, self.registers.b);
+                self.memory
+                    .write(self.registers.get_hl() as usize, self.registers.b);
             }
             0x71 => {
                 println!("LD (HL), C");
-                self.write_memory_location(self.registers.get_hl() as usize, self.registers.c);
+                self.memory
+                    .write(self.registers.get_hl() as usize, self.registers.c);
             }
             0x72 => {
                 println!("LD (HL), D");
-                self.write_memory_location(self.registers.get_hl() as usize, self.registers.d);
+                self.memory
+                    .write(self.registers.get_hl() as usize, self.registers.d);
             }
             0x73 => {
                 println!("LD (HL), E");
-                self.write_memory_location(self.registers.get_hl() as usize, self.registers.e);
+                self.memory
+                    .write(self.registers.get_hl() as usize, self.registers.e);
             }
             0x74 => {
                 println!("LD (HL), H");
-                self.write_memory_location(self.registers.get_hl() as usize, self.registers.h);
+                self.memory
+                    .write(self.registers.get_hl() as usize, self.registers.h);
             }
             0x75 => {
                 println!("LD (HL), L");
-                self.write_memory_location(self.registers.get_hl() as usize, self.registers.l);
+                self.memory
+                    .write(self.registers.get_hl() as usize, self.registers.l);
             }
             0x36 => {
                 println!("LD (HL), n");
                 let v = self.get_u8();
-                self.write_memory_location(self.registers.get_hl() as usize, v);
+                self.memory.write(self.registers.get_hl() as usize, v);
             }
 
             0xfa => {
                 println!("LD A, nn");
                 let source = self.get_u16();
-                self.registers.a = self.get_memory_location(source as usize);
+                self.registers.a = self.memory.get(source as usize);
             }
 
             // LD A, (C)
             0xf2 => {
                 println!("LD A, (C)");
-                self.registers.a = self.get_ffxx_memory_location(self.registers.c as usize);
+                self.registers.a = self.memory.get_ffxx(self.registers.c as usize);
             }
 
             // LD (C), A
             0xe2 => {
                 println!("LD (C), A");
-                self.write_ffxx_memory_location(self.registers.c, self.registers.a);
+                self.memory.write_ffxx(self.registers.c, self.registers.a);
             }
 
             // ADD
@@ -817,7 +684,7 @@ impl<'a> Cpu<'a> {
             }
             0x86 => {
                 println!("ADD A, (HL)");
-                let v = self.get_memory_location(self.registers.get_hl() as usize);
+                let v = self.memory.get(self.registers.get_hl() as usize);
                 self.registers.f = self.registers.a.add(v);
             }
             0xc6 => {
@@ -960,10 +827,10 @@ impl<'a> Cpu<'a> {
             0x34 => {
                 println!("INC (HL)");
                 let location = self.registers.get_hl() as usize;
-                let mut value = self.get_memory_location(location);
+                let mut value = self.memory.get(location);
                 let f = value.inc(self.registers.f);
                 self.registers.f = f;
-                self.write_memory_location(location, value);
+                self.memory.write(location, value);
             }
 
             // DEC
@@ -1130,7 +997,7 @@ impl<'a> Cpu<'a> {
             0xbe => {
                 println!("CP (HL)");
                 let mem_loc = self.registers.get_hl() as usize;
-                self.registers.f = self.registers.a.cp(self.get_memory_location(mem_loc));
+                self.registers.f = self.registers.a.cp(self.memory.get(mem_loc));
             }
 
             0xfe => {
@@ -1303,7 +1170,7 @@ impl<'a> Cpu<'a> {
             0x76 => {
                 self.halt = true;
                 println!("HALT");
-                println!("Interrupt enable: {:#8b}", self.interrupt_enable)
+                println!("Interrupt enable: {:#8b}", self.memory.interrupt_enable)
             }
 
             0xcb => {
@@ -1312,7 +1179,7 @@ impl<'a> Cpu<'a> {
 
             _ => {
                 println!("Info for debugging");
-                self.dump_tile_data();
+                self.memory.dump_tile_data();
 
                 panic!("missing operator {:#x}", op);
             }
@@ -1423,37 +1290,20 @@ impl<'a> Cpu<'a> {
         }
     }
 
-    fn dump_tile_data(&self) {
-        println!("DUMPING TILE DATA");
-        for tile in 0..384 {
-            let mut sum = 0i32;
-            for i in 0..16 {
-                sum += self.tile_data[tile * 16 + i] as i32;
-            }
-            if sum > 0 {
-                for i in 0..16 {
-                    print!("{:#04x} ", self.tile_data[tile * 16 + i]);
-                }
-                println!()
-            }
-        }
-        println!("DUMPING TILE DATA COMPLETED");
-    }
-
-    fn dump_tile_map(&self) {
-        for tile in 0..32 {
-            let mut sum = 0i32;
-            for i in 0..16 {
-                sum += self.tile_data[tile * 16 + i] as i32;
-            }
-            if sum > 0 {
-                for i in 0..16 {
-                    print!("{:#04x} ", self.tile_data[tile * 16 + i]);
-                }
-                println!()
-            }
-        }
-    }
+    // fn dump_tile_map(&self) {
+    //     for tile in 0..32 {
+    //         let mut sum = 0i32;
+    //         for i in 0..16 {
+    //             sum += self.tile_data[tile * 16 + i] as i32;
+    //         }
+    //         if sum > 0 {
+    //             for i in 0..16 {
+    //                 print!("{:#04x} ", self.tile_data[tile * 16 + i]);
+    //             }
+    //             println!()
+    //         }
+    //     }
+    // }
 }
 
 fn main() {
@@ -1509,20 +1359,11 @@ fn main() {
             e: 0xd8,
             h: 0x01,
         },
-        rom: buffer,
-        rom_bank: 1,
-        // ram: &mut vec![0; 8192],
-        high_ram: &mut vec![0; 0xfffe - 0xff80 + 1],
-        work_ram: &mut vec![0; 0xdfff - 0xc000 + 1], // 4+4 but half could be rotatable..
+        memory: &mut Memory::default_with_rom(buffer),
+
         ime: false,
-        interrupt_enable: 0,
-        io_registers: &mut IORegisters::default(),
 
         halt: false,
-
-        tile_data: &mut vec![0; 0x97FF - 0x8000 + 1],
-        tile_maps: &mut vec![0; 0x9FFF - 0x9800 + 1],
-        oam: &mut vec![0; 0xFE9F - 0xFE00 + 1],
 
         debug_counter: 0,
     };
@@ -1531,5 +1372,5 @@ fn main() {
         // println!("Iteration {}", _i);
         cpu.step();
     }
-    cpu.dump_tile_data();
+    cpu.memory.dump_tile_data();
 }
