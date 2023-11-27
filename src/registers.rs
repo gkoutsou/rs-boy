@@ -16,6 +16,7 @@ pub trait RegisterOperation {
     fn or(&mut self, b: u8) -> u8;
     fn and(&mut self, b: u8) -> u8;
     fn add(&mut self, b: u8) -> u8;
+    fn sub(&mut self, b: u8) -> u8;
     fn cp(self, b: u8) -> u8;
 
     fn inc(&mut self, f: u8) -> u8;
@@ -99,6 +100,17 @@ impl RegisterOperation for u8 {
         f = set_flag(f, Flag::N, false);
         f = set_flag(f, Flag::H, (a & 0xF) + (b & 0xF) > 0xF);
         f = set_flag(f, Flag::C, (a as u16) + (b as u16) > 0xFF);
+        *self = result;
+        f
+    }
+
+    fn sub(&mut self, b: u8) -> u8 {
+        let a = *self;
+        let mut f = set_flag(0x0, Flag::C, a < b);
+        f = set_flag(f, Flag::H, (b & 0x0f) > (a & 0x0f));
+        let result = a.wrapping_sub(b);
+        f = set_flag(f, Flag::Z, result == 0);
+        f = set_flag(f, Flag::N, true);
         *self = result;
         f
     }

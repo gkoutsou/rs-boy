@@ -28,6 +28,7 @@ fn u8s_to_u16(ls: u8, hs: u8) -> u16 {
 struct Cpu {
     registers: Registers,
     memory: Memory,
+    cpu_cycles: u32,
 
     halt: bool,
 
@@ -89,14 +90,24 @@ impl Cpu {
         }
 
         self.find_operator(location);
+        self.cpu_cycles += 4; // TODO needs to change
 
         // todo this is not CPU steps but w/e for now
-        self.memory.io_registers.scanline += 1;
-        if self.memory.io_registers.scanline == 144 {
-            self.memory.io_registers.enable_video_interrupt();
-        }
-        if self.memory.io_registers.scanline > 153 {
-            self.memory.io_registers.scanline = 0;
+        self.gpu_step();
+    }
+
+    fn gpu_step(&mut self) {
+        if self.cpu_cycles >= 456 / 4 {
+            self.memory.io_registers.scanline += 1;
+            if self.memory.io_registers.scanline == 144 {
+                self.memory.io_registers.enable_video_interrupt();
+            }
+            if self.memory.io_registers.scanline > 153 {
+                self.memory.io_registers.scanline = 0;
+                // self.memory.dump_tile_data();
+                // panic!("tadadaaa")
+            }
+            self.cpu_cycles = 0;
         }
     }
 
@@ -731,34 +742,142 @@ impl Cpu {
                 self.registers.set_hl(hl);
             }
 
+            // ADC
+            0x8f => {
+                println!("ADC A, A");
+                self.registers.f = self
+                    .registers
+                    .a
+                    .add(self.registers.a + self.registers.f.has_flag(registers::Flag::C) as u8);
+            }
+            0x88 => {
+                println!("ADC A, B");
+                self.registers.f = self
+                    .registers
+                    .a
+                    .add(self.registers.b + self.registers.f.has_flag(registers::Flag::C) as u8);
+            }
+            0x89 => {
+                println!("ADC A, C");
+                self.registers.f = self
+                    .registers
+                    .a
+                    .add(self.registers.c + self.registers.f.has_flag(registers::Flag::C) as u8);
+            }
+            0x8a => {
+                println!("ADC A, D");
+                self.registers.f = self
+                    .registers
+                    .a
+                    .add(self.registers.d + self.registers.f.has_flag(registers::Flag::C) as u8);
+            }
+            0x8b => {
+                println!("ADC A, E");
+                self.registers.f = self
+                    .registers
+                    .a
+                    .add(self.registers.e + self.registers.f.has_flag(registers::Flag::C) as u8);
+            }
+            0x8c => {
+                println!("ADC A, H");
+                self.registers.f = self
+                    .registers
+                    .a
+                    .add(self.registers.h + self.registers.f.has_flag(registers::Flag::C) as u8);
+            }
+            0x8d => {
+                println!("ADC A, L");
+                self.registers.f = self
+                    .registers
+                    .a
+                    .add(self.registers.l + self.registers.f.has_flag(registers::Flag::C) as u8);
+            }
+            0x8e => {
+                println!("ADC A, (HL)");
+                let v = self.memory.get(self.registers.get_hl() as usize);
+                self.registers.f = self
+                    .registers
+                    .a
+                    .add(v + self.registers.f.has_flag(registers::Flag::C) as u8);
+            }
+            0xce => {
+                println!("ADC A, #");
+                let v = self.get_u8();
+                self.registers.f = self
+                    .registers
+                    .a
+                    .add(v + self.registers.f.has_flag(registers::Flag::C) as u8);
+            }
+
             // SUB n
             0x90 => {
                 println!("SUB B");
-                let mut f = cpu_ops::set_flag(
-                    self.registers.f,
-                    CpuFlag::C,
-                    self.registers.a < self.registers.b,
-                );
-                f = cpu_ops::set_flag(
-                    f,
-                    CpuFlag::H,
-                    (self.registers.b & 0x0f) > (self.registers.a & 0x0f),
-                );
-                self.registers.a = self.registers.a.wrapping_sub(self.registers.b);
-                f = cpu_ops::set_flag(f, CpuFlag::Z, self.registers.a == 0);
-                f = cpu_ops::set_flag(f, CpuFlag::N, true);
-                self.registers.f = f;
+                self.registers.f = self.registers.a.sub(self.registers.b);
             }
 
             0xd6 => {
                 println!("SUB #");
-                let b = self.get_u8();
-                let mut f = cpu_ops::set_flag(self.registers.f, CpuFlag::C, self.registers.a < b);
-                f = cpu_ops::set_flag(f, CpuFlag::H, (b & 0x0f) > (self.registers.a & 0x0f));
-                self.registers.a = self.registers.a.wrapping_sub(b);
-                f = cpu_ops::set_flag(f, CpuFlag::Z, self.registers.a == 0);
-                f = cpu_ops::set_flag(f, CpuFlag::N, true);
-                self.registers.f = f;
+                let v = self.get_u8();
+                self.registers.f = self.registers.a.sub(v);
+            }
+
+            // SBC
+            0x9f => {
+                println!("SBC A, A");
+                self.registers.f = self
+                    .registers
+                    .a
+                    .sub(self.registers.a + self.registers.f.has_flag(registers::Flag::C) as u8);
+            }
+            0x98 => {
+                println!("SBC A, B");
+                self.registers.f = self
+                    .registers
+                    .a
+                    .sub(self.registers.b + self.registers.f.has_flag(registers::Flag::C) as u8);
+            }
+            0x99 => {
+                println!("SBC A, C");
+                self.registers.f = self
+                    .registers
+                    .a
+                    .sub(self.registers.c + self.registers.f.has_flag(registers::Flag::C) as u8);
+            }
+            0x9a => {
+                println!("SBC A, D");
+                self.registers.f = self
+                    .registers
+                    .a
+                    .sub(self.registers.d + self.registers.f.has_flag(registers::Flag::C) as u8);
+            }
+            0x9b => {
+                println!("SBC A, E");
+                self.registers.f = self
+                    .registers
+                    .a
+                    .sub(self.registers.e + self.registers.f.has_flag(registers::Flag::C) as u8);
+            }
+            0x9c => {
+                println!("SBC A, H");
+                self.registers.f = self
+                    .registers
+                    .a
+                    .sub(self.registers.h + self.registers.f.has_flag(registers::Flag::C) as u8);
+            }
+            0x9d => {
+                println!("SBC A, L");
+                self.registers.f = self
+                    .registers
+                    .a
+                    .sub(self.registers.l + self.registers.f.has_flag(registers::Flag::C) as u8);
+            }
+            0x9e => {
+                println!("SBC A, (HL)");
+                let v = self.memory.get(self.registers.get_hl() as usize);
+                self.registers.f = self
+                    .registers
+                    .a
+                    .sub(v + self.registers.f.has_flag(registers::Flag::C) as u8);
             }
 
             // INC nn
@@ -1173,6 +1292,13 @@ impl Cpu {
                 println!("Interrupt enable: {:#8b}", self.memory.interrupt_enable)
             }
 
+            0xd9 => {
+                let new_loc = self.pop_stack();
+                println!("RETI to: {:#x}", new_loc);
+                self.registers.set_pc(new_loc);
+                self.ime = true;
+            }
+
             0xcb => {
                 self.do_cb();
             }
@@ -1286,7 +1412,20 @@ impl Cpu {
             0x44 => self.registers.f = self.registers.h.bit(0, self.registers.f),
             0x45 => self.registers.f = self.registers.l.bit(0, self.registers.f),
 
-            _ => panic!("Missing cb {:#x}", op),
+            0x4f => self.registers.f = self.registers.a.bit(1, self.registers.f),
+            0x48 => self.registers.f = self.registers.b.bit(1, self.registers.f),
+            0x49 => self.registers.f = self.registers.c.bit(1, self.registers.f),
+            0x4a => self.registers.f = self.registers.d.bit(1, self.registers.f),
+            0x4b => self.registers.f = self.registers.e.bit(1, self.registers.f),
+            0x4c => self.registers.f = self.registers.h.bit(1, self.registers.f),
+            0x4d => self.registers.f = self.registers.l.bit(1, self.registers.f),
+
+            _ => {
+                println!("Info for debugging");
+                self.memory.dump_tile_data();
+
+                panic!("Missing cb {:#x}", op)
+            }
         }
     }
 
@@ -1364,6 +1503,7 @@ fn main() {
         ime: false,
 
         halt: false,
+        cpu_cycles: 0,
 
         debug_counter: 0,
     };

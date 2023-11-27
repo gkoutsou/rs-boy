@@ -84,7 +84,12 @@ impl IORegisters {
             0xFF05 => self.tima = value,
             0xFF06 => self.tma = value,
             0xFF07 => self.tac = value,
-            0xff40 => self.lcd_control = value,
+            0xff40 => {
+                self.lcd_control = value;
+                // if value != 1 << 7 {
+                // panic!("{:#b}", value)
+                // }
+            }
             0xff41 => self.lcd_status = value,
             0xff42 => self.scy = value,
             0xff43 => self.scx = value,
