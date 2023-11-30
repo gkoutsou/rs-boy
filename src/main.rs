@@ -8,7 +8,7 @@ mod cpu_ops;
 mod registers;
 use cpu_ops::CpuFlag;
 pub use registers::Registers;
-// mod gpu;
+mod gpu;
 // pub use gpu::GPU;
 mod memory;
 pub use memory::Memory;
@@ -29,6 +29,7 @@ struct Cpu {
     registers: Registers,
     memory: Memory,
     cpu_cycles: u32,
+    gpu_mode: gpu::Mode,
 
     halt: bool,
 
@@ -89,25 +90,99 @@ impl Cpu {
             panic!("moving outside of bank 2")
         }
 
-        self.find_operator(location);
-        self.cpu_cycles += 4; // TODO needs to change
+        let op = self.memory.get_rom(location);
+        println!("operator: {:#x}", op);
+        match op {
+            0xcb => {
+                let cb_op = self.get_u8();
+                self.do_cb(cb_op);
+                self.cpu_cycles += cpu_ops::get_cb_ticks(cb_op);
+            }
+
+            _ => {
+                self.run_instruction(op);
+                self.cpu_cycles += cpu_ops::get_ticks(op);
+            }
+        }
 
         // todo this is not CPU steps but w/e for now
         self.gpu_step();
     }
 
     fn gpu_step(&mut self) {
-        if self.cpu_cycles >= 456 / 4 {
-            self.memory.io_registers.scanline += 1;
-            if self.memory.io_registers.scanline == 144 {
-                self.memory.io_registers.enable_video_interrupt();
-            }
-            if self.memory.io_registers.scanline > 153 {
-                self.memory.io_registers.scanline = 0;
-                // self.memory.dump_tile_data();
-                // panic!("tadadaaa")
-            }
+        if !self.memory.io_registers.lcd_enabled() {
+            println!("LCD disabled!");
             self.cpu_cycles = 0;
+            return;
+        }
+
+        match self.gpu_mode {
+            gpu::Mode::Two => {
+                let line = self.memory.io_registers.scanline;
+                println!("OAM Scan: line {} ({})", line, self.cpu_cycles);
+                // 80 dots
+                if self.cpu_cycles >= 80 / 4 {
+                    // scan pixels TODO ideally I should follow the ticks, not do it at once
+                    self.cpu_cycles -= 20;
+                    self.gpu_mode = gpu::Mode::Three;
+                    let mut object_counter = 0;
+                    for i in 0..40 {
+                        let tile = self.memory.get_oam_object(i);
+                        let double_size = self.memory.io_registers.has_lcd_flag(2);
+                        if tile.object_in_scanline(line, double_size) {
+                            object_counter += 1;
+                            panic!("found object {:?}", tile)
+                        }
+                    }
+                }
+            }
+            gpu::Mode::One => {
+                println!(
+                    "VBlank: line {} ({})",
+                    self.memory.io_registers.scanline, self.cpu_cycles
+                );
+
+                if self.cpu_cycles >= 456 / 4 {
+                    self.memory.io_registers.scanline += 1;
+                    self.cpu_cycles -= 456 / 4;
+                }
+
+                if self.memory.io_registers.scanline > 153 {
+                    self.gpu_mode = gpu::Mode::Two;
+                    self.memory.io_registers.scanline = 0
+                    // self.memory.dump_tile_data();
+                    // panic!("tadadaaa")
+                }
+            }
+            gpu::Mode::Zero => {
+                println!(
+                    "Horrizontal Blank: line {} ({})",
+                    self.memory.io_registers.scanline, self.cpu_cycles
+                );
+                if self.cpu_cycles >= 204 / 4 {
+                    self.cpu_cycles -= 204 / 4;
+                    if self.memory.io_registers.scanline == 143 {
+                        //todo should this be 143?
+                        self.memory.io_registers.enable_video_interrupt();
+                        self.gpu_mode = gpu::Mode::One;
+                    } else {
+                        self.gpu_mode = gpu::Mode::Two;
+                    }
+                }
+            }
+            gpu::Mode::Three => {
+                println!(
+                    "Drawing Pixels: line {} ({})",
+                    self.memory.io_registers.scanline, self.cpu_cycles
+                );
+                //todo hack
+
+                if self.cpu_cycles >= 172 / 4 {
+                    self.gpu_mode = gpu::Mode::Zero;
+                    self.cpu_cycles -= 172 / 4;
+                    self.memory.io_registers.scanline += 1;
+                }
+            }
         }
     }
 
@@ -140,9 +215,7 @@ impl Cpu {
         self.memory.get_rom(location)
     }
 
-    fn find_operator(&mut self, location: usize) {
-        let op = self.memory.get_rom(location);
-        println!("operator: {:#x}", op);
+    fn run_instruction(&mut self, op: u8) {
         match op {
             0x0 => println!("NOP"),
 
@@ -1300,7 +1373,7 @@ impl Cpu {
             }
 
             0xcb => {
-                self.do_cb();
+                panic!("cb operation should not run through this");
             }
 
             _ => {
@@ -1312,9 +1385,8 @@ impl Cpu {
         };
     }
 
-    fn do_cb(&mut self) {
-        let op = self.get_u8();
-        match op {
+    fn do_cb(&mut self, cb_instruction: u8) {
+        match cb_instruction {
             0x1a => {
                 println!("RR");
                 let new_c = self.registers.d & 0x01;
@@ -1424,7 +1496,7 @@ impl Cpu {
                 println!("Info for debugging");
                 self.memory.dump_tile_data();
 
-                panic!("Missing cb {:#x}", op)
+                panic!("Missing cb {:#x}", cb_instruction)
             }
         }
     }
@@ -1463,7 +1535,7 @@ fn main() {
 
     let title = str::from_utf8(&buffer[0x134..0x142]).unwrap();
 
-    println!("Title = {}", title);
+    // println!("Title = {}", title);
 
     println!("Type = {:#x}", buffer[0x143]);
     println!("GB/SGB Indicator = {:#x}", buffer[0x146]);
@@ -1504,6 +1576,7 @@ fn main() {
 
         halt: false,
         cpu_cycles: 0,
+        gpu_mode: gpu::Mode::Two,
 
         debug_counter: 0,
     };

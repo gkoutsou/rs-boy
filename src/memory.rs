@@ -1,6 +1,8 @@
 mod io_registers;
 pub use io_registers::IORegisters;
 
+use crate::gpu;
+
 pub struct Memory {
     rom: Vec<u8>,
     rom_bank: u8,
@@ -64,10 +66,13 @@ impl Memory {
             println!("Writting to WRAM: {:#x}", location);
             self.work_ram[location - 0xc000] = value;
         } else if location == 0xff46 {
-            println!("Triggering DMA transfter to OAM!");
             let location = (value as u16) << 8;
+            println!(
+                "Triggering DMA transfter to OAM! {:#x} --> {:#x}",
+                value, location
+            );
             for i in 0..0xA0 {
-                self.oam[i] = self.get(location as usize);
+                self.oam[i] = self.get(location as usize + i);
             }
         } else if location <= 0xff7f && location >= 0xff00 {
             self.io_registers.write(location, value);
@@ -78,19 +83,19 @@ impl Memory {
             println!("Writting to Interrupt Enable Register");
             self.interrupt_enable = value;
         } else if location <= 0x97FF && location >= 0x8000 {
-            println!("Writting to Tile Data");
+            // println!("Writting to Tile Data");
             // panic!("Wrote: {:#x}", value);
-            // if value != 0 {
-            //     println!(
-            //         "finally! non empty in Tile Data: {:#x} - {:#b} = {:#x}",
-            //         location, value, value
-            //     );
-            //     if self.debug_counter == 128 {
-            //         self.dump_tile_data();
-            //         panic!("reached counter")
-            //     }
-            //     self.debug_counter += 1;
-            // }
+            if value != 0 {
+                println!(
+                    "finally! non empty in Tile Data: {:#x} - {:#b} = {:#x}",
+                    location, value, value
+                );
+                // if self.debug_counter == 128 {
+                //     self.dump_tile_data();
+                //     panic!("reached counter")
+                // }
+                // self.debug_counter += 1;
+            }
             self.tile_data[location - 0x8000] = value
 
             // Starts writing here in location: 0x36e3
@@ -153,6 +158,14 @@ impl Memory {
             }
         }
         println!("DUMPING TILE DATA COMPLETED");
+    }
+
+    pub fn get_oam_object(&self, object: usize) -> gpu::Tile {
+        let y = self.oam[object * 4];
+        let x = self.oam[object * 4 + 1];
+        let tile_index = self.oam[object * 4 + 2];
+        let flags = self.oam[object * 4 + 3];
+        gpu::Tile::new(y, x, tile_index, flags)
     }
 
     pub fn default_with_rom(buffer: Vec<u8>) -> Memory {

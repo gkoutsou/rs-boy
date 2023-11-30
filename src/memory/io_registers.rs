@@ -21,7 +21,23 @@ pub struct IORegisters {
     tac: u8,
 
     /// ff40
-    lcd_control: u8,
+    ///
+    /// 7 - LCD & PPU enable: 0 = Off; 1 = On
+    ///
+    /// 6 - Window tile map area: 0 = 9800–9BFF; 1 = 9C00–9FFF
+    ///
+    /// 5 - Window enable: 0 = Off; 1 = On
+    ///
+    /// 4 - BG & Window tile data area: 0 = 8800–97FF; 1 = 8000–8FFF
+    ///
+    /// 3 - BG tile map area: 0 = 9800–9BFF; 1 = 9C00–9FFF
+    ///
+    /// 2 - OBJ size: 0 = 8×8; 1 = 8×16
+    ///
+    /// 1 - OBJ enable: 0 = Off; 1 = On
+    ///
+    /// 0 - BG & Window enable / priority [Different meaning in CGB Mode]: 0 = Off; 1 = On
+    pub lcd_control: u8,
     /// ff41
     lcd_status: u8,
     /// ff42
@@ -113,6 +129,14 @@ impl IORegisters {
 
     pub fn enable_video_interrupt(&mut self) {
         self.interrupt_flag |= 0x1;
+    }
+
+    pub fn lcd_enabled(&self) -> bool {
+        return self.lcd_control & (1 << 7) > 0;
+    }
+
+    pub fn has_lcd_flag(&self, bit: u8) -> bool {
+        return self.lcd_control & (1 << bit) > 0;
     }
 
     pub fn default() -> IORegisters {
