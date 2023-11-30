@@ -7,6 +7,8 @@ use std::{
 mod cpu_ops;
 mod registers;
 use cpu_ops::CpuFlag;
+use env_logger::Env;
+use log::{debug, info, trace};
 pub use registers::Registers;
 mod gpu;
 // pub use gpu::GPU;
@@ -82,16 +84,16 @@ impl Cpu {
         }
 
         let location = self.registers.step_pc();
-        println!("Running location {:#x}", location);
+        trace!("Running location {:#x}", location);
 
         if location >= 0xFF80 && location <= 0xFFFE {
-            println!("Running code in HRAM!")
+            trace!("Running code in HRAM!")
         } else if location > 0x7FFF {
             panic!("moving outside of bank 2")
         }
 
         let op = self.memory.get_rom(location);
-        println!("operator: {:#x}", op);
+        trace!("operator: {:#x}", op);
         match op {
             0xcb => {
                 let cb_op = self.get_u8();
@@ -111,7 +113,7 @@ impl Cpu {
 
     fn gpu_step(&mut self) {
         if !self.memory.io_registers.lcd_enabled() {
-            println!("LCD disabled!");
+            trace!("LCD disabled!");
             self.cpu_cycles = 0;
             return;
         }
@@ -119,7 +121,7 @@ impl Cpu {
         match self.gpu_mode {
             gpu::Mode::Two => {
                 let line = self.memory.io_registers.scanline;
-                println!("OAM Scan: line {} ({})", line, self.cpu_cycles);
+                trace!("OAM Scan: line {} ({})", line, self.cpu_cycles);
                 // 80 dots
                 if self.cpu_cycles >= 80 / 4 {
                     // scan pixels TODO ideally I should follow the ticks, not do it at once
@@ -137,9 +139,10 @@ impl Cpu {
                 }
             }
             gpu::Mode::One => {
-                println!(
+                trace!(
                     "VBlank: line {} ({})",
-                    self.memory.io_registers.scanline, self.cpu_cycles
+                    self.memory.io_registers.scanline,
+                    self.cpu_cycles
                 );
 
                 if self.cpu_cycles >= 456 / 4 {
@@ -155,9 +158,10 @@ impl Cpu {
                 }
             }
             gpu::Mode::Zero => {
-                println!(
+                trace!(
                     "Horrizontal Blank: line {} ({})",
-                    self.memory.io_registers.scanline, self.cpu_cycles
+                    self.memory.io_registers.scanline,
+                    self.cpu_cycles
                 );
                 if self.cpu_cycles >= 204 / 4 {
                     self.cpu_cycles -= 204 / 4;
@@ -171,9 +175,10 @@ impl Cpu {
                 }
             }
             gpu::Mode::Three => {
-                println!(
+                trace!(
                     "Drawing Pixels: line {} ({})",
-                    self.memory.io_registers.scanline, self.cpu_cycles
+                    self.memory.io_registers.scanline,
+                    self.cpu_cycles
                 );
                 //todo hack
 
@@ -217,12 +222,12 @@ impl Cpu {
 
     fn run_instruction(&mut self, op: u8) {
         match op {
-            0x0 => println!("NOP"),
+            0x0 => trace!("NOP"),
 
             0xc3 => {
                 let v = self.get_u16();
                 self.registers.set_pc(v);
-                println!("JP nn --> {:#x}", v);
+                trace!("JP nn --> {:#x}", v);
             }
 
             // JR n
@@ -230,42 +235,42 @@ impl Cpu {
                 let steps = self.get_u8() as i16;
                 let new_location = self.registers.pc as i32 + steps as i32;
                 self.registers.set_pc(new_location as u16);
-                println!("JR n (jump {} -> {:#x})", steps, new_location);
+                trace!("JR n (jump {} -> {:#x})", steps, new_location);
             }
 
             // JP NZ,nn
             0xc2 => {
                 let new_loc = self.get_u16();
-                println!("JP NZ,nn --> {:#x}", new_loc);
+                trace!("JP NZ,nn --> {:#x}", new_loc);
                 if !self.registers.f.has_flag(registers::Flag::Z) {
-                    println!("Making the jump!");
+                    trace!("Making the jump!");
                     self.registers.set_pc(new_loc);
                 }
             }
             // JP Z,nn CA 12
             0xca => {
                 let new_loc = self.get_u16();
-                println!("JP Z,nn --> {:#x}", new_loc);
+                trace!("JP Z,nn --> {:#x}", new_loc);
                 if self.registers.f.has_flag(registers::Flag::Z) {
-                    println!("Making the jump!");
+                    trace!("Making the jump!");
                     self.registers.set_pc(new_loc);
                 }
             }
             // JP NC,nn
             0xd2 => {
                 let new_loc = self.get_u16();
-                println!("JP NC,nn --> {:#x}", new_loc);
+                trace!("JP NC,nn --> {:#x}", new_loc);
                 if !self.registers.f.has_flag(registers::Flag::C) {
-                    println!("Making the jump!");
+                    trace!("Making the jump!");
                     self.registers.set_pc(new_loc);
                 }
             }
             // JP C,nn
             0xda => {
                 let new_loc = self.get_u16();
-                println!("JP C,nn --> {:#x}", new_loc);
+                trace!("JP C,nn --> {:#x}", new_loc);
                 if self.registers.f.has_flag(registers::Flag::C) {
-                    println!("Making the jump!");
+                    trace!("Making the jump!");
                     self.registers.set_pc(new_loc);
                 }
             }
@@ -273,43 +278,46 @@ impl Cpu {
             // JR cc,n
             0x20 => {
                 let steps = self.get_u8() as i8 as i32;
-                println!(
+                trace!(
                     "JR NZ,n --> {} - {:#x}",
                     steps,
                     self.registers.pc as i32 + steps
                 );
-                println!("############");
+                trace!("############");
                 if !self.registers.f.has_flag(registers::Flag::Z) {
                     let new_location = (self.registers.pc as i32 + steps) as u16;
-                    println!(
+                    trace!(
                         "Current location: {:#x}, next: {:#x}",
-                        self.registers.pc, new_location
+                        self.registers.pc,
+                        new_location
                     );
                     self.registers.set_pc(new_location);
                     // panic!("untested jump");
                 }
             }
             0x28 => {
-                println!("JR Z,n");
+                trace!("JR Z,n");
                 let steps = self.get_u8() as i8 as i32;
-                println!("{:#b}", self.registers.f);
+                trace!("{:#b}", self.registers.f);
                 if self.registers.f.has_flag(registers::Flag::Z) {
                     let new_location = (self.registers.pc as i32 + steps) as u16;
-                    println!(
+                    trace!(
                         "Current location: {}, next: {}",
-                        self.registers.pc, new_location
+                        self.registers.pc,
+                        new_location
                     );
                     self.registers.set_pc(new_location);
                 }
             }
             0x30 => {
-                println!("JR NC,n");
+                trace!("JR NC,n");
                 let steps = self.get_u8() as i8 as i32;
                 if !self.registers.f.has_flag(registers::Flag::C) {
                     let new_location = (self.registers.pc as i32 + steps) as u16;
-                    println!(
+                    trace!(
                         "Current location: {:#x}, next: {:#x}",
-                        self.registers.pc, new_location
+                        self.registers.pc,
+                        new_location
                     );
                     self.registers.set_pc(new_location);
                     // panic!("untested jump NC");
@@ -317,13 +325,14 @@ impl Cpu {
             }
 
             0x38 => {
-                println!("JR C,n");
+                trace!("JR C,n");
                 let steps = self.get_u8() as i8 as i32;
                 if self.registers.f.has_flag(registers::Flag::C) {
                     let new_location = (self.registers.pc as i32 + steps) as u16;
-                    println!(
+                    trace!(
                         "Current location: {:#x}, next: {:#x}",
-                        self.registers.pc, new_location
+                        self.registers.pc,
+                        new_location
                     );
                     self.registers.set_pc(new_location);
                     // panic!("untested jump C");
@@ -332,45 +341,45 @@ impl Cpu {
 
             // JP (HL)
             0xe9 => {
-                println!("JP (HL)");
+                trace!("JP (HL)");
                 self.registers.set_pc(self.registers.get_hl());
             }
 
             // LD n,nn
             0x01 => {
-                println!("LD n,BC");
+                trace!("LD n,BC");
                 let v = self.get_u16();
                 self.registers.set_bc(v)
             }
             0x11 => {
-                println!("LD n,DE");
+                trace!("LD n,DE");
                 let v = self.get_u16();
                 self.registers.set_de(v)
             }
             0x21 => {
-                println!("LD n,HL");
+                trace!("LD n,HL");
                 let v = self.get_u16();
                 self.registers.set_hl(v)
             }
             0x31 => {
                 let v = self.get_u16();
-                println!("LD n,SP -> {:#x}", v);
+                trace!("LD n,SP -> {:#x}", v);
                 self.registers.sp = v
             }
 
             // LD NN, A
             0x02 => {
-                println!("LD (BC), A");
+                trace!("LD (BC), A");
                 self.memory
                     .write(self.registers.get_bc() as usize, self.registers.a);
             }
             0x12 => {
-                println!("LD (DE), A");
+                trace!("LD (DE), A");
                 self.memory
                     .write(self.registers.get_de() as usize, self.registers.a);
             }
             0xea => {
-                println!("LD (nn),A");
+                trace!("LD (nn),A");
                 let target = self.get_u16();
                 self.memory.write(target as usize, self.registers.a);
             }
@@ -378,20 +387,20 @@ impl Cpu {
             // LDH (n),A
             0xe0 => {
                 let steps = self.get_u8();
-                println!("LDH (n),A --> {} value: {}", steps, self.registers.a);
+                trace!("LDH (n),A --> {} value: {}", steps, self.registers.a);
                 self.memory.write(0xff00 + steps as usize, self.registers.a);
             }
 
             // LDH A,(n)
             0xf0 => {
                 let steps = self.get_u8();
-                println!("LDH A,(n) --> {}", steps);
+                trace!("LDH A,(n) --> {}", steps);
                 self.registers.a = self.memory.get_ffxx(steps as usize);
             }
 
             // LDI (HL), A
             0x22 => {
-                println!(
+                trace!(
                     "LDI (HL), A {:#x} => {:#x}",
                     self.registers.get_hl(),
                     self.registers.a
@@ -406,13 +415,13 @@ impl Cpu {
 
             // LDD A, (HL)
             0x3a => {
-                println!("LDD A, (HL)");
+                trace!("LDD A, (HL)");
                 self.registers.a = self.memory.get(self.registers.get_hl() as usize);
                 self.registers.set_hl(self.registers.get_hl() - 1)
             }
             // LDI A, (HL)
             0x2a => {
-                println!("LDI A, (HL)");
+                trace!("LDI A, (HL)");
                 self.registers.a = self.memory.get(self.registers.get_hl() as usize);
                 self.registers.set_hl(self.registers.get_hl() + 1)
             }
@@ -420,365 +429,365 @@ impl Cpu {
             // LD A,n
             0x7f => {}
             0x78 => {
-                println!("LD A, B");
+                trace!("LD A, B");
                 self.registers.a = self.registers.b
             }
             0x79 => {
-                println!("LD A, C");
+                trace!("LD A, C");
                 self.registers.a = self.registers.c
             }
             0x7a => {
-                println!("LD A, D");
+                trace!("LD A, D");
                 self.registers.a = self.registers.d
             }
             0x7b => {
-                println!("LD A, E");
+                trace!("LD A, E");
                 self.registers.a = self.registers.e
             }
             0x7c => {
-                println!("LD A, H");
+                trace!("LD A, H");
                 self.registers.a = self.registers.h
             }
             0x7d => {
-                println!("LD A, L");
+                trace!("LD A, L");
                 self.registers.a = self.registers.l
             }
             0x0a => {
-                println!("LD A, (BC)");
+                trace!("LD A, (BC)");
                 self.registers.a = self.memory.get(self.registers.get_bc() as usize);
             }
             0x1a => {
-                println!("LD A, (DE)");
+                trace!("LD A, (DE)");
                 self.registers.a = self.memory.get(self.registers.get_de() as usize);
             }
             0x7e => {
-                println!("LD A, (HL)");
+                trace!("LD A, (HL)");
                 self.registers.a = self.memory.get(self.registers.get_hl() as usize);
             }
             0x3e => {
                 let value = self.get_u8();
-                println!("LD A, n -> {}", value);
+                trace!("LD A, n -> {}", value);
                 self.registers.a = value;
             }
 
             // B
             0x47 => {
-                println!("LD B, A");
+                trace!("LD B, A");
                 self.registers.b = self.registers.a;
             }
             0x40 => {}
             0x41 => {
-                println!("LD B, C");
+                trace!("LD B, C");
                 self.registers.b = self.registers.c
             }
             0x42 => {
-                println!("LD B, D");
+                trace!("LD B, D");
                 self.registers.b = self.registers.d
             }
             0x43 => {
-                println!("LD B, E");
+                trace!("LD B, E");
                 self.registers.b = self.registers.e
             }
             0x44 => {
-                println!("LD B, H");
+                trace!("LD B, H");
                 self.registers.b = self.registers.h
             }
             0x45 => {
-                println!("LD B, L");
+                trace!("LD B, L");
                 self.registers.b = self.registers.l
             }
             0x46 => {
-                println!("LD B, (HL)");
+                trace!("LD B, (HL)");
                 self.registers.b = self.memory.get(self.registers.get_hl() as usize);
             }
             0x06 => {
                 let value = self.get_u8();
-                println!("LD B, n -> {}", value);
+                trace!("LD B, n -> {}", value);
                 self.registers.b = value;
             }
 
             // C
             0x4f => {
-                println!("LD C, A");
+                trace!("LD C, A");
                 self.registers.c = self.registers.a;
             }
             0x48 => {
-                println!("LD C, B");
+                trace!("LD C, B");
                 self.registers.c = self.registers.b
             }
             0x49 => {}
             0x4a => {
-                println!("LD C, D");
+                trace!("LD C, D");
                 self.registers.c = self.registers.d
             }
             0x4b => {
-                println!("LD C, E");
+                trace!("LD C, E");
                 self.registers.c = self.registers.e
             }
             0x4c => {
-                println!("LD C, H");
+                trace!("LD C, H");
                 self.registers.c = self.registers.h
             }
             0x4d => {
-                println!("LD C, L");
+                trace!("LD C, L");
                 self.registers.c = self.registers.l
             }
             0x4e => {
-                println!("LD C, (HL)");
+                trace!("LD C, (HL)");
                 self.registers.c = self.memory.get(self.registers.get_hl() as usize);
             }
             0x0e => {
                 let value = self.get_u8();
-                println!("LD C, n -> {}", value);
+                trace!("LD C, n -> {}", value);
                 self.registers.c = value;
             }
 
             // D
             0x57 => {
-                println!("LD D, A");
+                trace!("LD D, A");
                 self.registers.d = self.registers.a;
             }
             0x50 => {
-                println!("LD D, B");
+                trace!("LD D, B");
                 self.registers.d = self.registers.b
             }
             0x51 => {
-                println!("LD D, C");
+                trace!("LD D, C");
                 self.registers.d = self.registers.c
             }
             0x52 => {}
             0x53 => {
-                println!("LD D, E");
+                trace!("LD D, E");
                 self.registers.d = self.registers.e
             }
             0x54 => {
-                println!("LD D, H");
+                trace!("LD D, H");
                 self.registers.d = self.registers.h
             }
             0x55 => {
-                println!("LD D, L");
+                trace!("LD D, L");
                 self.registers.d = self.registers.l
             }
             0x56 => {
-                println!("LD D, (HL)");
+                trace!("LD D, (HL)");
                 self.registers.d = self.memory.get(self.registers.get_hl() as usize);
             }
             0x16 => {
                 let value = self.get_u8();
-                println!("LD D, n -> {}", value);
+                trace!("LD D, n -> {}", value);
                 self.registers.d = value;
             }
 
             // E
             0x5f => {
-                println!("LD E, A");
+                trace!("LD E, A");
                 self.registers.e = self.registers.a;
             }
             0x58 => {
-                println!("LD E, B");
+                trace!("LD E, B");
                 self.registers.e = self.registers.b
             }
             0x59 => {
-                println!("LD E, C");
+                trace!("LD E, C");
                 self.registers.e = self.registers.c
             }
             0x5a => {
-                println!("LD E, D");
+                trace!("LD E, D");
                 self.registers.e = self.registers.d
             }
             0x5b => {}
             0x5c => {
-                println!("LD E, H");
+                trace!("LD E, H");
                 self.registers.e = self.registers.h
             }
             0x5d => {
-                println!("LD E, L");
+                trace!("LD E, L");
                 self.registers.e = self.registers.l
             }
             0x5e => {
-                println!("LD E, (HL)");
+                trace!("LD E, (HL)");
                 self.registers.e = self.memory.get(self.registers.get_hl() as usize);
             }
             0x1e => {
                 let value = self.get_u8();
-                println!("LD E, n -> {}", value);
+                trace!("LD E, n -> {}", value);
                 self.registers.e = value;
             }
 
             // H
             0x67 => {
-                println!("LD H, A");
+                trace!("LD H, A");
                 self.registers.h = self.registers.a;
             }
             0x60 => {
-                println!("LD H, B");
+                trace!("LD H, B");
                 self.registers.h = self.registers.b
             }
             0x61 => {
-                println!("LD H, C");
+                trace!("LD H, C");
                 self.registers.h = self.registers.c
             }
             0x62 => {
-                println!("LD H, D");
+                trace!("LD H, D");
                 self.registers.h = self.registers.d
             }
             0x63 => {
-                println!("LD H, E");
+                trace!("LD H, E");
                 self.registers.h = self.registers.e
             }
             0x64 => {}
             0x65 => {
-                println!("LD H, L");
+                trace!("LD H, L");
                 self.registers.h = self.registers.l
             }
             0x66 => {
-                println!("LD H, (HL)");
+                trace!("LD H, (HL)");
                 self.registers.h = self.memory.get(self.registers.get_hl() as usize);
             }
             0x26 => {
                 let value = self.get_u8();
-                println!("LD H, n -> {}", value);
+                trace!("LD H, n -> {}", value);
                 self.registers.h = value;
             }
 
             // L
             0x6f => {
-                println!("LD L, A");
+                trace!("LD L, A");
                 self.registers.l = self.registers.a;
             }
             0x68 => {
-                println!("LD L, B");
+                trace!("LD L, B");
                 self.registers.l = self.registers.b
             }
             0x69 => {
-                println!("LD L, C");
+                trace!("LD L, C");
                 self.registers.l = self.registers.c
             }
             0x6A => {
-                println!("LD L, D");
+                trace!("LD L, D");
                 self.registers.l = self.registers.d
             }
             0x6B => {
-                println!("LD L, E");
+                trace!("LD L, E");
                 self.registers.l = self.registers.e
             }
             0x6C => {
-                println!("LD L, H");
+                trace!("LD L, H");
                 self.registers.l = self.registers.h
             }
             0x6D => {}
             0x6E => {
-                println!("LD L, (HL)");
+                trace!("LD L, (HL)");
                 self.registers.l = self.memory.get(self.registers.get_hl() as usize);
             }
             0x2e => {
                 let value = self.get_u8();
-                println!("LD L, n -> {}", value);
+                trace!("LD L, n -> {}", value);
                 self.registers.l = value;
             }
 
             // (HL)
             0x77 => {
-                println!("LD (HL), A");
+                trace!("LD (HL), A");
                 self.memory
                     .write(self.registers.get_hl() as usize, self.registers.a);
             }
             0x70 => {
-                println!("LD (HL), B");
+                trace!("LD (HL), B");
                 self.memory
                     .write(self.registers.get_hl() as usize, self.registers.b);
             }
             0x71 => {
-                println!("LD (HL), C");
+                trace!("LD (HL), C");
                 self.memory
                     .write(self.registers.get_hl() as usize, self.registers.c);
             }
             0x72 => {
-                println!("LD (HL), D");
+                trace!("LD (HL), D");
                 self.memory
                     .write(self.registers.get_hl() as usize, self.registers.d);
             }
             0x73 => {
-                println!("LD (HL), E");
+                trace!("LD (HL), E");
                 self.memory
                     .write(self.registers.get_hl() as usize, self.registers.e);
             }
             0x74 => {
-                println!("LD (HL), H");
+                trace!("LD (HL), H");
                 self.memory
                     .write(self.registers.get_hl() as usize, self.registers.h);
             }
             0x75 => {
-                println!("LD (HL), L");
+                trace!("LD (HL), L");
                 self.memory
                     .write(self.registers.get_hl() as usize, self.registers.l);
             }
             0x36 => {
-                println!("LD (HL), n");
+                trace!("LD (HL), n");
                 let v = self.get_u8();
                 self.memory.write(self.registers.get_hl() as usize, v);
             }
 
             0xfa => {
-                println!("LD A, nn");
+                trace!("LD A, nn");
                 let source = self.get_u16();
                 self.registers.a = self.memory.get(source as usize);
             }
 
             // LD A, (C)
             0xf2 => {
-                println!("LD A, (C)");
+                trace!("LD A, (C)");
                 self.registers.a = self.memory.get_ffxx(self.registers.c as usize);
             }
 
             // LD (C), A
             0xe2 => {
-                println!("LD (C), A");
+                trace!("LD (C), A");
                 self.memory.write_ffxx(self.registers.c, self.registers.a);
             }
 
             // ADD
             0x87 => {
-                println!("ADD A, A");
+                trace!("ADD A, A");
                 self.registers.f = self.registers.a.add(self.registers.a);
             }
             0x80 => {
-                println!("ADD A, B");
+                trace!("ADD A, B");
                 self.registers.f = self.registers.a.add(self.registers.b);
             }
             0x81 => {
-                println!("ADD A, C");
+                trace!("ADD A, C");
                 self.registers.f = self.registers.a.add(self.registers.c);
             }
             0x82 => {
-                println!("ADD A, D");
+                trace!("ADD A, D");
                 self.registers.f = self.registers.a.add(self.registers.d);
             }
             0x83 => {
-                println!("ADD A, E");
+                trace!("ADD A, E");
                 self.registers.f = self.registers.a.add(self.registers.e);
             }
             0x84 => {
-                println!("ADD A, H");
+                trace!("ADD A, H");
                 self.registers.f = self.registers.a.add(self.registers.h);
             }
             0x85 => {
-                println!("ADD A, L");
+                trace!("ADD A, L");
                 self.registers.f = self.registers.a.add(self.registers.l);
             }
             0x86 => {
-                println!("ADD A, (HL)");
+                trace!("ADD A, (HL)");
                 let v = self.memory.get(self.registers.get_hl() as usize);
                 self.registers.f = self.registers.a.add(v);
             }
             0xc6 => {
-                println!("ADD A, #");
+                trace!("ADD A, #");
                 let v = self.get_u8();
                 self.registers.f = self.registers.a.add(v);
             }
 
             0x09 => {
-                println!("ADD HL, BC");
+                trace!("ADD HL, BC");
                 let hl;
                 (hl, self.registers.f) = Registers::add(
                     self.registers.get_hl(),
@@ -788,7 +797,7 @@ impl Cpu {
                 self.registers.set_hl(hl);
             }
             0x19 => {
-                println!("ADD HL, DE");
+                trace!("ADD HL, DE");
                 let hl;
                 (hl, self.registers.f) = Registers::add(
                     self.registers.get_hl(),
@@ -798,7 +807,7 @@ impl Cpu {
                 self.registers.set_hl(hl);
             }
             0x29 => {
-                println!("ADD HL, HL");
+                trace!("ADD HL, HL");
                 let hl;
                 (hl, self.registers.f) = Registers::add(
                     self.registers.get_hl(),
@@ -808,7 +817,7 @@ impl Cpu {
                 self.registers.set_hl(hl);
             }
             0x39 => {
-                println!("ADD HL, SP");
+                trace!("ADD HL, SP");
                 let hl;
                 (hl, self.registers.f) =
                     Registers::add(self.registers.get_hl(), self.registers.sp, self.registers.f);
@@ -817,56 +826,56 @@ impl Cpu {
 
             // ADC
             0x8f => {
-                println!("ADC A, A");
+                trace!("ADC A, A");
                 self.registers.f = self
                     .registers
                     .a
                     .add(self.registers.a + self.registers.f.has_flag(registers::Flag::C) as u8);
             }
             0x88 => {
-                println!("ADC A, B");
+                trace!("ADC A, B");
                 self.registers.f = self
                     .registers
                     .a
                     .add(self.registers.b + self.registers.f.has_flag(registers::Flag::C) as u8);
             }
             0x89 => {
-                println!("ADC A, C");
+                trace!("ADC A, C");
                 self.registers.f = self
                     .registers
                     .a
                     .add(self.registers.c + self.registers.f.has_flag(registers::Flag::C) as u8);
             }
             0x8a => {
-                println!("ADC A, D");
+                trace!("ADC A, D");
                 self.registers.f = self
                     .registers
                     .a
                     .add(self.registers.d + self.registers.f.has_flag(registers::Flag::C) as u8);
             }
             0x8b => {
-                println!("ADC A, E");
+                trace!("ADC A, E");
                 self.registers.f = self
                     .registers
                     .a
                     .add(self.registers.e + self.registers.f.has_flag(registers::Flag::C) as u8);
             }
             0x8c => {
-                println!("ADC A, H");
+                trace!("ADC A, H");
                 self.registers.f = self
                     .registers
                     .a
                     .add(self.registers.h + self.registers.f.has_flag(registers::Flag::C) as u8);
             }
             0x8d => {
-                println!("ADC A, L");
+                trace!("ADC A, L");
                 self.registers.f = self
                     .registers
                     .a
                     .add(self.registers.l + self.registers.f.has_flag(registers::Flag::C) as u8);
             }
             0x8e => {
-                println!("ADC A, (HL)");
+                trace!("ADC A, (HL)");
                 let v = self.memory.get(self.registers.get_hl() as usize);
                 self.registers.f = self
                     .registers
@@ -874,7 +883,7 @@ impl Cpu {
                     .add(v + self.registers.f.has_flag(registers::Flag::C) as u8);
             }
             0xce => {
-                println!("ADC A, #");
+                trace!("ADC A, #");
                 let v = self.get_u8();
                 self.registers.f = self
                     .registers
@@ -884,68 +893,68 @@ impl Cpu {
 
             // SUB n
             0x90 => {
-                println!("SUB B");
+                trace!("SUB B");
                 self.registers.f = self.registers.a.sub(self.registers.b);
             }
 
             0xd6 => {
-                println!("SUB #");
+                trace!("SUB #");
                 let v = self.get_u8();
                 self.registers.f = self.registers.a.sub(v);
             }
 
             // SBC
             0x9f => {
-                println!("SBC A, A");
+                trace!("SBC A, A");
                 self.registers.f = self
                     .registers
                     .a
                     .sub(self.registers.a + self.registers.f.has_flag(registers::Flag::C) as u8);
             }
             0x98 => {
-                println!("SBC A, B");
+                trace!("SBC A, B");
                 self.registers.f = self
                     .registers
                     .a
                     .sub(self.registers.b + self.registers.f.has_flag(registers::Flag::C) as u8);
             }
             0x99 => {
-                println!("SBC A, C");
+                trace!("SBC A, C");
                 self.registers.f = self
                     .registers
                     .a
                     .sub(self.registers.c + self.registers.f.has_flag(registers::Flag::C) as u8);
             }
             0x9a => {
-                println!("SBC A, D");
+                trace!("SBC A, D");
                 self.registers.f = self
                     .registers
                     .a
                     .sub(self.registers.d + self.registers.f.has_flag(registers::Flag::C) as u8);
             }
             0x9b => {
-                println!("SBC A, E");
+                trace!("SBC A, E");
                 self.registers.f = self
                     .registers
                     .a
                     .sub(self.registers.e + self.registers.f.has_flag(registers::Flag::C) as u8);
             }
             0x9c => {
-                println!("SBC A, H");
+                trace!("SBC A, H");
                 self.registers.f = self
                     .registers
                     .a
                     .sub(self.registers.h + self.registers.f.has_flag(registers::Flag::C) as u8);
             }
             0x9d => {
-                println!("SBC A, L");
+                trace!("SBC A, L");
                 self.registers.f = self
                     .registers
                     .a
                     .sub(self.registers.l + self.registers.f.has_flag(registers::Flag::C) as u8);
             }
             0x9e => {
-                println!("SBC A, (HL)");
+                trace!("SBC A, (HL)");
                 let v = self.memory.get(self.registers.get_hl() as usize);
                 self.registers.f = self
                     .registers
@@ -961,63 +970,63 @@ impl Cpu {
                 self.registers.set_de(self.registers.get_de() + 1);
             }
             0x23 => {
-                println!("INC HL");
+                trace!("INC HL");
                 self.registers.set_hl(self.registers.get_hl() + 1);
             }
             0x33 => {
-                println!("INC SP");
+                trace!("INC SP");
                 self.registers.sp += 1;
             }
 
             // DEC nn
             0x0B => {
-                println!("DEC BC");
+                trace!("DEC BC");
                 self.registers.set_bc(self.registers.get_bc() - 1);
             }
             0x1B => {
-                println!("DEC DE");
+                trace!("DEC DE");
                 self.registers.set_de(self.registers.get_de() - 1);
             }
             0x2B => {
-                println!("DEC HL");
+                trace!("DEC HL");
                 self.registers.set_hl(self.registers.get_hl() - 1);
             }
             0x3B => {
-                println!("DEC SP");
+                trace!("DEC SP");
                 self.registers.sp -= 1;
             }
 
             // INC n
             0x3c => {
-                println!("INC A");
+                trace!("INC A");
                 self.registers.f = self.registers.a.inc(self.registers.f);
             }
             0x04 => {
-                println!("INC B");
+                trace!("INC B");
                 self.registers.f = self.registers.b.inc(self.registers.f);
             }
             0x0c => {
-                println!("INC C");
+                trace!("INC C");
                 self.registers.f = self.registers.c.inc(self.registers.f);
             }
             0x14 => {
-                println!("INC D");
+                trace!("INC D");
                 self.registers.f = self.registers.d.inc(self.registers.f);
             }
             0x1c => {
-                println!("INC E");
+                trace!("INC E");
                 self.registers.f = self.registers.e.inc(self.registers.f);
             }
             0x24 => {
-                println!("INC H");
+                trace!("INC H");
                 self.registers.f = self.registers.h.inc(self.registers.f);
             }
             0x2c => {
-                println!("INC L");
+                trace!("INC L");
                 self.registers.f = self.registers.l.inc(self.registers.f);
             }
             0x34 => {
-                println!("INC (HL)");
+                trace!("INC (HL)");
                 let location = self.registers.get_hl() as usize;
                 let mut value = self.memory.get(location);
                 let f = value.inc(self.registers.f);
@@ -1027,173 +1036,173 @@ impl Cpu {
 
             // DEC
             0x3d => {
-                println!("DEC A");
+                trace!("DEC A");
                 self.registers.f = self.registers.a.dec(self.registers.f);
             }
             0x05 => {
-                println!("DEC B");
+                trace!("DEC B");
                 self.registers.f = self.registers.b.dec(self.registers.f);
             }
             0x0d => {
-                println!("DEC C");
+                trace!("DEC C");
                 self.registers.f = self.registers.c.dec(self.registers.f);
             }
             0x15 => {
-                println!("DEC D");
+                trace!("DEC D");
                 self.registers.f = self.registers.d.dec(self.registers.f);
             }
             0x1d => {
-                println!("DEC E");
+                trace!("DEC E");
                 self.registers.f = self.registers.e.dec(self.registers.f);
             }
             0x25 => {
-                println!("DEC H");
+                trace!("DEC H");
                 self.registers.f = self.registers.h.dec(self.registers.f);
             }
             0x2d => {
-                println!("DEC L");
+                trace!("DEC L");
                 self.registers.f = self.registers.l.dec(self.registers.f);
             }
 
             // AND n
             0xa7 => {
-                println!("AND A");
+                trace!("AND A");
                 self.registers.f = self.registers.a.and(self.registers.a);
             }
             0xa0 => {
-                println!("AND B");
+                trace!("AND B");
                 self.registers.f = self.registers.a.and(self.registers.b);
             }
             0xa1 => {
-                println!("AND C");
+                trace!("AND C");
                 self.registers.f = self.registers.a.and(self.registers.c);
             }
             0xa2 => {
-                println!("AND D");
+                trace!("AND D");
                 self.registers.f = self.registers.a.and(self.registers.d);
             }
             0xa3 => {
-                println!("AND E");
+                trace!("AND E");
                 self.registers.f = self.registers.a.and(self.registers.e);
             }
             0xa4 => {
-                println!("AND H");
+                trace!("AND H");
                 self.registers.f = self.registers.a.and(self.registers.h);
             }
             0xa5 => {
-                println!("AND L");
+                trace!("AND L");
                 self.registers.f = self.registers.a.and(self.registers.l);
             }
             0xe6 => {
                 let n = self.get_u8();
-                println!("AND # -> {}", n);
+                trace!("AND # -> {}", n);
                 self.registers.f = self.registers.a.and(n);
             }
 
             // OR n
             0xb7 => {
-                println!("OR A");
+                trace!("OR A");
                 self.registers.f = self.registers.a.or(self.registers.a);
             }
             0xb0 => {
-                println!("OR B");
+                trace!("OR B");
                 self.registers.f = self.registers.a.or(self.registers.b);
             }
             0xb1 => {
-                println!("OR C");
+                trace!("OR C");
                 self.registers.f = self.registers.a.or(self.registers.c);
             }
             0xb2 => {
-                println!("OR D");
+                trace!("OR D");
                 self.registers.f = self.registers.a.or(self.registers.d);
             }
             0xb3 => {
-                println!("OR E");
+                trace!("OR E");
                 self.registers.f = self.registers.a.or(self.registers.e);
             }
             0xb4 => {
-                println!("OR H");
+                trace!("OR H");
                 self.registers.f = self.registers.a.or(self.registers.h);
             }
             0xb5 => {
-                println!("OR L");
+                trace!("OR L");
                 self.registers.f = self.registers.a.or(self.registers.l);
             }
 
             0xf6 => {
-                println!("OR #");
+                trace!("OR #");
                 let v = self.get_u8();
                 self.registers.f = self.registers.a.or(v);
             }
 
             // XOR n
             0xaf => {
-                println!("XOR A");
+                trace!("XOR A");
                 self.registers.f = self.registers.a.xor(self.registers.a);
             }
             0xa8 => {
-                println!("XOR B");
+                trace!("XOR B");
                 self.registers.f = self.registers.a.xor(self.registers.b);
             }
             0xa9 => {
-                println!("XOR C");
+                trace!("XOR C");
                 self.registers.f = self.registers.a.xor(self.registers.c);
             }
             0xaa => {
-                println!("XOR D");
+                trace!("XOR D");
                 self.registers.f = self.registers.a.xor(self.registers.d);
             }
             0xab => {
-                println!("XOR E");
+                trace!("XOR E");
                 self.registers.f = self.registers.a.xor(self.registers.e);
             }
             0xac => {
-                println!("XOR H");
+                trace!("XOR H");
                 self.registers.f = self.registers.a.xor(self.registers.h);
             }
             0xad => {
-                println!("XOR L");
+                trace!("XOR L");
                 self.registers.f = self.registers.a.xor(self.registers.l);
             }
 
             // CP n
             0xbf => {
-                println!("CP A");
+                trace!("CP A");
                 self.registers.f = self.registers.a.cp(self.registers.a);
             }
             0xb8 => {
-                println!("CP B");
+                trace!("CP B");
                 self.registers.f = self.registers.a.cp(self.registers.b);
             }
             0xb9 => {
-                println!("CP C");
+                trace!("CP C");
                 self.registers.f = self.registers.a.cp(self.registers.c);
             }
             0xba => {
-                println!("CP D");
+                trace!("CP D");
                 self.registers.f = self.registers.a.cp(self.registers.d);
             }
             0xbb => {
-                println!("CP E");
+                trace!("CP E");
                 self.registers.f = self.registers.a.cp(self.registers.e);
             }
             0xbc => {
-                println!("CP H");
+                trace!("CP H");
                 self.registers.f = self.registers.a.cp(self.registers.h);
             }
             0xbd => {
-                println!("CP L");
+                trace!("CP L");
                 self.registers.f = self.registers.a.cp(self.registers.l);
             }
 
             0xbe => {
-                println!("CP (HL)");
+                trace!("CP (HL)");
                 let mem_loc = self.registers.get_hl() as usize;
                 self.registers.f = self.registers.a.cp(self.memory.get(mem_loc));
             }
 
             0xfe => {
-                println!("CP #");
+                trace!("CP #");
                 self.registers.f = self.registers.a.cp(self.get_u8());
             }
 
@@ -1202,7 +1211,7 @@ impl Cpu {
                 // This instruction disables interrupts but not
                 // immediately. Interrupts are disabled after
                 // instruction after DI is executed.
-                println!("Warning: DI");
+                info!("Warning: DI");
                 self.ime = false;
             }
 
@@ -1210,14 +1219,14 @@ impl Cpu {
                 // This instruction disables interrupts but not
                 // immediately. Interrupts are enabled after
                 // instruction after DI is executed.
-                println!("Warning: EI");
+                info!("Warning: EI");
                 self.ime = true;
             }
 
             // Calls
             0xcd => {
                 let new_location = self.get_u16();
-                println!(
+                debug!(
                     "Call nn (from {:#x} to {:#x})",
                     self.registers.pc, new_location
                 );
@@ -1227,36 +1236,36 @@ impl Cpu {
 
             0xc4 => {
                 let new_location = self.get_u16();
-                println!("CALL NZ,nn --> {:#x}", new_location);
+                debug!("CALL NZ,nn --> {:#x}", new_location);
                 if !self.registers.f.has_flag(registers::Flag::Z) {
-                    println!("Making the jump!");
+                    debug!("Making the jump!");
                     self.push_stack(self.registers.pc);
                     self.registers.set_pc(new_location);
                 }
             }
             0xcc => {
                 let new_location = self.get_u16();
-                println!("CALL Z,nn --> {:#x}", new_location);
+                debug!("CALL Z,nn --> {:#x}", new_location);
                 if self.registers.f.has_flag(registers::Flag::Z) {
-                    println!("Making the jump!");
+                    debug!("Making the jump!");
                     self.push_stack(self.registers.pc);
                     self.registers.set_pc(new_location);
                 }
             }
             0xd4 => {
                 let new_location = self.get_u16();
-                println!("CALL NC,nn --> {:#x}", new_location);
+                debug!("CALL NC,nn --> {:#x}", new_location);
                 if !self.registers.f.has_flag(registers::Flag::C) {
-                    println!("Making the jump!");
+                    debug!("Making the jump!");
                     self.push_stack(self.registers.pc);
                     self.registers.set_pc(new_location);
                 }
             }
             0xdc => {
                 let new_location = self.get_u16();
-                println!("CALL C,nn --> {:#x}", new_location);
+                debug!("CALL C,nn --> {:#x}", new_location);
                 if self.registers.f.has_flag(registers::Flag::C) {
-                    println!("Making the jump!");
+                    debug!("Making the jump!");
                     self.push_stack(self.registers.pc);
                     self.registers.set_pc(new_location);
                 }
@@ -1265,93 +1274,93 @@ impl Cpu {
             // RET
             0xc9 => {
                 let new_loc = self.pop_stack();
-                println!("RET to: {:#x}", new_loc);
+                debug!("RET to: {:#x}", new_loc);
                 self.registers.set_pc(new_loc);
             }
 
             0xc0 => {
-                println!("RET NZ");
+                debug!("RET NZ");
                 if !self.registers.f.has_flag(registers::Flag::Z) {
                     let new_loc = self.pop_stack();
-                    println!("Made the jump");
+                    debug!("Made the jump");
                     self.registers.set_pc(new_loc);
                 }
             }
             0xc8 => {
-                println!("RET Z");
+                debug!("RET Z");
                 if self.registers.f.has_flag(registers::Flag::Z) {
                     let new_loc = self.pop_stack();
-                    println!("Made the jump");
+                    debug!("Made the jump");
                     self.registers.set_pc(new_loc);
                 }
             }
             0xd0 => {
-                println!("RET NC");
+                debug!("RET NC");
                 if !self.registers.f.has_flag(registers::Flag::C) {
                     let new_loc = self.pop_stack();
-                    println!("Made the jump");
+                    debug!("Made the jump");
                     self.registers.set_pc(new_loc);
                 }
             }
             0xd8 => {
-                println!("RET C");
+                debug!("RET C");
                 if self.registers.f.has_flag(registers::Flag::C) {
                     let new_loc = self.pop_stack();
-                    println!("Made the jump");
+                    debug!("Made the jump");
                     self.registers.set_pc(new_loc);
                 }
             }
 
             // PUSH
             0xf5 => {
-                println!("PUSH AF");
+                trace!("PUSH AF");
                 self.push_stack(self.registers.get_af());
             }
             0xc5 => {
-                println!("PUSH BC");
+                trace!("PUSH BC");
                 self.push_stack(self.registers.get_bc());
             }
             0xd5 => {
-                println!("PUSH DE");
+                trace!("PUSH DE");
                 self.push_stack(self.registers.get_de());
             }
             0xe5 => {
-                println!("PUSH HL");
+                trace!("PUSH HL");
                 self.push_stack(self.registers.get_hl());
             }
 
             // POP
             0xf1 => {
-                println!("POP AF");
+                trace!("POP AF");
                 let v = self.pop_stack();
                 self.registers.set_af(v);
             }
 
             0xc1 => {
-                println!("POP BC");
+                trace!("POP BC");
                 let v = self.pop_stack();
                 self.registers.set_bc(v);
             }
             0xd1 => {
-                println!("POP DE");
+                trace!("POP DE");
                 let v = self.pop_stack();
                 self.registers.set_de(v);
             }
             0xe1 => {
-                println!("POP HL");
+                trace!("POP HL");
                 let v = self.pop_stack();
                 self.registers.set_hl(v);
             }
 
             // CPL
             0x2f => {
-                println!("CPL");
+                trace!("CPL");
                 self.registers.f = self.registers.a.complement(self.registers.f);
             }
 
             // SCF
             0x37 => {
-                println!("SCF");
+                trace!("SCF");
                 let mut f = cpu_ops::set_flag(self.registers.f, CpuFlag::C, true);
                 f = cpu_ops::set_flag(f, CpuFlag::H, false);
                 f = cpu_ops::set_flag(f, CpuFlag::N, false);
@@ -1361,13 +1370,13 @@ impl Cpu {
             // MISC
             0x76 => {
                 self.halt = true;
-                println!("HALT");
-                println!("Interrupt enable: {:#8b}", self.memory.interrupt_enable)
+                debug!("HALT");
+                debug!("Interrupt enable: {:#8b}", self.memory.interrupt_enable)
             }
 
             0xd9 => {
                 let new_loc = self.pop_stack();
-                println!("RETI to: {:#x}", new_loc);
+                debug!("RETI to: {:#x}", new_loc);
                 self.registers.set_pc(new_loc);
                 self.ime = true;
             }
@@ -1377,7 +1386,7 @@ impl Cpu {
             }
 
             _ => {
-                println!("Info for debugging");
+                debug!("Info for debugging");
                 self.memory.dump_tile_data();
 
                 panic!("missing operator {:#x}", op);
@@ -1388,12 +1397,12 @@ impl Cpu {
     fn do_cb(&mut self, cb_instruction: u8) {
         match cb_instruction {
             0x1a => {
-                println!("RR");
+                trace!("RR");
                 let new_c = self.registers.d & 0x01;
                 let msb = (self.registers.f.has_flag(registers::Flag::C) as u8) << 7;
                 let shifted = self.registers.d >> 1;
 
-                println!("FROM: {:#b} - {:#b}", self.registers.d, self.registers.f);
+                trace!("FROM: {:#b} - {:#b}", self.registers.d, self.registers.f);
                 self.registers.d = shifted | msb;
 
                 let mut f = cpu_ops::set_flag(self.registers.f, CpuFlag::C, new_c == 1); //
@@ -1401,12 +1410,12 @@ impl Cpu {
                 f = cpu_ops::set_flag(f, CpuFlag::Z, self.registers.d == 0);
                 f = cpu_ops::set_flag(f, CpuFlag::N, false);
                 self.registers.f = f;
-                println!("  TO: {:#b} - {:#b}", self.registers.d, self.registers.f);
+                trace!("  TO: {:#b} - {:#b}", self.registers.d, self.registers.f);
                 // panic!("TEST RR")
             }
 
             0x37 => {
-                println!("SWAP nimble A");
+                trace!("SWAP nimble A");
                 self.registers.a = (self.registers.a >> 4) | (self.registers.a << 4);
                 let mut f = cpu_ops::set_flag(self.registers.f, CpuFlag::Z, self.registers.a == 0);
                 f = cpu_ops::set_flag(f, CpuFlag::N, false);
@@ -1417,12 +1426,12 @@ impl Cpu {
 
             // SRA n
             0x28 => {
-                println!("SRA B");
+                trace!("SRA B");
                 let c = self.registers.b & 0x01;
                 let msb = self.registers.b | (1 << 7);
                 let shifted = self.registers.b >> 1;
 
-                println!("FROM: {:#x}", self.registers.b);
+                trace!("FROM: {:#x}", self.registers.b);
 
                 let mut f = cpu_ops::set_flag(self.registers.f, CpuFlag::C, c == 1);
                 f = cpu_ops::set_flag(f, CpuFlag::H, false);
@@ -1430,17 +1439,17 @@ impl Cpu {
                 f = cpu_ops::set_flag(f, CpuFlag::N, false);
                 self.registers.f = f;
                 self.registers.b = shifted | msb;
-                println!("TO: {:#x}", self.registers.b);
+                trace!("TO: {:#x}", self.registers.b);
                 panic!("not implememented SRA properly")
             }
 
             // SRL n
             0x3f => {
-                println!("SRL A");
+                trace!("SRL A");
                 let c = self.registers.a & 0x01;
                 let shifted = self.registers.a >> 1;
 
-                println!("FROM: {:#b}", self.registers.a);
+                trace!("FROM: {:#b}", self.registers.a);
 
                 let mut f = cpu_ops::set_flag(0x0, CpuFlag::C, c == 1);
                 f = cpu_ops::set_flag(f, CpuFlag::H, false);
@@ -1448,7 +1457,7 @@ impl Cpu {
                 f = cpu_ops::set_flag(f, CpuFlag::N, false);
                 self.registers.f = f;
                 self.registers.a = shifted;
-                println!("TO: {:#b} F: {:#b}", self.registers.a, self.registers.f);
+                trace!("TO: {:#b} F: {:#b}", self.registers.a, self.registers.f);
             }
 
             // RES
@@ -1493,7 +1502,7 @@ impl Cpu {
             0x4d => self.registers.f = self.registers.l.bit(1, self.registers.f),
 
             _ => {
-                println!("Info for debugging");
+                debug!("Info for debugging");
                 self.memory.dump_tile_data();
 
                 panic!("Missing cb {:#x}", cb_instruction)
@@ -1518,7 +1527,9 @@ impl Cpu {
 }
 
 fn main() {
-    println!("Hello, world!");
+    env_logger::Builder::from_env(Env::default().default_filter_or("info"))
+        .format_timestamp(None)
+        .init();
 
     let result = load_rom();
 
@@ -1537,12 +1548,12 @@ fn main() {
 
     // println!("Title = {}", title);
 
-    println!("Type = {:#x}", buffer[0x143]);
-    println!("GB/SGB Indicator = {:#x}", buffer[0x146]);
-    println!("Cartridge type = {:#x}", buffer[0x147]);
+    info!("Type = {:#x}", buffer[0x143]);
+    info!("GB/SGB Indicator = {:#x}", buffer[0x146]);
+    info!("Cartridge type = {:#x}", buffer[0x147]);
     let rom_size = buffer[0x148];
-    println!("ROM size = {:#x}", rom_size);
-    println!("RAM size = {:#x}", buffer[0x149]);
+    info!("ROM size = {:#x}", rom_size);
+    info!("RAM size = {:#x}", buffer[0x149]);
 
     let expected_rom_size = 32 * (2u32.pow(rom_size as u32)) * 1024u32;
 

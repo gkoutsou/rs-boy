@@ -1,5 +1,6 @@
 mod io_registers;
 pub use io_registers::IORegisters;
+use log::{debug, info, trace};
 
 use crate::gpu;
 
@@ -29,18 +30,18 @@ impl Memory {
         if location <= 0x7fff {
             self.get_rom(location)
         } else if location <= 0xfffe && location >= 0xff80 {
-            println!("HRAM Read: {:#x}", location);
+            trace!("HRAM Read: {:#x}", location);
             self.high_ram[location - 0xff80]
         } else if location <= 0xdfff && location >= 0xc000 {
-            println!("WRAM Read: {:#x}", location);
+            trace!("WRAM Read: {:#x}", location);
             self.work_ram[location - 0xc000]
         } else if location <= 0x97FF && location >= 0x8000 {
-            // println!("Getting Tile Data: {:#x}", location);
+            // trace!("Getting Tile Data: {:#x}", location);
             self.tile_data[location - 0x8000]
         } else if location <= 0xff77 && location >= 0xff00 {
             self.io_registers.get(location)
         } else if location == 0xffff {
-            println!("IME");
+            trace!("IME");
             self.interrupt_enable
         } else {
             panic!("Unknown location: {:#x}", location)
@@ -54,7 +55,7 @@ impl Memory {
                 // todo 20, 40 etc also step
                 self.rom_bank = 1;
             }
-            println!(
+            info!(
                 "###### Changing to bank: {} (value: {})",
                 self.rom_bank,
                 value & 0b11111
@@ -63,30 +64,31 @@ impl Memory {
             panic!("how can I write to ROM?! {:#x}:{:0b}", location, value)
         } else if location <= 0xdfff && location >= 0xc000 {
             // in CGB mode, the 2nd 4k are rotatable
-            println!("Writting to WRAM: {:#x}", location);
+            trace!("Writting to WRAM: {:#x}", location);
             self.work_ram[location - 0xc000] = value;
         } else if location == 0xff46 {
             let location = (value as u16) << 8;
-            println!(
+            debug!(
                 "Triggering DMA transfter to OAM! {:#x} --> {:#x}",
                 value, location
             );
             for i in 0..0xA0 {
                 self.oam[i] = self.get(location as usize + i);
             }
+            self.dump_oam()
         } else if location <= 0xff7f && location >= 0xff00 {
             self.io_registers.write(location, value);
         } else if location <= 0xfffe && location >= 0xff80 {
-            println!("Writting to HRAM: {:#x}", location);
+            trace!("Writting to HRAM: {:#x}", location);
             self.high_ram[location - 0xff80] = value;
         } else if location == 0xffff {
-            println!("Writting to Interrupt Enable Register");
+            debug!("Writting to Interrupt Enable Register");
             self.interrupt_enable = value;
         } else if location <= 0x97FF && location >= 0x8000 {
             // println!("Writting to Tile Data");
             // panic!("Wrote: {:#x}", value);
             if value != 0 {
-                println!(
+                debug!(
                     "finally! non empty in Tile Data: {:#x} - {:#b} = {:#x}",
                     location, value, value
                 );
@@ -100,7 +102,7 @@ impl Memory {
 
             // Starts writing here in location: 0x36e3
         } else if location <= 0x9FFF && location >= 0x9800 {
-            println!("Writting to Tile Map");
+            debug!("Writting to Tile Map");
             // panic!("ASDD");
             // if value != 0 {
             //     panic!(
@@ -158,6 +160,15 @@ impl Memory {
             }
         }
         println!("DUMPING TILE DATA COMPLETED");
+    }
+
+    pub fn dump_oam(&self) {
+        println!("DUMPING OAM DATA");
+        for object in 0..40 {
+            let tile = self.get_oam_object(object);
+            println!("{:?}", tile)
+        }
+        println!("DUMPING OAM DATA COMPLETED");
     }
 
     pub fn get_oam_object(&self, object: usize) -> gpu::Tile {
