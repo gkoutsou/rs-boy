@@ -47,6 +47,8 @@ fn load_rom() -> io::Result<Vec<u8>> {
     let mut f = File::open("PokemonRed.gb")?;
     let mut buffer = Vec::new();
 
+    panic!("checked up to after jump 'next: 0x1cf9'");
+
     // read the whole file
     f.read_to_end(&mut buffer)?;
 
@@ -56,7 +58,7 @@ fn load_rom() -> io::Result<Vec<u8>> {
 impl Cpu {
     fn step(&mut self) {
         if self.ime != false
-            && self.memory.interrupt_enable & self.memory.io_registers.interrupt_flag > 0
+            && (self.memory.interrupt_enable & self.memory.io_registers.interrupt_flag) > 0
         {
             let interrupts = self.memory.interrupt_enable & self.memory.io_registers.interrupt_flag;
             if interrupts & 0x1 > 0 {
@@ -65,7 +67,9 @@ impl Cpu {
                 self.memory.io_registers.interrupt_flag &= 0b11111110;
                 self.push_stack(self.registers.pc);
                 self.registers.set_pc(0x40);
-                println!("VBlank Interrupt Handler");
+                self.halt = false;
+                info!("VBlank Interrupt Handler");
+                self.memory.dump_tile_data();
                 // panic!("asd");
                 return;
             }
@@ -79,10 +83,17 @@ impl Cpu {
             panic!("found interrupt")
         }
 
-        if self.halt {
-            return;
+        if !self.halt {
+            self.cpu_step();
+        } else {
+            self.cpu_cycles += 4;
         }
 
+        // todo this is not CPU steps but w/e for now
+        self.gpu_step();
+    }
+
+    fn cpu_step(&mut self) {
         let location = self.registers.step_pc();
         trace!("Running location {:#x}", location);
 
@@ -93,7 +104,7 @@ impl Cpu {
         }
 
         let op = self.memory.get_rom(location);
-        trace!("operator: {:#x}", op);
+        debug!("operator: {:#x}", op);
         match op {
             0xcb => {
                 let cb_op = self.get_u8();
@@ -106,15 +117,13 @@ impl Cpu {
                 self.cpu_cycles += cpu_ops::get_ticks(op);
             }
         }
-
-        // todo this is not CPU steps but w/e for now
-        self.gpu_step();
     }
 
     fn gpu_step(&mut self) {
         if !self.memory.io_registers.lcd_enabled() {
             trace!("LCD disabled!");
             self.cpu_cycles = 0;
+            self.memory.io_registers.scanline = 0;
             return;
         }
 
@@ -123,9 +132,9 @@ impl Cpu {
                 let line = self.memory.io_registers.scanline;
                 trace!("OAM Scan: line {} ({})", line, self.cpu_cycles);
                 // 80 dots
-                if self.cpu_cycles >= 80 / 4 {
+                if self.cpu_cycles >= 80 {
                     // scan pixels TODO ideally I should follow the ticks, not do it at once
-                    self.cpu_cycles -= 20;
+                    self.cpu_cycles -= 80;
                     self.gpu_mode = gpu::Mode::Three;
                     let mut object_counter = 0;
                     for i in 0..40 {
@@ -145,16 +154,16 @@ impl Cpu {
                     self.cpu_cycles
                 );
 
-                if self.cpu_cycles >= 456 / 4 {
+                if self.cpu_cycles >= 456 {
                     self.memory.io_registers.scanline += 1;
-                    self.cpu_cycles -= 456 / 4;
-                }
+                    self.cpu_cycles -= 456;
 
-                if self.memory.io_registers.scanline > 153 {
-                    self.gpu_mode = gpu::Mode::Two;
-                    self.memory.io_registers.scanline = 0
-                    // self.memory.dump_tile_data();
-                    // panic!("tadadaaa")
+                    if self.memory.io_registers.scanline > 153 {
+                        self.gpu_mode = gpu::Mode::Two;
+                        self.memory.io_registers.scanline = 0;
+                        // self.memory.dump_tile_data();
+                    }
+                    debug!("line: {}", self.memory.io_registers.scanline);
                 }
             }
             gpu::Mode::Zero => {
@@ -163,9 +172,13 @@ impl Cpu {
                     self.memory.io_registers.scanline,
                     self.cpu_cycles
                 );
-                if self.cpu_cycles >= 204 / 4 {
-                    self.cpu_cycles -= 204 / 4;
-                    if self.memory.io_registers.scanline == 143 {
+                if self.cpu_cycles >= 204 {
+                    self.cpu_cycles -= 204;
+
+                    self.memory.io_registers.scanline += 1;
+                    debug!("line: {}", self.memory.io_registers.scanline);
+
+                    if self.memory.io_registers.scanline == 144 {
                         //todo should this be 143?
                         self.memory.io_registers.enable_video_interrupt();
                         self.gpu_mode = gpu::Mode::One;
@@ -182,10 +195,9 @@ impl Cpu {
                 );
                 //todo hack
 
-                if self.cpu_cycles >= 172 / 4 {
+                if self.cpu_cycles >= 172 {
                     self.gpu_mode = gpu::Mode::Zero;
-                    self.cpu_cycles -= 172 / 4;
-                    self.memory.io_registers.scanline += 1;
+                    self.cpu_cycles -= 172;
                 }
             }
         }
@@ -384,6 +396,12 @@ impl Cpu {
                 self.memory.write(target as usize, self.registers.a);
             }
 
+            // LD SP, HL
+            0xf9 => {
+                trace!("LD SP, HL");
+                self.registers.sp = self.registers.get_hl();
+            }
+
             // LDH (n),A
             0xe0 => {
                 let steps = self.get_u8();
@@ -424,6 +442,34 @@ impl Cpu {
                 trace!("LDI A, (HL)");
                 self.registers.a = self.memory.get(self.registers.get_hl() as usize);
                 self.registers.set_hl(self.registers.get_hl() + 1)
+            }
+
+            0xf8 => {
+                let steps = self.get_u8() as i8 as i16;
+                trace!("LDHL SP,n -> {}", steps);
+                let old_val = self.registers.sp;
+                let new_val = old_val.wrapping_add_signed(steps);
+                // panic!(
+                //     "SP: {:#x}, steps: {}, new {:#x}",
+                //     old_val, steps, new_val
+                // )
+                let steps = steps as u16;
+
+                let mut f = cpu_ops::set_flag(0, CpuFlag::N, false);
+                f = cpu_ops::set_flag(f, CpuFlag::Z, false);
+                f = cpu_ops::set_flag(
+                    f,
+                    CpuFlag::H,
+                    (old_val & 0x000F) + (steps & 0x000F) > 0x000F,
+                );
+                f = cpu_ops::set_flag(
+                    f,
+                    CpuFlag::C,
+                    (old_val & 0x00FF) + (steps & 0x00FF) > 0x00FF,
+                );
+
+                self.registers.set_hl(new_val);
+                self.registers.f = f;
             }
 
             // LD A,n
@@ -1509,26 +1555,12 @@ impl Cpu {
             }
         }
     }
-
-    // fn dump_tile_map(&self) {
-    //     for tile in 0..32 {
-    //         let mut sum = 0i32;
-    //         for i in 0..16 {
-    //             sum += self.tile_data[tile * 16 + i] as i32;
-    //         }
-    //         if sum > 0 {
-    //             for i in 0..16 {
-    //                 print!("{:#04x} ", self.tile_data[tile * 16 + i]);
-    //             }
-    //             println!()
-    //         }
-    //     }
-    // }
 }
 
 fn main() {
     env_logger::Builder::from_env(Env::default().default_filter_or("info"))
         .format_timestamp(None)
+        .target(env_logger::Target::Stdout)
         .init();
 
     let result = load_rom();
@@ -1592,7 +1624,7 @@ fn main() {
         debug_counter: 0,
     };
 
-    for _i in 0..2000000 {
+    for _i in 0..500000 {
         // println!("Iteration {}", _i);
         cpu.step();
     }

@@ -82,7 +82,10 @@ impl Memory {
             trace!("Writting to HRAM: {:#x}", location);
             self.high_ram[location - 0xff80] = value;
         } else if location == 0xffff {
-            debug!("Writting to Interrupt Enable Register");
+            debug!(
+                "Writting to Interrupt Enable Register {:#b} -> {:#b}",
+                self.interrupt_enable, value
+            );
             self.interrupt_enable = value;
         } else if location <= 0x97FF && location >= 0x8000 {
             // println!("Writting to Tile Data");

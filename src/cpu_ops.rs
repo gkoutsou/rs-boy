@@ -48,6 +48,9 @@ pub fn get_ticks(instruction: u8) -> u32 {
         // LDI A, (HL)
         0x2a => 8,
 
+        // LDHL SP,n
+        0xf8 => 12,
+
         // LD A,n
         0x7f => 4,
         0x78 => 4,
@@ -144,6 +147,9 @@ pub fn get_ticks(instruction: u8) -> u32 {
 
         // LD (C), A
         0xe2 => 8,
+
+        // LD SP, HL
+        0xf9 => 8,
 
         // ADD
         0x87 => 4,
