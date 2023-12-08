@@ -1,4 +1,4 @@
-use log::debug;
+use log::{debug, trace};
 
 pub struct IORegisters {
     // ime: bool,
@@ -93,7 +93,7 @@ impl IORegisters {
     }
 
     pub fn write(&mut self, location: usize, value: u8) {
-        debug!("Writting to I/O Register: {:#x}: {:#b}", location, value);
+        trace!("Writting to I/O Register: {:#x}: {:#b}", location, value);
         match location {
             0xff00 => self.joypad = value,
             0xff01 => self.serial_transfer_data = value,

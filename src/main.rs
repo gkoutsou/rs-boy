@@ -1443,6 +1443,37 @@ impl Cpu {
                 self.ime = true;
             }
 
+            0x07 => {
+                trace!("RLCA");
+                let new_c = self.registers.a & (1 << 7) > 0;
+                self.registers.a = self.registers.a << 1 | (new_c as u8);
+                self.registers.f = cpu_ops::set_flag(0, CpuFlag::C, new_c);
+            }
+
+            0x0f => {
+                trace!("RRCA");
+                let new_c = self.registers.a & 1 > 0;
+                self.registers.a = self.registers.a >> 1 | ((new_c as u8) << 7);
+                self.registers.f = cpu_ops::set_flag(0, CpuFlag::C, new_c);
+            }
+
+            0x1f => {
+                trace!("RRA");
+                let old_c = self.registers.f.has_flag(registers::Flag::C);
+                let new_c = self.registers.a & 1 > 0;
+                self.registers.a = self.registers.a >> 1 | ((old_c as u8) << 7);
+                self.registers.f = cpu_ops::set_flag(0, CpuFlag::C, new_c);
+            }
+
+            0x3f => {
+                trace!("CCF");
+                let c = !self.registers.f.has_flag(registers::Flag::C);
+                let mut f = cpu_ops::set_flag(self.registers.f, CpuFlag::C, c);
+                f = cpu_ops::set_flag(f, CpuFlag::N, false);
+                f = cpu_ops::set_flag(f, CpuFlag::H, false);
+                self.registers.f = f;
+            }
+
             0xcb => {
                 panic!("cb operation should not run through this");
             }
@@ -1562,6 +1593,22 @@ impl Cpu {
             0x4b => self.registers.f = self.registers.e.bit(1, self.registers.f),
             0x4c => self.registers.f = self.registers.h.bit(1, self.registers.f),
             0x4d => self.registers.f = self.registers.l.bit(1, self.registers.f),
+
+            0x57 => self.registers.f = self.registers.a.bit(2, self.registers.f),
+            0x50 => self.registers.f = self.registers.b.bit(2, self.registers.f),
+            0x51 => self.registers.f = self.registers.c.bit(2, self.registers.f),
+            0x52 => self.registers.f = self.registers.d.bit(2, self.registers.f),
+            0x53 => self.registers.f = self.registers.e.bit(2, self.registers.f),
+            0x54 => self.registers.f = self.registers.h.bit(2, self.registers.f),
+            0x55 => self.registers.f = self.registers.l.bit(2, self.registers.f),
+
+            0x7f => self.registers.f = self.registers.a.bit(7, self.registers.f),
+            0x78 => self.registers.f = self.registers.b.bit(7, self.registers.f),
+            0x79 => self.registers.f = self.registers.c.bit(7, self.registers.f),
+            0x7a => self.registers.f = self.registers.d.bit(7, self.registers.f),
+            0x7b => self.registers.f = self.registers.e.bit(7, self.registers.f),
+            0x7c => self.registers.f = self.registers.h.bit(7, self.registers.f),
+            0x7d => self.registers.f = self.registers.l.bit(7, self.registers.f),
 
             _ => {
                 debug!("Info for debugging");

@@ -326,6 +326,12 @@ pub fn get_ticks(instruction: u8) -> u32 {
 
         0xd9 => 8, // 16
 
+        0x07 => 4,
+        0x0f => 4,
+        0x1f => 4,
+
+        0x3f => 4, // CCF
+
         _ => {
             panic!("missing operator CPU cycles{:#x}", instruction);
         }
