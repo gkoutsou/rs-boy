@@ -295,36 +295,36 @@ pub fn get_ticks(instruction: u8) -> u32 {
 
         0xc3 => 12,
 
-        0xc2 => 12,
-        0xca => 12,
-        0xd2 => 12,
-        0xda => 12,
+        0xc2 => 12, // If cc is true, 16 else 12.
+        0xca => 12, // If cc is true, 16 else 12.
+        0xd2 => 12, // If cc is true, 16 else 12.
+        0xda => 12, // If cc is true, 16 else 12.
 
         0xe9 => 4,
 
-        0x18 => 8,
+        0x18 => 12, // 12
 
-        0x20 => 8,
-        0x28 => 8,
-        0x30 => 8,
-        0x38 => 8,
+        0x20 => 8, // If cc is true, 12 else 8
+        0x28 => 8, // If cc is true, 12 else 8
+        0x30 => 8, // If cc is true, 12 else 8
+        0x38 => 8, // If cc is true, 12 else 8
 
-        0xcd => 12,
+        0xcd => 24, // 24
 
-        0xc4 => 12,
-        0xcc => 12,
-        0xd4 => 12,
-        0xdc => 12,
+        0xc4 => 12, // If cc is true, 24 else 12
+        0xcc => 12, // If cc is true, 24 else 12
+        0xd4 => 12, // If cc is true, 24 else 12
+        0xdc => 12, // If cc is true, 24 else 12
 
         //
-        0xc9 => 8,
+        0xc9 => 16, // 16
 
-        0xc0 => 8,
-        0xc8 => 8,
-        0xd0 => 8,
-        0xd8 => 8,
+        0xc0 => 8, // If cc is true, 20 else 8.
+        0xc8 => 8, // If cc is true, 20 else 8.
+        0xd0 => 8, // If cc is true, 20 else 8.
+        0xd8 => 8, // If cc is true, 20 else 8.
 
-        0xd9 => 8,
+        0xd9 => 8, // 16
 
         _ => {
             panic!("missing operator CPU cycles{:#x}", instruction);

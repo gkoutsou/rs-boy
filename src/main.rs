@@ -47,7 +47,7 @@ fn load_rom() -> io::Result<Vec<u8>> {
     let mut f = File::open("PokemonRed.gb")?;
     let mut buffer = Vec::new();
 
-    panic!("checked up to after jump 'next: 0x1cf9'");
+    // panic!("checked up to after jump 'next: 0x1cf9'");
 
     // read the whole file
     f.read_to_end(&mut buffer)?;
@@ -256,6 +256,7 @@ impl Cpu {
                 trace!("JP NZ,nn --> {:#x}", new_loc);
                 if !self.registers.f.has_flag(registers::Flag::Z) {
                     trace!("Making the jump!");
+                    self.cpu_cycles += 4;
                     self.registers.set_pc(new_loc);
                 }
             }
@@ -265,6 +266,7 @@ impl Cpu {
                 trace!("JP Z,nn --> {:#x}", new_loc);
                 if self.registers.f.has_flag(registers::Flag::Z) {
                     trace!("Making the jump!");
+                    self.cpu_cycles += 4;
                     self.registers.set_pc(new_loc);
                 }
             }
@@ -274,6 +276,7 @@ impl Cpu {
                 trace!("JP NC,nn --> {:#x}", new_loc);
                 if !self.registers.f.has_flag(registers::Flag::C) {
                     trace!("Making the jump!");
+                    self.cpu_cycles += 4;
                     self.registers.set_pc(new_loc);
                 }
             }
@@ -283,6 +286,7 @@ impl Cpu {
                 trace!("JP C,nn --> {:#x}", new_loc);
                 if self.registers.f.has_flag(registers::Flag::C) {
                     trace!("Making the jump!");
+                    self.cpu_cycles += 4;
                     self.registers.set_pc(new_loc);
                 }
             }
@@ -303,6 +307,7 @@ impl Cpu {
                         self.registers.pc,
                         new_location
                     );
+                    self.cpu_cycles += 4;
                     self.registers.set_pc(new_location);
                     // panic!("untested jump");
                 }
@@ -318,6 +323,7 @@ impl Cpu {
                         self.registers.pc,
                         new_location
                     );
+                    self.cpu_cycles += 4;
                     self.registers.set_pc(new_location);
                 }
             }
@@ -331,6 +337,7 @@ impl Cpu {
                         self.registers.pc,
                         new_location
                     );
+                    self.cpu_cycles += 4;
                     self.registers.set_pc(new_location);
                     // panic!("untested jump NC");
                 }
@@ -346,6 +353,7 @@ impl Cpu {
                         self.registers.pc,
                         new_location
                     );
+                    self.cpu_cycles += 4;
                     self.registers.set_pc(new_location);
                     // panic!("untested jump C");
                 }
@@ -1285,6 +1293,7 @@ impl Cpu {
                 debug!("CALL NZ,nn --> {:#x}", new_location);
                 if !self.registers.f.has_flag(registers::Flag::Z) {
                     debug!("Making the jump!");
+                    self.cpu_cycles += 12;
                     self.push_stack(self.registers.pc);
                     self.registers.set_pc(new_location);
                 }
@@ -1294,6 +1303,7 @@ impl Cpu {
                 debug!("CALL Z,nn --> {:#x}", new_location);
                 if self.registers.f.has_flag(registers::Flag::Z) {
                     debug!("Making the jump!");
+                    self.cpu_cycles += 12;
                     self.push_stack(self.registers.pc);
                     self.registers.set_pc(new_location);
                 }
@@ -1303,6 +1313,7 @@ impl Cpu {
                 debug!("CALL NC,nn --> {:#x}", new_location);
                 if !self.registers.f.has_flag(registers::Flag::C) {
                     debug!("Making the jump!");
+                    self.cpu_cycles += 12;
                     self.push_stack(self.registers.pc);
                     self.registers.set_pc(new_location);
                 }
@@ -1312,6 +1323,7 @@ impl Cpu {
                 debug!("CALL C,nn --> {:#x}", new_location);
                 if self.registers.f.has_flag(registers::Flag::C) {
                     debug!("Making the jump!");
+                    self.cpu_cycles += 12;
                     self.push_stack(self.registers.pc);
                     self.registers.set_pc(new_location);
                 }
@@ -1329,6 +1341,7 @@ impl Cpu {
                 if !self.registers.f.has_flag(registers::Flag::Z) {
                     let new_loc = self.pop_stack();
                     debug!("Made the jump");
+                    self.cpu_cycles += 12;
                     self.registers.set_pc(new_loc);
                 }
             }
@@ -1337,6 +1350,7 @@ impl Cpu {
                 if self.registers.f.has_flag(registers::Flag::Z) {
                     let new_loc = self.pop_stack();
                     debug!("Made the jump");
+                    self.cpu_cycles += 12;
                     self.registers.set_pc(new_loc);
                 }
             }
@@ -1345,6 +1359,7 @@ impl Cpu {
                 if !self.registers.f.has_flag(registers::Flag::C) {
                     let new_loc = self.pop_stack();
                     debug!("Made the jump");
+                    self.cpu_cycles += 12;
                     self.registers.set_pc(new_loc);
                 }
             }
@@ -1353,6 +1368,7 @@ impl Cpu {
                 if self.registers.f.has_flag(registers::Flag::C) {
                     let new_loc = self.pop_stack();
                     debug!("Made the jump");
+                    self.cpu_cycles += 12;
                     self.registers.set_pc(new_loc);
                 }
             }
@@ -1624,7 +1640,7 @@ fn main() {
         debug_counter: 0,
     };
 
-    for _i in 0..500000 {
+    for _i in 0..1500000 {
         // println!("Iteration {}", _i);
         cpu.step();
     }
