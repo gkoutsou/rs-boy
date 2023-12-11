@@ -222,7 +222,7 @@ pub fn get_ticks(instruction: u8) -> u32 {
         0x15 => 4,
         0x1d => 4,
         0x25 => 4,
-        0x2d => 12,
+        0x2d => 4,
 
         // AND n
         0xa7 => 4,
@@ -293,7 +293,7 @@ pub fn get_ticks(instruction: u8) -> u32 {
 
         0xcb => panic!("cb cycles not supported"),
 
-        0xc3 => 12,
+        0xc3 => 16,
 
         0xc2 => 12, // If cc is true, 16 else 12.
         0xca => 12, // If cc is true, 16 else 12.
@@ -317,14 +317,14 @@ pub fn get_ticks(instruction: u8) -> u32 {
         0xdc => 12, // If cc is true, 24 else 12
 
         //
-        0xc9 => 16, // 16
+        0xc9 => 16, // RET 16
 
         0xc0 => 8, // If cc is true, 20 else 8.
         0xc8 => 8, // If cc is true, 20 else 8.
         0xd0 => 8, // If cc is true, 20 else 8.
         0xd8 => 8, // If cc is true, 20 else 8.
 
-        0xd9 => 8, // 16
+        0xd9 => 16, // RETI 16
 
         0x07 => 4,
         0x0f => 4,
@@ -355,9 +355,14 @@ pub fn get_cb_ticks(cb_instruction: u8) -> u32 {
         0x86 => 16,
         0x80..=0x87 => 8,
 
+        // SET
+        0xc6 | 0xd6 | 0xe6 | 0xf6 => 16,
+        0xce | 0xde | 0xee | 0xfe => 16,
+        0xc0..=0xff => 8,
+
         // BIT b,r
-        0x46 | 0x56 | 0x66 | 0x76 => 16,
-        0x4e | 0x5e | 0x6e | 0x7e => 16,
+        0x46 | 0x56 | 0x66 | 0x76 => 12,
+        0x4e | 0x5e | 0x6e | 0x7e => 12,
         0x40..=0x7f => 8,
 
         _ => {

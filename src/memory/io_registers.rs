@@ -65,7 +65,15 @@ pub struct IORegisters {
 impl IORegisters {
     pub fn get(&self, location: usize) -> u8 {
         match location {
-            0xff00 => self.joypad,
+            0xff00 => {
+                // If neither buttons nor d-pad is selected ($30 was written), then the low nibble
+                // reads $F (all buttons released).
+                if self.joypad == 0x30 {
+                    self.joypad | 0xf
+                } else {
+                    self.joypad
+                }
+            }
             0xff01 => self.serial_transfer_data,
             0xff02 => self.serial_transfer_control,
             0xFF04 => self.div,

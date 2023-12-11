@@ -37,6 +37,8 @@ struct Cpu {
 
     /// Interrupt Master Enable
     ime: bool,
+    set_ei: bool,
+    set_di: bool,
 
     // debug stuff
     debug_counter: i32,
@@ -47,7 +49,30 @@ fn load_rom() -> io::Result<Vec<u8>> {
     let mut f = File::open("PokemonRed.gb")?;
     let mut buffer = Vec::new();
 
-    // panic!("checked up to after jump 'next: 0x1cf9'");
+    // todo!("problem after jump  739646 [DEBUG rs_boy] RET to: 0x373c
+    //  739647 [DEBUG rs_boy] operator: 0xd
+    //  739648 [DEBUG rs_boy] operator: 0x20
+    //  739649 [DEBUG rs_boy] operator: 0xc9");
+
+    // newer..
+    // 1081371 GKO: Change Bank! 4
+    // 1081372 0xe1
+    // 1081373 0xd1
+    // 1081374 0xc1
+    // 1081375 0xf1
+    // 1081376 0xd9
+    // 1081377 RETI to: 0x20b4
+    // 1081378 0xf0
+    // 1081379 LDH A,(n) --> 0xffd6
+    // 1081380 0xa7
+    // 1081381 0x20
+    // 1081382 0xc9
+    // 1081383 RET to: 0x1880
+    // 1081384 0x79
+    // 1081385 line: 4
+    // 1081386 0xd6
+    // 1081387 0x4f
+    // 1081388 0x18 //  848855 [DEBUG rs_boy] JR n (jump 222 -> 0x1964)
 
     // read the whole file
     f.read_to_end(&mut buffer)?;
@@ -57,30 +82,10 @@ fn load_rom() -> io::Result<Vec<u8>> {
 
 impl Cpu {
     fn step(&mut self) {
-        if self.ime != false
-            && (self.memory.interrupt_enable & self.memory.io_registers.interrupt_flag) > 0
-        {
-            let interrupts = self.memory.interrupt_enable & self.memory.io_registers.interrupt_flag;
-            if interrupts & 0x1 > 0 {
-                // vblank interrupt
-                self.ime = false;
-                self.memory.io_registers.interrupt_flag &= 0b11111110;
-                self.push_stack(self.registers.pc);
-                self.registers.set_pc(0x40);
-                self.halt = false;
-                info!("VBlank Interrupt Handler");
-                self.memory.dump_tile_data();
-                // panic!("asd");
-                return;
-            }
-
-            println!("Interrupt enable: {:#8b}", self.memory.interrupt_enable);
-            println!(
-                "Interrupt flag: {:#8b}",
-                self.memory.io_registers.interrupt_flag
-            );
-            self.memory.dump_tile_data();
-            panic!("found interrupt")
+        if self.interrupt_step() {
+            self.cpu_cycles += 16; // todo 16 or 12?
+            return;
+            // todo should an interrupt still run gpu?
         }
 
         if !self.halt {
@@ -91,6 +96,46 @@ impl Cpu {
 
         // todo this is not CPU steps but w/e for now
         self.gpu_step();
+    }
+
+    fn interrupt_step(&mut self) -> bool {
+        if self.set_di {
+            self.ime = false;
+            self.set_di = false;
+            return false;
+        }
+        if self.set_ei {
+            self.ime = true;
+            self.set_ei = false;
+            return false;
+        }
+        if self.ime == false {
+            return false;
+        }
+        let interrupts = self.memory.interrupt_enable & self.memory.io_registers.interrupt_flag;
+        if interrupts == 0 {
+            return false;
+        }
+
+        if interrupts & 0x1 > 0 {
+            // vblank interrupt
+            self.ime = false;
+            self.memory.io_registers.interrupt_flag &= 0b11111110;
+            self.push_stack(self.registers.pc);
+            info!("VBlank Interrupt Handler from: {:#x}", self.registers.pc);
+            self.registers.set_pc(0x40);
+            self.halt = false;
+            self.memory.dump_tile_data();
+            return true;
+        }
+
+        println!("Interrupt enable: {:#8b}", self.memory.interrupt_enable);
+        println!(
+            "Interrupt flag: {:#8b}",
+            self.memory.io_registers.interrupt_flag
+        );
+        self.memory.dump_tile_data();
+        panic!("found interrupt")
     }
 
     fn cpu_step(&mut self) {
@@ -244,10 +289,10 @@ impl Cpu {
 
             // JR n
             0x18 => {
-                let steps = self.get_u8() as i16;
+                let steps = self.get_u8() as i8;
                 let new_location = self.registers.pc as i32 + steps as i32;
                 self.registers.set_pc(new_location as u16);
-                trace!("JR n (jump {} -> {:#x})", steps, new_location);
+                debug!("JR n (jump {} -> {:#x})", steps, new_location);
             }
 
             // JP NZ,nn
@@ -302,10 +347,9 @@ impl Cpu {
                 trace!("############");
                 if !self.registers.f.has_flag(registers::Flag::Z) {
                     let new_location = (self.registers.pc as i32 + steps) as u16;
-                    trace!(
-                        "Current location: {:#x}, next: {:#x}",
-                        self.registers.pc,
-                        new_location
+                    debug!(
+                        "JUMP - Current location: {:#x}, next: {:#x}",
+                        self.registers.pc, new_location
                     );
                     self.cpu_cycles += 4;
                     self.registers.set_pc(new_location);
@@ -463,10 +507,8 @@ impl Cpu {
                 // )
                 let steps = steps as u16;
 
-                let mut f = cpu_ops::set_flag(0, CpuFlag::N, false);
-                f = cpu_ops::set_flag(f, CpuFlag::Z, false);
-                f = cpu_ops::set_flag(
-                    f,
+                let mut f = cpu_ops::set_flag(
+                    0,
                     CpuFlag::H,
                     (old_val & 0x000F) + (steps & 0x000F) > 0x000F,
                 );
@@ -1266,15 +1308,15 @@ impl Cpu {
                 // immediately. Interrupts are disabled after
                 // instruction after DI is executed.
                 info!("Warning: DI");
-                self.ime = false;
+                self.set_di = true;
             }
 
             0xfb => {
-                // This instruction disables interrupts but not
+                // This instruction enables interrupts but not
                 // immediately. Interrupts are enabled after
-                // instruction after DI is executed.
+                // instruction after EI is executed.
                 info!("Warning: EI");
-                self.ime = true;
+                self.set_ei = true;
             }
 
             // Calls
@@ -1526,10 +1568,8 @@ impl Cpu {
 
                 trace!("FROM: {:#x}", self.registers.b);
 
-                let mut f = cpu_ops::set_flag(self.registers.f, CpuFlag::C, c == 1);
-                f = cpu_ops::set_flag(f, CpuFlag::H, false);
+                let mut f = cpu_ops::set_flag(0x0, CpuFlag::C, c == 1);
                 f = cpu_ops::set_flag(f, CpuFlag::Z, self.registers.b == 0);
-                f = cpu_ops::set_flag(f, CpuFlag::N, false);
                 self.registers.f = f;
                 self.registers.b = shifted | msb;
                 trace!("TO: {:#x}", self.registers.b);
@@ -1545,9 +1585,7 @@ impl Cpu {
                 trace!("FROM: {:#b}", self.registers.a);
 
                 let mut f = cpu_ops::set_flag(0x0, CpuFlag::C, c == 1);
-                f = cpu_ops::set_flag(f, CpuFlag::H, false);
                 f = cpu_ops::set_flag(f, CpuFlag::Z, self.registers.a == 0);
-                f = cpu_ops::set_flag(f, CpuFlag::N, false);
                 self.registers.f = f;
                 self.registers.a = shifted;
                 trace!("TO: {:#b} F: {:#b}", self.registers.a, self.registers.f);
@@ -1555,27 +1593,22 @@ impl Cpu {
 
             // RES
             // 0 byte
-            0x87 => {
-                self.registers.a.set_bit(0, false);
-            }
-            0x80 => {
-                self.registers.b.set_bit(0, false);
-            }
-            0x81 => {
-                self.registers.c.set_bit(0, false);
-            }
-            0x82 => {
-                self.registers.d.set_bit(0, false);
-            }
-            0x83 => {
-                self.registers.e.set_bit(0, false);
-            }
-            0x84 => {
-                self.registers.h.set_bit(0, false);
-            }
-            0x85 => {
-                self.registers.l.set_bit(0, false);
-            }
+            0x87 => self.registers.a.set_bit(0, false),
+            0x80 => self.registers.b.set_bit(0, false),
+            0x81 => self.registers.c.set_bit(0, false),
+            0x82 => self.registers.d.set_bit(0, false),
+            0x83 => self.registers.e.set_bit(0, false),
+            0x84 => self.registers.h.set_bit(0, false),
+            0x85 => self.registers.l.set_bit(0, false),
+
+            // SET
+            0xff => self.registers.a.set_bit(7, true),
+            0xf8 => self.registers.b.set_bit(7, true),
+            0xf9 => self.registers.c.set_bit(7, true),
+            0xfa => self.registers.d.set_bit(7, true),
+            0xfb => self.registers.e.set_bit(7, true),
+            0xfc => self.registers.h.set_bit(7, true),
+            0xfd => self.registers.l.set_bit(7, true),
 
             // BIT b,r
             0x47 => self.registers.f = self.registers.a.bit(0, self.registers.f),
@@ -1601,6 +1634,14 @@ impl Cpu {
             0x53 => self.registers.f = self.registers.e.bit(2, self.registers.f),
             0x54 => self.registers.f = self.registers.h.bit(2, self.registers.f),
             0x55 => self.registers.f = self.registers.l.bit(2, self.registers.f),
+
+            0x77 => self.registers.f = self.registers.a.bit(6, self.registers.f),
+            0x70 => self.registers.f = self.registers.b.bit(6, self.registers.f),
+            0x71 => self.registers.f = self.registers.c.bit(6, self.registers.f),
+            0x72 => self.registers.f = self.registers.d.bit(6, self.registers.f),
+            0x73 => self.registers.f = self.registers.e.bit(6, self.registers.f),
+            0x74 => self.registers.f = self.registers.h.bit(6, self.registers.f),
+            0x75 => self.registers.f = self.registers.l.bit(6, self.registers.f),
 
             0x7f => self.registers.f = self.registers.a.bit(7, self.registers.f),
             0x78 => self.registers.f = self.registers.b.bit(7, self.registers.f),
@@ -1679,6 +1720,8 @@ fn main() {
         memory: Memory::default_with_rom(buffer),
 
         ime: false,
+        set_di: false,
+        set_ei: false,
 
         halt: false,
         cpu_cycles: 0,
@@ -1687,7 +1730,7 @@ fn main() {
         debug_counter: 0,
     };
 
-    for _i in 0..1500000 {
+    for _i in 0..7500000 {
         // println!("Iteration {}", _i);
         cpu.step();
     }
