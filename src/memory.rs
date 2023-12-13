@@ -38,6 +38,9 @@ impl Memory {
         } else if location <= 0x97FF && location >= 0x8000 {
             // trace!("Getting Tile Data: {:#x}", location);
             self.tile_data[location - 0x8000]
+        } else if location <= 0x9FFF && location >= 0x9800 {
+            debug!("Reading Tile Map");
+            self.tile_maps[location - 0x9800]
         } else if location <= 0xff77 && location >= 0xff00 {
             self.io_registers.get(location)
         } else if location == 0xffff {
@@ -105,7 +108,7 @@ impl Memory {
 
             // Starts writing here in location: 0x36e3
         } else if location <= 0x9FFF && location >= 0x9800 {
-            debug!("Writting to Tile Map");
+            debug!("Writing to Tile Map");
             // panic!("ASDD");
             // if value != 0 {
             //     panic!(
@@ -180,6 +183,12 @@ impl Memory {
         let tile_index = self.oam[object * 4 + 2];
         let flags = self.oam[object * 4 + 3];
         gpu::Tile::new(y, x, tile_index, flags)
+    }
+
+    pub fn get_tile_data(&self, baseline: usize, id: usize, row: usize) -> (u8, u8) {
+        let a = self.tile_data[baseline - 0x8000 + id * 16 + row * 2];
+        let b = self.tile_data[baseline - 0x8000 + id * 16 + row * 2 + 1];
+        (a, b)
     }
 
     pub fn default_with_rom(buffer: Vec<u8>) -> Memory {

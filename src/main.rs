@@ -168,62 +168,53 @@ impl Cpu {
         if !self.memory.io_registers.lcd_enabled() {
             trace!("LCD disabled!");
             self.cpu_cycles = 0;
-            self.memory.io_registers.scanline = 0;
+            self.memory.io_registers.ly = 0;
             return;
         }
 
         match self.gpu_mode {
             gpu::Mode::Two => {
-                let line = self.memory.io_registers.scanline;
+                let line = self.memory.io_registers.ly;
                 trace!("OAM Scan: line {} ({})", line, self.cpu_cycles);
                 // 80 dots
                 if self.cpu_cycles >= 80 {
                     // scan pixels TODO ideally I should follow the ticks, not do it at once
                     self.cpu_cycles -= 80;
                     self.gpu_mode = gpu::Mode::Three;
-                    let mut object_counter = 0;
-                    for i in 0..40 {
-                        let tile = self.memory.get_oam_object(i);
-                        let double_size = self.memory.io_registers.has_lcd_flag(2);
-                        if tile.object_in_scanline(line, double_size) {
-                            object_counter += 1;
-                            panic!("found object {:?}", tile)
-                        }
-                    }
                 }
             }
             gpu::Mode::One => {
                 trace!(
                     "VBlank: line {} ({})",
-                    self.memory.io_registers.scanline,
+                    self.memory.io_registers.ly,
                     self.cpu_cycles
                 );
 
                 if self.cpu_cycles >= 456 {
-                    self.memory.io_registers.scanline += 1;
+                    self.memory.io_registers.ly += 1;
                     self.cpu_cycles -= 456;
 
-                    if self.memory.io_registers.scanline > 153 {
+                    if self.memory.io_registers.ly > 153 {
                         self.gpu_mode = gpu::Mode::Two;
-                        self.memory.io_registers.scanline = 0;
+                        self.memory.io_registers.ly = 0;
                         // self.memory.dump_tile_data();
                     }
-                    debug!("line: {}", self.memory.io_registers.scanline);
+                    debug!("line: {}", self.memory.io_registers.ly);
                 }
             }
             gpu::Mode::Zero => {
                 trace!(
                     "Horrizontal Blank: line {} ({})",
-                    self.memory.io_registers.scanline,
+                    self.memory.io_registers.ly,
                     self.cpu_cycles
                 );
                 if self.cpu_cycles >= 204 {
                     self.cpu_cycles -= 204;
 
-                    self.memory.io_registers.scanline += 1;
-                    debug!("line: {}", self.memory.io_registers.scanline);
+                    self.memory.io_registers.ly += 1;
+                    debug!("line: {}", self.memory.io_registers.ly);
 
-                    if self.memory.io_registers.scanline == 144 {
+                    if self.memory.io_registers.ly == 144 {
                         //todo should this be 143?
                         self.memory.io_registers.enable_video_interrupt();
                         self.gpu_mode = gpu::Mode::One;
@@ -233,19 +224,170 @@ impl Cpu {
                 }
             }
             gpu::Mode::Three => {
+                let line = self.memory.io_registers.ly;
                 trace!(
                     "Drawing Pixels: line {} ({})",
-                    self.memory.io_registers.scanline,
+                    self.memory.io_registers.ly,
                     self.cpu_cycles
                 );
                 //todo hack
 
                 if self.cpu_cycles >= 172 {
+                    let mut object_counter = 0;
+
+                    self.draw_background();
+
+                    // draw window
+                    // if self.memory.io_registers.has_lcd_flag(5) {
+                    // panic!("window is enabled. :sadge:")
+                    // }
+
+                    // draw sprites
+                    for i in 0..40 {
+                        let tile = self.memory.get_oam_object(i);
+                        let double_size = self
+                            .memory
+                            .io_registers
+                            .has_lcd_flag(gpu::LcdStatusFlag::ObjectSize);
+                        if tile.object_in_scanline(line, double_size) {
+                            object_counter += 1;
+                            panic!("found object {:?}", tile)
+                        }
+                    }
                     self.gpu_mode = gpu::Mode::Zero;
                     self.cpu_cycles -= 172;
                 }
             }
         }
+    }
+
+    fn draw_background(&self) {
+        let line = self.memory.io_registers.ly;
+        if !self
+            .memory
+            .io_registers
+            .has_lcd_flag(gpu::LcdStatusFlag::BgWindowEnabled)
+        {
+            println!("bg/window is disabled. must draw white :sadge:")
+        }
+        let bottom = self.memory.io_registers.scy.wrapping_add(143); // ) % 256;
+        let right = self.memory.io_registers.scx.wrapping_add(159); // % 256;
+
+        let tilemap_location = self.get_tile_map_baseline();
+        let w_tilemap_location = self.get_window_tile_map_baseline();
+        let tiledata_location = self.get_tile_data_baseline();
+
+        if self.memory.io_registers.scy != 0 {
+            panic!("scy!")
+        }
+
+        // Window
+        if self
+            .memory
+            .io_registers
+            .has_lcd_flag(gpu::LcdStatusFlag::WindowEnabled)
+            && self.memory.io_registers.wy <= line
+        {
+            // panic!("overlapping window!");
+            // let wx =                 self.memory.io_registers.wx - 7*/
+            let wy = self.memory.io_registers.wy;
+            let tiley = line - wy;
+            println!("wy {} line {} tiley {}", wy, line, tiley);
+            println!(
+                "bl {:#x}, rest: {}",
+                w_tilemap_location,
+                tiley as usize / 8 * 32
+            );
+
+            for x in 0..20 {
+                let tile_id = self
+                    .memory
+                    .get(w_tilemap_location + tiley as usize / 8 * 32 + x) // todo ignoring wx..
+                    as usize; // todo yolo
+                let tdl = if tiledata_location == 0x8000 {
+                    tiledata_location
+                } else if tile_id < 128 {
+                    0x9000 // id 0
+                } else {
+                    0x8000 // 8800 has id 128
+                };
+                if tile_id != 0 {
+                    // println!("ID not 0! {}", tile_id);
+                    println!(
+                        "{:#x}, - tile {} - row {}",
+                        tdl,
+                        tile_id,
+                        tiley as usize % 8
+                    )
+                }
+                let (byte1, byte2) = self.memory.get_tile_data(tdl, tile_id, tiley as usize % 8); // todo yolo
+                if byte1 != 0 && byte2 != 0 {
+                    panic!("TileData {:#x} {:#x}", byte1, byte2);
+                }
+            }
+        }
+
+        let tiley = (line as usize + self.memory.io_registers.scy as usize) % 256;
+        println!("Tiley: {}", tiley);
+        let tilex = 0;
+
+        // draw background
+        for x in 0..20 {
+            let tile_id = self.memory.get(tilemap_location + tiley / 8 * 32 + x) as usize;
+            // let tile = self.memory.get(tiledata_location + tile_id as usize);
+            let (byte1, byte2) = self
+                .memory
+                .get_tile_data(tiledata_location, tile_id, tiley % 8);
+            if byte1 != 0 && byte2 != 0 {
+                panic!("TileData {:#x} {:#x}", byte1, byte2);
+            }
+        }
+    }
+
+    /// This step determines which background/window tile to fetch pixels from.
+    /// By default the tilemap used is the one at $9800 but certain conditions can change that.
+    ///
+    /// When LCDC.3 is enabled and the X coordinate of the current scanline is not inside the
+    // window then tilemap $9C00 is used.
+    ///
+    /// When LCDC.6 is enabled and the X coordinate of the current scanline is inside the window
+    //then tilemap $9C00 is used.
+    fn get_tile_map_baseline(&self) -> usize {
+        if self
+            .memory
+            .io_registers
+            .has_lcd_flag(gpu::LcdStatusFlag::BGTileMapArea)
+        {
+            return 0x9c00;
+        }
+
+        return 0x9800;
+    }
+
+    /// When it’s clear (0), the $9800 tilemap is used, otherwise it’s the $9C00 one.
+    fn get_window_tile_map_baseline(&self) -> usize {
+        if self
+            .memory
+            .io_registers
+            .has_lcd_flag(gpu::LcdStatusFlag::WindowTileMapArea)
+        {
+            return 0x9c00;
+        }
+
+        return 0x9800;
+    }
+
+    /// For window/background only
+    /// 0 = 8800–97FF; 1 = 8000–8FFF
+    fn get_tile_data_baseline(&self) -> usize {
+        if !self
+            .memory
+            .io_registers
+            .has_lcd_flag(gpu::LcdStatusFlag::TileDataArea)
+        {
+            return 0x8800;
+        }
+        return 0x8000;
     }
 
     fn pop_stack(&mut self) -> u16 {

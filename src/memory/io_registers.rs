@@ -1,9 +1,11 @@
 use log::{debug, trace};
 
+use crate::gpu;
+
 pub struct IORegisters {
     // ime: bool,
     // interrupt_enable: u8,
-    pub scanline: u8,
+    // pub scanline: u8,
     pub interrupt_flag: u8,
 
     /// ff00
@@ -43,11 +45,11 @@ pub struct IORegisters {
     /// ff41
     lcd_status: u8,
     /// ff42
-    scy: u8,
+    pub scy: u8,
     /// ff43
-    scx: u8,
+    pub scx: u8,
     /// ff44
-    ly: u8,
+    pub ly: u8,
     /// ff45
     lyc: u8,
     /// FF47
@@ -57,9 +59,9 @@ pub struct IORegisters {
     /// FF49
     obp1: u8,
     /// ff4a
-    wy: u8,
+    pub wy: u8,
     /// ff4b
-    wx: u8,
+    pub wx: u8,
 }
 
 impl IORegisters {
@@ -85,7 +87,7 @@ impl IORegisters {
             0xff41 => self.lcd_status,
             0xff42 => self.scy,
             0xff43 => self.scx,
-            0xff44 => self.scanline,
+            0xff44 => self.ly,
             0xff47 => self.bgp,
             0xff48 => self.obp0,
             0xff49 => self.obp1,
@@ -142,17 +144,17 @@ impl IORegisters {
     }
 
     pub fn lcd_enabled(&self) -> bool {
-        return self.lcd_control & (1 << 7) > 0;
+        return self.lcd_control & gpu::LcdStatusFlag::LcdEnabled as u8 > 0;
     }
 
-    pub fn has_lcd_flag(&self, bit: u8) -> bool {
-        return self.lcd_control & (1 << bit) > 0;
+    pub fn has_lcd_flag(&self, flag: gpu::LcdStatusFlag) -> bool {
+        return self.lcd_control & flag as u8 > 0;
     }
 
     pub fn default() -> IORegisters {
         IORegisters {
             joypad: 0,
-            scanline: 0,
+            // scanline: 0,
             interrupt_flag: 0,
             lcd_control: 0x91,
             lcd_status: 0,

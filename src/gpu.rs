@@ -28,6 +28,17 @@ pub enum Mode {
     Three,
 }
 
+pub enum LcdStatusFlag {
+    LcdEnabled = 1 << 7,
+    WindowTileMapArea = 1 << 6,
+    WindowEnabled = 1 << 5,
+    TileDataArea = 1 << 4,
+    BGTileMapArea = 1 << 3,
+    ObjectSize = 1 << 2,
+    ObjectEnabled = 1 << 1,
+    BgWindowEnabled = 1 << 0,
+}
+
 #[derive(Debug)]
 pub struct Tile {
     y: u8,
