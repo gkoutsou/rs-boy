@@ -275,65 +275,64 @@ impl Cpu {
             .has_lcd_flag(gpu::LcdStatusFlag::BgWindowEnabled)
         {
             trace!("bg/window is disabled. must draw white :sadge:");
-            for elem in self.screen.iter_mut() {
-                *elem = 0xffffff;
-            }
+            self.wipe_screen();
         }
         let bottom = self.memory.io_registers.scy.wrapping_add(143); // ) % 256;
         let right = self.memory.io_registers.scx.wrapping_add(159); // % 256;
 
         let tilemap_location = self.get_tile_map_baseline();
         let w_tilemap_location = self.get_window_tile_map_baseline();
-        let tiledata_location = self.get_tile_data_baseline();
 
         if self.memory.io_registers.scy != 0 {
             panic!("scy!")
         }
 
-        // Window
-        if self
-            .memory
-            .io_registers
-            .has_lcd_flag(gpu::LcdStatusFlag::WindowEnabled)
-            && self.memory.io_registers.wy <= line
-        {
-            // panic!("overlapping window!");
-            // let wx =                 self.memory.io_registers.wx - 7*/
-            let wy = self.memory.io_registers.wy;
-            let tiley = line - wy;
-            debug!("wy {} line {} tiley {}", wy, line, tiley);
-            debug!(
-                "bl {:#x}, rest: {}",
-                w_tilemap_location,
-                tiley as usize / 8 * 32
-            );
+        let wx = self.memory.io_registers.wx;
+        let wy = self.memory.io_registers.wy;
+        for x in 0..20u8 {
+            // Window
+            if self
+                .memory
+                .io_registers
+                .has_lcd_flag(gpu::LcdStatusFlag::WindowEnabled)
+                && wy <= line
+                && wx < x + 7
+            // todo this have issue if hiding half tile
+            {
+                // panic!("overlapping window!");
+                let tiley = line - wy;
+                let tilex = x * 8 - wx + 7; // todo half-tile
+                trace!(
+                    "wx:{} wy:{} line:{} tilex:{} tiley:{}",
+                    wx,
+                    wy,
+                    line,
+                    tilex,
+                    tiley
+                );
+                debug!(
+                    "bl {:#x}, rest: {}",
+                    w_tilemap_location,
+                    tiley as usize / 8 * 32
+                );
 
-            for x in 0..20u8 {
                 let tile_id = self
                     .memory
-                    .get(w_tilemap_location + tiley as usize / 8 * 32 + x as usize) // todo ignoring wx..
+                    .get(w_tilemap_location + tiley as usize / 8 * 32 + tilex as usize / 8) // todo ignoring wx..
                     as usize; // todo yolo
-                let tdl = if tiledata_location == 0x8000 {
-                    tiledata_location
-                } else if tile_id < 128 {
-                    0x9000 // id 0
-                } else {
-                    0x8000 // 8800 has id 128
-                };
+
+                let tdl = self.get_tile_data_baseline(tile_id);
+
                 if tile_id != 0 {
                     // println!("ID not 0! {}", tile_id);
-                    trace!(
-                        "{:#x}, - tile {} - row {}",
-                        tdl,
-                        tile_id,
-                        tiley as usize % 8
-                    )
+                    trace!("{:#x} - tile {} - row {}", tdl, tile_id, tiley as usize % 8)
                 }
                 let (byte1, byte2) = self.memory.get_tile_data(tdl, tile_id, tiley as usize % 8); // todo yolo
-                if byte1 != 0 && byte2 != 0 {
-                    self.draw_tile(x, line, byte1, byte2);
-                    // panic!("Win TileData {:#x} {:#x}", byte1, byte2);
-                }
+                trace!("bytes: {} - {}", byte1, byte2);
+
+                // if byte1 != 0 && byte2 != 0 {
+                self.draw_tile(x, line, byte1, byte2);
+                // }
 
                 if self.window.is_open() && !self.window.is_key_down(Key::Escape) {
                     self.window
@@ -346,12 +345,14 @@ impl Cpu {
         }
 
         let tiley = (line as usize + self.memory.io_registers.scy as usize) % 256;
+
         // debug!("Tiley: {}", tiley);
         let tilex = 0;
 
         // draw background
         for x in 0..20 {
             let tile_id = self.memory.get(tilemap_location + tiley / 8 * 32 + x) as usize;
+            let tiledata_location = self.get_tile_data_baseline(tile_id);
             // let tile = self.memory.get(tiledata_location + tile_id as usize);
             let (byte1, byte2) = self
                 .memory
@@ -359,6 +360,12 @@ impl Cpu {
             if byte1 != 0 && byte2 != 0 {
                 panic!("TileData {:#x} {:#x}", byte1, byte2);
             }
+        }
+    }
+
+    fn wipe_screen(&mut self) {
+        for elem in self.screen.iter_mut() {
+            *elem = 0xffffff;
         }
     }
 
@@ -378,6 +385,16 @@ impl Cpu {
             } else {
                 0xffffff
             };
+            trace!(
+                "Line:{} W:{} Rest:{} All: {:#x}",
+                line,
+                WIDTH,
+                x as usize * 8 + 7 - pixel,
+                line as usize * WIDTH + x as usize * 8 + 7 - pixel - 7
+            );
+            if line as usize >= HEIGHT {
+                return;
+            }
 
             self.screen[line as usize * WIDTH + x as usize * 8 + 7 - pixel] = color
         }
@@ -418,15 +435,24 @@ impl Cpu {
 
     /// For window/background only
     /// 0 = 8800–97FF; 1 = 8000–8FFF
-    fn get_tile_data_baseline(&self) -> usize {
-        if !self
+    fn get_tile_data_baseline(&self, tile_id: usize) -> usize {
+        let tiledata_location = if !self
             .memory
             .io_registers
             .has_lcd_flag(gpu::LcdStatusFlag::TileDataArea)
         {
-            return 0x8800;
+            0x8800
+        } else {
+            0x8000
+        };
+
+        if tiledata_location == 0x8000 {
+            tiledata_location
+        } else if tile_id < 128 {
+            0x9000 // id 0
+        } else {
+            0x8000 // 8800 has id 128
         }
-        return 0x8000;
     }
 
     fn pop_stack(&mut self) -> u16 {
