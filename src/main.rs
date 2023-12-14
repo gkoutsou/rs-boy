@@ -16,6 +16,10 @@ mod memory;
 pub use memory::Memory;
 
 use crate::registers::RegisterOperation;
+use minifb::{Key, Window, WindowOptions};
+
+const WIDTH: usize = 160;
+const HEIGHT: usize = 140;
 
 fn u16_to_u8s(input: u16) -> (u8, u8) {
     let hs = (input >> 8) as u8;
@@ -42,6 +46,8 @@ struct Cpu {
 
     // debug stuff
     debug_counter: i32,
+    screen: Vec<u32>,
+    window: Window,
 }
 
 fn load_rom() -> io::Result<Vec<u8>> {
@@ -261,14 +267,17 @@ impl Cpu {
         }
     }
 
-    fn draw_background(&self) {
+    fn draw_background(&mut self) {
         let line = self.memory.io_registers.ly;
         if !self
             .memory
             .io_registers
             .has_lcd_flag(gpu::LcdStatusFlag::BgWindowEnabled)
         {
-            println!("bg/window is disabled. must draw white :sadge:")
+            trace!("bg/window is disabled. must draw white :sadge:");
+            for elem in self.screen.iter_mut() {
+                *elem = 0xffffff;
+            }
         }
         let bottom = self.memory.io_registers.scy.wrapping_add(143); // ) % 256;
         let right = self.memory.io_registers.scx.wrapping_add(159); // % 256;
@@ -292,17 +301,17 @@ impl Cpu {
             // let wx =                 self.memory.io_registers.wx - 7*/
             let wy = self.memory.io_registers.wy;
             let tiley = line - wy;
-            println!("wy {} line {} tiley {}", wy, line, tiley);
-            println!(
+            debug!("wy {} line {} tiley {}", wy, line, tiley);
+            debug!(
                 "bl {:#x}, rest: {}",
                 w_tilemap_location,
                 tiley as usize / 8 * 32
             );
 
-            for x in 0..20 {
+            for x in 0..20u8 {
                 let tile_id = self
                     .memory
-                    .get(w_tilemap_location + tiley as usize / 8 * 32 + x) // todo ignoring wx..
+                    .get(w_tilemap_location + tiley as usize / 8 * 32 + x as usize) // todo ignoring wx..
                     as usize; // todo yolo
                 let tdl = if tiledata_location == 0x8000 {
                     tiledata_location
@@ -313,7 +322,7 @@ impl Cpu {
                 };
                 if tile_id != 0 {
                     // println!("ID not 0! {}", tile_id);
-                    println!(
+                    trace!(
                         "{:#x}, - tile {} - row {}",
                         tdl,
                         tile_id,
@@ -322,13 +331,22 @@ impl Cpu {
                 }
                 let (byte1, byte2) = self.memory.get_tile_data(tdl, tile_id, tiley as usize % 8); // todo yolo
                 if byte1 != 0 && byte2 != 0 {
-                    panic!("TileData {:#x} {:#x}", byte1, byte2);
+                    self.draw_tile(x, line, byte1, byte2);
+                    // panic!("Win TileData {:#x} {:#x}", byte1, byte2);
+                }
+
+                if self.window.is_open() && !self.window.is_key_down(Key::Escape) {
+                    self.window
+                        .update_with_buffer(&self.screen, WIDTH, HEIGHT)
+                        .unwrap();
+                } else {
+                    panic!("window deado")
                 }
             }
         }
 
         let tiley = (line as usize + self.memory.io_registers.scy as usize) % 256;
-        println!("Tiley: {}", tiley);
+        // debug!("Tiley: {}", tiley);
         let tilex = 0;
 
         // draw background
@@ -341,6 +359,27 @@ impl Cpu {
             if byte1 != 0 && byte2 != 0 {
                 panic!("TileData {:#x} {:#x}", byte1, byte2);
             }
+        }
+    }
+
+    fn draw_tile(&mut self, x: u8, line: u8, lsb_byte: u8, msb_byte: u8) {
+        for pixel in 0..8 {
+            let lsb = lsb_byte & (1 << pixel) > 0;
+            let msb = msb_byte & (1 << pixel) > 0;
+
+            let color_code = (msb as u8) << 1 | lsb as u8;
+
+            let color = if color_code == 1 {
+                0xCDC392
+            } else if color_code == 2 {
+                0xE8E5DA
+            } else if color_code == 3 {
+                0x9EB7E5
+            } else {
+                0xffffff
+            };
+
+            self.screen[line as usize * WIDTH + x as usize * 8 + 7 - pixel] = color
         }
     }
 
@@ -1809,6 +1848,20 @@ fn main() {
         .target(env_logger::Target::Stdout)
         .init();
 
+    let mut screen_buffer: Vec<u32> = vec![0; WIDTH * HEIGHT];
+
+    let mut window_opts = WindowOptions::default();
+    window_opts.scale = minifb::Scale::X2;
+
+    let mut window =
+        Window::new("Test - ESC to exit", WIDTH, HEIGHT, window_opts).unwrap_or_else(|e| {
+            panic!("{}", e);
+        });
+
+    // Limit to max ~60 fps update rate
+    // window.limit_update_rate(Some(std::time::Duration::from_micros(16600)));
+    window.limit_update_rate(None);
+
     let result = load_rom();
 
     let buffer = result.unwrap();
@@ -1868,6 +1921,8 @@ fn main() {
         halt: false,
         cpu_cycles: 0,
         gpu_mode: gpu::Mode::Two,
+        screen: screen_buffer,
+        window: window,
 
         debug_counter: 0,
     };
