@@ -152,20 +152,20 @@ impl Memory {
     }
 
     pub fn dump_tile_data(&self) {
-        println!("DUMPING TILE DATA");
-        for tile in 0..384 {
-            let mut sum = 0i32;
-            for i in 0..16 {
-                sum += self.tile_data[tile * 16 + i] as i32;
-            }
-            if sum > 0 {
-                for i in 0..16 {
-                    print!("{:#04x} ", self.tile_data[tile * 16 + i]);
-                }
-                println!()
-            }
-        }
-        println!("DUMPING TILE DATA COMPLETED");
+        // println!("DUMPING TILE DATA");
+        // for tile in 0..384 {
+        //     let mut sum = 0i32;
+        //     for i in 0..16 {
+        //         sum += self.tile_data[tile * 16 + i] as i32;
+        //     }
+        //     if sum > 0 {
+        //         for i in 0..16 {
+        //             print!("{:#04x} ", self.tile_data[tile * 16 + i]);
+        //         }
+        //         println!()
+        //     }
+        // }
+        // println!("DUMPING TILE DATA COMPLETED");
     }
 
     pub fn dump_oam(&self) {

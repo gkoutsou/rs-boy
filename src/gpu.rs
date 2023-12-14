@@ -41,10 +41,10 @@ pub enum LcdStatusFlag {
 
 #[derive(Debug)]
 pub struct Tile {
-    y: u8,
-    x: u8,
-    tile_index: u8,
-    flags: u8,
+    pub y: u8,
+    pub x: u8,
+    pub tile_index: u8,
+    pub flags: u8,
 }
 
 impl Tile {

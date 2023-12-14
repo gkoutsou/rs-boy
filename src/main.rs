@@ -1,7 +1,7 @@
 use std::{
     fs::File,
     io::{self, Read},
-    str,
+    str, thread, time,
 };
 
 mod cpu_ops;
@@ -257,9 +257,32 @@ impl Cpu {
                             .has_lcd_flag(gpu::LcdStatusFlag::ObjectSize);
                         if tile.object_in_scanline(line, double_size) {
                             object_counter += 1;
-                            panic!("found object {:?}", tile)
+                            println!("found object {:?}", tile);
+
+                            let (byte1, byte2) = self.memory.get_tile_data(
+                                0x8000,
+                                tile.tile_index as usize,
+                                tile.y as usize % 8,
+                            ); // todo double size
+
+                            self.draw_tile(tile.x, line, byte1, byte2, true);
+                            if object_counter == 2 {
+                                println!("sleeping");
+                                let ten_millis = time::Duration::from_secs(2);
+                                thread::sleep(ten_millis);
+                            }
+                            // todo exit if 8? objects presented
                         }
                     }
+
+                    if self.window.is_open() && !self.window.is_key_down(Key::Escape) {
+                        self.window
+                            .update_with_buffer(&self.screen, WIDTH, HEIGHT)
+                            .unwrap();
+                    } else {
+                        panic!("window deado")
+                    }
+
                     self.gpu_mode = gpu::Mode::Zero;
                     self.cpu_cycles -= 172;
                 }
@@ -331,16 +354,8 @@ impl Cpu {
                 trace!("bytes: {} - {}", byte1, byte2);
 
                 // if byte1 != 0 && byte2 != 0 {
-                self.draw_tile(x, line, byte1, byte2);
+                self.draw_tile(x * 8, line, byte1, byte2, false);
                 // }
-
-                if self.window.is_open() && !self.window.is_key_down(Key::Escape) {
-                    self.window
-                        .update_with_buffer(&self.screen, WIDTH, HEIGHT)
-                        .unwrap();
-                } else {
-                    panic!("window deado")
-                }
             }
         }
 
@@ -350,15 +365,27 @@ impl Cpu {
         let tilex = 0;
 
         // draw background
-        for x in 0..20 {
-            let tile_id = self.memory.get(tilemap_location + tiley / 8 * 32 + x) as usize;
+        for x in 0..20u8 {
+            let tile_id = self
+                .memory
+                .get(tilemap_location + tiley / 8 * 32 + x as usize / 8)
+                as usize;
             let tiledata_location = self.get_tile_data_baseline(tile_id);
             // let tile = self.memory.get(tiledata_location + tile_id as usize);
             let (byte1, byte2) = self
                 .memory
                 .get_tile_data(tiledata_location, tile_id, tiley % 8);
             if byte1 != 0 && byte2 != 0 {
-                panic!("TileData {:#x} {:#x}", byte1, byte2);
+                println!(
+                    "{:#x} - tile {} - row {} - {:#x} {:#x}",
+                    tiledata_location,
+                    tile_id,
+                    tiley as usize % 8,
+                    byte1,
+                    byte2
+                );
+                // panic!("TileData {:#x} {:#x}", byte1, byte2);
+                self.draw_tile(x * 8, line, byte1, byte2, false);
             }
         }
     }
@@ -369,12 +396,20 @@ impl Cpu {
         }
     }
 
-    fn draw_tile(&mut self, x: u8, line: u8, lsb_byte: u8, msb_byte: u8) {
-        for pixel in 0..8 {
+    fn draw_tile(&mut self, x: u8, y: u8, lsb_byte: u8, msb_byte: u8, is_sprite: bool) {
+        if is_sprite {
+            println!("DRAWING: ({},{}) {:#b} {:#b}", x, y, lsb_byte, msb_byte)
+        }
+        for pixel in (0..8).rev() {
+            let x = x + 7 - pixel;
             let lsb = lsb_byte & (1 << pixel) > 0;
             let msb = msb_byte & (1 << pixel) > 0;
 
             let color_code = (msb as u8) << 1 | lsb as u8;
+            if is_sprite && color_code == 0 {
+                println!("skiping transparent for sprite");
+                continue;
+            }
 
             let color = if color_code == 1 {
                 0xCDC392
@@ -385,18 +420,20 @@ impl Cpu {
             } else {
                 0xffffff
             };
-            trace!(
-                "Line:{} W:{} Rest:{} All: {:#x}",
-                line,
-                WIDTH,
-                x as usize * 8 + 7 - pixel,
-                line as usize * WIDTH + x as usize * 8 + 7 - pixel - 7
-            );
-            if line as usize >= HEIGHT {
+            if is_sprite {
+                println!(
+                    "({}, {}) Color: {:#x} All: {:#x}",
+                    y,
+                    y,
+                    color,
+                    y as usize * WIDTH + x as usize
+                );
+            }
+            if y as usize >= HEIGHT || x as usize >= WIDTH {
                 return;
             }
 
-            self.screen[line as usize * WIDTH + x as usize * 8 + 7 - pixel] = color
+            self.screen[y as usize * WIDTH + x as usize] = color
         }
     }
 
@@ -1808,6 +1845,70 @@ impl Cpu {
             0x84 => self.registers.h.set_bit(0, false),
             0x85 => self.registers.l.set_bit(0, false),
 
+            0x8f => self.registers.a.set_bit(1, false),
+            0x88 => self.registers.b.set_bit(1, false),
+            0x89 => self.registers.c.set_bit(1, false),
+            0x8a => self.registers.d.set_bit(1, false),
+            0x8b => self.registers.e.set_bit(1, false),
+            0x8c => self.registers.h.set_bit(1, false),
+            0x8d => self.registers.l.set_bit(1, false),
+
+            0x97 => self.registers.a.set_bit(2, false),
+            0x90 => self.registers.b.set_bit(2, false),
+            0x91 => self.registers.c.set_bit(2, false),
+            0x92 => self.registers.d.set_bit(2, false),
+            0x93 => self.registers.e.set_bit(2, false),
+            0x94 => self.registers.h.set_bit(2, false),
+            0x95 => self.registers.l.set_bit(2, false),
+
+            0xaf => self.registers.a.set_bit(5, false),
+            0xa8 => self.registers.b.set_bit(5, false),
+            0xa9 => self.registers.c.set_bit(5, false),
+            0xaa => self.registers.d.set_bit(5, false),
+            0xab => self.registers.e.set_bit(5, false),
+            0xac => self.registers.h.set_bit(5, false),
+            0xad => self.registers.l.set_bit(5, false),
+            0x86 => {
+                let mut value = self.memory.get(self.registers.get_hl() as usize);
+                value.set_bit(0, false);
+                self.memory.write(self.registers.get_hl() as usize, value);
+            }
+            0x8e => {
+                let mut value = self.memory.get(self.registers.get_hl() as usize);
+                value.set_bit(1, false);
+                self.memory.write(self.registers.get_hl() as usize, value);
+            }
+            0x96 => {
+                let mut value = self.memory.get(self.registers.get_hl() as usize);
+                value.set_bit(2, false);
+                self.memory.write(self.registers.get_hl() as usize, value);
+            }
+            0x9e => {
+                let mut value = self.memory.get(self.registers.get_hl() as usize);
+                value.set_bit(3, false);
+                self.memory.write(self.registers.get_hl() as usize, value);
+            }
+            0xa6 => {
+                let mut value = self.memory.get(self.registers.get_hl() as usize);
+                value.set_bit(4, false);
+                self.memory.write(self.registers.get_hl() as usize, value);
+            }
+            0xae => {
+                let mut value = self.memory.get(self.registers.get_hl() as usize);
+                value.set_bit(5, false);
+                self.memory.write(self.registers.get_hl() as usize, value);
+            }
+            0xb6 => {
+                let mut value = self.memory.get(self.registers.get_hl() as usize);
+                value.set_bit(6, false);
+                self.memory.write(self.registers.get_hl() as usize, value);
+            }
+            0xbe => {
+                let mut value = self.memory.get(self.registers.get_hl() as usize);
+                value.set_bit(7, false);
+                self.memory.write(self.registers.get_hl() as usize, value);
+            }
+
             // SET
             0xff => self.registers.a.set_bit(7, true),
             0xf8 => self.registers.b.set_bit(7, true),
@@ -1816,6 +1917,46 @@ impl Cpu {
             0xfb => self.registers.e.set_bit(7, true),
             0xfc => self.registers.h.set_bit(7, true),
             0xfd => self.registers.l.set_bit(7, true),
+            0xc6 => {
+                let mut value = self.memory.get(self.registers.get_hl() as usize);
+                value.set_bit(0, true);
+                self.memory.write(self.registers.get_hl() as usize, value);
+            }
+            0xce => {
+                let mut value = self.memory.get(self.registers.get_hl() as usize);
+                value.set_bit(1, true);
+                self.memory.write(self.registers.get_hl() as usize, value);
+            }
+            0xd6 => {
+                let mut value = self.memory.get(self.registers.get_hl() as usize);
+                value.set_bit(2, true);
+                self.memory.write(self.registers.get_hl() as usize, value);
+            }
+            0xde => {
+                let mut value = self.memory.get(self.registers.get_hl() as usize);
+                value.set_bit(3, true);
+                self.memory.write(self.registers.get_hl() as usize, value);
+            }
+            0xe6 => {
+                let mut value = self.memory.get(self.registers.get_hl() as usize);
+                value.set_bit(4, true);
+                self.memory.write(self.registers.get_hl() as usize, value);
+            }
+            0xee => {
+                let mut value = self.memory.get(self.registers.get_hl() as usize);
+                value.set_bit(5, true);
+                self.memory.write(self.registers.get_hl() as usize, value);
+            }
+            0xf6 => {
+                let mut value = self.memory.get(self.registers.get_hl() as usize);
+                value.set_bit(6, true);
+                self.memory.write(self.registers.get_hl() as usize, value);
+            }
+            0xfe => {
+                let mut value = self.memory.get(self.registers.get_hl() as usize);
+                value.set_bit(7, true);
+                self.memory.write(self.registers.get_hl() as usize, value);
+            }
 
             // BIT b,r
             0x47 => self.registers.f = self.registers.a.bit(0, self.registers.f),
@@ -1841,6 +1982,14 @@ impl Cpu {
             0x53 => self.registers.f = self.registers.e.bit(2, self.registers.f),
             0x54 => self.registers.f = self.registers.h.bit(2, self.registers.f),
             0x55 => self.registers.f = self.registers.l.bit(2, self.registers.f),
+
+            0x6f => self.registers.f = self.registers.a.bit(5, self.registers.f),
+            0x68 => self.registers.f = self.registers.b.bit(5, self.registers.f),
+            0x69 => self.registers.f = self.registers.c.bit(5, self.registers.f),
+            0x6a => self.registers.f = self.registers.d.bit(5, self.registers.f),
+            0x6b => self.registers.f = self.registers.e.bit(5, self.registers.f),
+            0x6c => self.registers.f = self.registers.h.bit(5, self.registers.f),
+            0x6d => self.registers.f = self.registers.l.bit(5, self.registers.f),
 
             0x77 => self.registers.f = self.registers.a.bit(6, self.registers.f),
             0x70 => self.registers.f = self.registers.b.bit(6, self.registers.f),
