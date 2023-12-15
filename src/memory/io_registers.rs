@@ -97,7 +97,9 @@ impl IORegisters {
             0xff0f => self.interrupt_flag,
 
             // ignore
-            // 0xFF4D => _
+            // 0xFF4D => 0,
+            // sound
+            0xFF10..=0xFF26 => 0, // todo
             _ => panic!("i/o register location read: {:#x}", location),
         }
     }

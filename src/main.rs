@@ -255,22 +255,35 @@ impl Cpu {
                             .memory
                             .io_registers
                             .has_lcd_flag(gpu::LcdStatusFlag::ObjectSize);
-                        if tile.object_in_scanline(line, double_size) {
+
+                        if tile.object_in_scanline(line) {
                             object_counter += 1;
                             println!("found object {:?}", tile);
+                            let index = if double_size {
+                                if tile.y - line < 8 {
+                                    tile.tile_index & 0xfe
+                                } else {
+                                    tile.tile_index | 0x01
+                                }
+                            } else {
+                                tile.tile_index
+                            };
 
+                            println!("line: {} tile.y: {}", line, tile.y);
                             let (byte1, byte2) = self.memory.get_tile_data(
                                 0x8000,
-                                tile.tile_index as usize,
-                                tile.y as usize % 8,
+                                index as usize,
+                                (16 + line as usize - tile.y as usize) % 8,
                             ); // todo double size
 
-                            self.draw_tile(tile.x, line, byte1, byte2, true);
-                            if object_counter == 2 {
-                                println!("sleeping");
-                                let ten_millis = time::Duration::from_secs(2);
-                                thread::sleep(ten_millis);
-                            }
+                            self.memory.dump_tile(tile.tile_index);
+
+                            self.draw_tile(tile.x - 8, line, byte1, byte2, true);
+                            // if object_counter == 2 {
+                            //     println!("sleeping");
+                            //     let ten_millis = time::Duration::from_secs(1);
+                            //     thread::sleep(ten_millis);
+                            // }
                             // todo exit if 8? objects presented
                         }
                     }
@@ -376,7 +389,7 @@ impl Cpu {
                 .memory
                 .get_tile_data(tiledata_location, tile_id, tiley % 8);
             if byte1 != 0 && byte2 != 0 {
-                println!(
+                trace!(
                     "{:#x} - tile {} - row {} - {:#x} {:#x}",
                     tiledata_location,
                     tile_id,
@@ -398,7 +411,10 @@ impl Cpu {
 
     fn draw_tile(&mut self, x: u8, y: u8, lsb_byte: u8, msb_byte: u8, is_sprite: bool) {
         if is_sprite {
-            println!("DRAWING: ({},{}) {:#b} {:#b}", x, y, lsb_byte, msb_byte)
+            println!("DRAWING: ({},{}) {:#x} {:#x}", x, y, lsb_byte, msb_byte)
+        }
+        if x < 0 {
+            panic!("negative x :(");
         }
         for pixel in (0..8).rev() {
             let x = x + 7 - pixel;
@@ -407,7 +423,7 @@ impl Cpu {
 
             let color_code = (msb as u8) << 1 | lsb as u8;
             if is_sprite && color_code == 0 {
-                println!("skiping transparent for sprite");
+                trace!("skiping transparent for sprite");
                 continue;
             }
 
@@ -423,7 +439,7 @@ impl Cpu {
             if is_sprite {
                 println!(
                     "({}, {}) Color: {:#x} All: {:#x}",
-                    y,
+                    x,
                     y,
                     color,
                     y as usize * WIDTH + x as usize
@@ -1468,7 +1484,11 @@ impl Cpu {
                 trace!("OR L");
                 self.registers.f = self.registers.a.or(self.registers.l);
             }
-
+            0xb6 => {
+                trace!("OR (HL)");
+                let value = self.memory.get(self.registers.get_hl() as usize);
+                self.registers.f = self.registers.a.or(value);
+            }
             0xf6 => {
                 trace!("OR #");
                 let v = self.get_u8();
@@ -1503,6 +1523,17 @@ impl Cpu {
             0xad => {
                 trace!("XOR L");
                 self.registers.f = self.registers.a.xor(self.registers.l);
+            }
+            0xa6 => {
+                trace!("XOR (HL)");
+                let value = self.get_u8();
+                self.registers.f = self.registers.a.xor(value);
+            }
+
+            0xee => {
+                trace!("XOR n");
+                let value = self.memory.get(self.registers.get_hl() as usize);
+                self.registers.f = self.registers.a.xor(value);
             }
 
             // CP n
@@ -1768,6 +1799,8 @@ impl Cpu {
                 debug!("Info for debugging");
                 self.memory.dump_tile_data();
 
+                let ten_millis = time::Duration::from_secs(10);
+                thread::sleep(ten_millis);
                 panic!("missing operator {:#x}", op);
             }
         };
@@ -1793,6 +1826,16 @@ impl Cpu {
                 // panic!("TEST RR")
             }
 
+            // RL
+            0x12 => {
+                let new_c = self.registers.d & (1 << 7) > 0;
+                let old_c = self.registers.f.has_flag(registers::Flag::C);
+                self.registers.d = self.registers.d << 1 | old_c as u8;
+                let mut f = cpu_ops::set_flag(0, CpuFlag::Z, self.registers.d == 0);
+                f = cpu_ops::set_flag(f, CpuFlag::C, new_c);
+                self.registers.f = f;
+            }
+
             0x37 => {
                 trace!("SWAP nimble A");
                 self.registers.a = (self.registers.a >> 4) | (self.registers.a << 4);
@@ -1803,21 +1846,42 @@ impl Cpu {
                 self.registers.f = f;
             }
 
+            // SLA
+            0x23 => {
+                let c = self.registers.e & (1 << 7) > 0;
+                self.registers.e = self.registers.e << 1;
+                let mut f = cpu_ops::set_flag(0, CpuFlag::Z, self.registers.e == 0);
+                f = cpu_ops::set_flag(f, CpuFlag::C, c);
+                self.registers.f = f;
+            }
+            0x27 => {
+                let c = self.registers.a & (1 << 7) > 0;
+                self.registers.a = self.registers.a << 1;
+                let mut f = cpu_ops::set_flag(0, CpuFlag::Z, self.registers.a == 0);
+                f = cpu_ops::set_flag(f, CpuFlag::C, c);
+                self.registers.f = f;
+            }
+
             // SRA n
             0x28 => {
                 trace!("SRA B");
-                let c = self.registers.b & 0x01;
-                let msb = self.registers.b | (1 << 7);
-                let shifted = self.registers.b >> 1;
+                let new_c = self.registers.b & 0x01 > 0;
+                let msb = self.registers.b & (1 << 7);
+                self.registers.b = self.registers.b >> 1 | msb;
 
-                trace!("FROM: {:#x}", self.registers.b);
-
-                let mut f = cpu_ops::set_flag(0x0, CpuFlag::C, c == 1);
+                let mut f = cpu_ops::set_flag(0x0, CpuFlag::C, new_c);
                 f = cpu_ops::set_flag(f, CpuFlag::Z, self.registers.b == 0);
                 self.registers.f = f;
-                self.registers.b = shifted | msb;
-                trace!("TO: {:#x}", self.registers.b);
-                panic!("not implememented SRA properly")
+            }
+            0x2a => {
+                trace!("SRA D");
+                let new_c = self.registers.d & 0x01 > 0;
+                let msb = self.registers.d & (1 << 7);
+                self.registers.d = self.registers.d >> 1 | msb;
+
+                let mut f = cpu_ops::set_flag(0x0, CpuFlag::C, new_c);
+                f = cpu_ops::set_flag(f, CpuFlag::Z, self.registers.d == 0);
+                self.registers.f = f;
             }
 
             // SRL n
@@ -2007,10 +2071,33 @@ impl Cpu {
             0x7c => self.registers.f = self.registers.h.bit(7, self.registers.f),
             0x7d => self.registers.f = self.registers.l.bit(7, self.registers.f),
 
+            0x46 => {
+                let value = self.memory.get(self.registers.get_hl() as usize);
+                self.registers.f = value.bit(0, self.registers.f);
+                self.memory.write(self.registers.get_hl() as usize, value);
+            }
+            0x56 => {
+                let value = self.memory.get(self.registers.get_hl() as usize);
+                self.registers.f = value.bit(2, self.registers.f);
+                self.memory.write(self.registers.get_hl() as usize, value);
+            }
+            0x66 => {
+                let value = self.memory.get(self.registers.get_hl() as usize);
+                self.registers.f = value.bit(4, self.registers.f);
+                self.memory.write(self.registers.get_hl() as usize, value);
+            }
+            0x76 => {
+                let value = self.memory.get(self.registers.get_hl() as usize);
+                self.registers.f = value.bit(6, self.registers.f);
+                self.memory.write(self.registers.get_hl() as usize, value);
+            }
+
             _ => {
                 debug!("Info for debugging");
                 self.memory.dump_tile_data();
 
+                let ten_millis = time::Duration::from_secs(10);
+                thread::sleep(ten_millis);
                 panic!("Missing cb {:#x}", cb_instruction)
             }
         }
@@ -2034,8 +2121,8 @@ fn main() {
         });
 
     // Limit to max ~60 fps update rate
-    // window.limit_update_rate(Some(std::time::Duration::from_micros(16600)));
-    window.limit_update_rate(None);
+    window.limit_update_rate(Some(std::time::Duration::from_nanos(119714)));
+    // window.limit_update_rate(None);
 
     let result = load_rom();
 

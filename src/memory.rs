@@ -168,6 +168,15 @@ impl Memory {
         // println!("DUMPING TILE DATA COMPLETED");
     }
 
+    pub fn dump_tile(&self, tile_id: u8) {
+        println!("DUMPING TILE DATA");
+        for i in 0..16 {
+            print!("{:#04x} ", self.tile_data[tile_id as usize * 16 + i]);
+        }
+        println!();
+        println!("DUMPING TILE DATA COMPLETED");
+    }
+
     pub fn dump_oam(&self) {
         println!("DUMPING OAM DATA");
         for object in 0..40 {

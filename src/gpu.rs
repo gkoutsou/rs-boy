@@ -48,8 +48,8 @@ pub struct Tile {
 }
 
 impl Tile {
-    pub fn object_in_scanline(&self, scanline: u8, double_size: bool) -> bool {
-        let size = if double_size { 16 } else { 8 };
+    pub fn object_in_scanline(&self, scanline: u8) -> bool {
+        let size = 8;
         let y = self.y as i16;
         let scan = scanline as i16;
         // todo totally wrong

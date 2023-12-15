@@ -33,10 +33,7 @@ pub trait RegisterOperation {
 impl RegisterOperation for u8 {
     fn or(&mut self, b: u8) -> u8 {
         *self |= b;
-        let mut f = set_flag(0x0, Flag::Z, *self == 0);
-        f = set_flag(f, Flag::N, false);
-        f = set_flag(f, Flag::H, false);
-        f = set_flag(f, Flag::C, false);
+        let f = set_flag(0x0, Flag::Z, *self == 0);
         f
     }
 
