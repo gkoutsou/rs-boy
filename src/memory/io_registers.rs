@@ -1,3 +1,5 @@
+use std::{thread, time};
+
 use log::{debug, trace};
 
 use crate::gpu;
@@ -137,7 +139,11 @@ impl IORegisters {
             0xFF10..=0xFF26 => (),
 
             // 0xff0f => self.interrupt_flag,
-            _ => panic!("i/o register location write: {:#x}", location),
+            _ => {
+                let ten_millis = time::Duration::from_secs(10);
+                thread::sleep(ten_millis);
+                panic!("i/o register location write: {:#x}", location)
+            }
         }
     }
 

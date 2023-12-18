@@ -55,31 +55,6 @@ fn load_rom() -> io::Result<Vec<u8>> {
     let mut f = File::open("PokemonRed.gb")?;
     let mut buffer = Vec::new();
 
-    // todo!("problem after jump  739646 [DEBUG rs_boy] RET to: 0x373c
-    //  739647 [DEBUG rs_boy] operator: 0xd
-    //  739648 [DEBUG rs_boy] operator: 0x20
-    //  739649 [DEBUG rs_boy] operator: 0xc9");
-
-    // newer..
-    // 1081371 GKO: Change Bank! 4
-    // 1081372 0xe1
-    // 1081373 0xd1
-    // 1081374 0xc1
-    // 1081375 0xf1
-    // 1081376 0xd9
-    // 1081377 RETI to: 0x20b4
-    // 1081378 0xf0
-    // 1081379 LDH A,(n) --> 0xffd6
-    // 1081380 0xa7
-    // 1081381 0x20
-    // 1081382 0xc9
-    // 1081383 RET to: 0x1880
-    // 1081384 0x79
-    // 1081385 line: 4
-    // 1081386 0xd6
-    // 1081387 0x4f
-    // 1081388 0x18 //  848855 [DEBUG rs_boy] JR n (jump 222 -> 0x1964)
-
     // read the whole file
     f.read_to_end(&mut buffer)?;
 
@@ -239,54 +214,8 @@ impl Cpu {
                 //todo hack
 
                 if self.cpu_cycles >= 172 {
-                    let mut object_counter = 0;
-
                     self.draw_background();
-
-                    // draw window
-                    // if self.memory.io_registers.has_lcd_flag(5) {
-                    // panic!("window is enabled. :sadge:")
-                    // }
-
-                    // draw sprites
-                    for i in 0..40 {
-                        let tile = self.memory.get_oam_object(i);
-                        let double_size = self
-                            .memory
-                            .io_registers
-                            .has_lcd_flag(gpu::LcdStatusFlag::ObjectSize);
-
-                        if tile.object_in_scanline(line) {
-                            object_counter += 1;
-                            println!("found object {:?}", tile);
-                            let index = if double_size {
-                                if tile.y - line < 8 {
-                                    tile.tile_index & 0xfe
-                                } else {
-                                    tile.tile_index | 0x01
-                                }
-                            } else {
-                                tile.tile_index
-                            };
-
-                            println!("line: {} tile.y: {}", line, tile.y);
-                            let (byte1, byte2) = self.memory.get_tile_data(
-                                0x8000,
-                                index as usize,
-                                (16 + line as usize - tile.y as usize) % 8,
-                            ); // todo double size
-
-                            self.memory.dump_tile(tile.tile_index);
-
-                            self.draw_tile(tile.x - 8, line, byte1, byte2, true);
-                            // if object_counter == 2 {
-                            //     println!("sleeping");
-                            //     let ten_millis = time::Duration::from_secs(1);
-                            //     thread::sleep(ten_millis);
-                            // }
-                            // todo exit if 8? objects presented
-                        }
-                    }
+                    self.draw_sprites(line);
 
                     if self.window.is_open() && !self.window.is_key_down(Key::Escape) {
                         self.window
@@ -299,6 +228,47 @@ impl Cpu {
                     self.gpu_mode = gpu::Mode::Zero;
                     self.cpu_cycles -= 172;
                 }
+            }
+        }
+    }
+
+    fn draw_sprites(&mut self, line: u8) {
+        let mut object_counter = 0;
+        for i in 0..40 {
+            let tile = self.memory.get_oam_object(i);
+            let double_size = self
+                .memory
+                .io_registers
+                .has_lcd_flag(gpu::LcdStatusFlag::ObjectSize);
+
+            if tile.object_in_scanline(line) {
+                object_counter += 1;
+                println!("found object {:?}", tile);
+                let index = if double_size {
+                    if tile.y - line < 8 {
+                        tile.tile_index & 0xfe
+                    } else {
+                        tile.tile_index | 0x01
+                    }
+                } else {
+                    tile.tile_index
+                };
+
+                println!("line: {} tile.y: {}", line, tile.y);
+                let (byte1, byte2) = self.memory.get_tile_data(
+                    0x8000,
+                    index as usize,
+                    (16 + line as usize - tile.y as usize) % 8,
+                ); // todo double size
+
+                self.draw_tile(tile.x - 8, line, byte1, byte2, true);
+                if object_counter > 10 {
+                    todo!("too many sprites on the line. Is it a bug?")
+                    //     println!("sleeping");
+                    //     let ten_millis = time::Duration::from_secs(1);
+                    //     thread::sleep(ten_millis);
+                }
+                // todo exit if 8? objects presented
             }
         }
     }
@@ -790,6 +760,7 @@ impl Cpu {
             }
             0x79 => {
                 trace!("LD A, C");
+                trace!("A: {:#x} - C: {:#x}", self.registers.a, self.registers.c);
                 self.registers.a = self.registers.c
             }
             0x7a => {
@@ -819,6 +790,11 @@ impl Cpu {
             0x7e => {
                 trace!("LD A, (HL)");
                 self.registers.a = self.memory.get(self.registers.get_hl() as usize);
+                debug!(
+                    "LD A,(HL): {:#x} hl: {:#x}",
+                    self.registers.a,
+                    self.registers.get_hl()
+                )
             }
             0x3e => {
                 let value = self.get_u8();
@@ -1129,6 +1105,7 @@ impl Cpu {
             }
             0x85 => {
                 trace!("ADD A, L");
+                trace!("A: {:#x} - L: {:#x}", self.registers.a, self.registers.l);
                 self.registers.f = self.registers.a.add(self.registers.l);
             }
             0x86 => {
@@ -1808,8 +1785,9 @@ impl Cpu {
 
     fn do_cb(&mut self, cb_instruction: u8) {
         match cb_instruction {
+            // RR
             0x1a => {
-                trace!("RR");
+                /*
                 let new_c = self.registers.d & 0x01;
                 let msb = (self.registers.f.has_flag(registers::Flag::C) as u8) << 7;
                 let shifted = self.registers.d >> 1;
@@ -1824,6 +1802,19 @@ impl Cpu {
                 self.registers.f = f;
                 trace!("  TO: {:#b} - {:#b}", self.registers.d, self.registers.f);
                 // panic!("TEST RR")
+                */
+                let new_c = self.registers.d & 0x01;
+                let old_c = (self.registers.f.has_flag(registers::Flag::C) as u8) << 7;
+                self.registers.d = self.registers.d >> 1 | old_c;
+                let f = cpu_ops::set_flag(0x0, CpuFlag::C, new_c == 1);
+                self.registers.f = cpu_ops::set_flag(f, CpuFlag::Z, self.registers.d == 0);
+            }
+            0x1b => {
+                let new_c = self.registers.e & 0x01;
+                let old_c = (self.registers.f.has_flag(registers::Flag::C) as u8) << 7;
+                self.registers.e = self.registers.e >> 1 | old_c;
+                let f = cpu_ops::set_flag(0x0, CpuFlag::C, new_c == 1);
+                self.registers.f = cpu_ops::set_flag(f, CpuFlag::Z, self.registers.e == 0);
             }
 
             // RL

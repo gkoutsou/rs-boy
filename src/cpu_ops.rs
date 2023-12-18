@@ -343,7 +343,7 @@ pub fn get_ticks(instruction: u8) -> u32 {
 
 pub fn get_cb_ticks(cb_instruction: u8) -> u32 {
     match cb_instruction {
-        0x1a => 8,
+        0x1a | 0x1b => 8,
 
         // RL
         0x12 => 8,
