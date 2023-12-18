@@ -5,8 +5,10 @@ use std::{
 };
 
 mod cpu_ops;
+mod display;
 mod registers;
 use cpu_ops::CpuFlag;
+pub use display::Display;
 use env_logger::Env;
 use log::{debug, info, trace};
 pub use registers::Registers;
@@ -16,10 +18,6 @@ mod memory;
 pub use memory::Memory;
 
 use crate::registers::RegisterOperation;
-use minifb::{Key, Window, WindowOptions};
-
-const WIDTH: usize = 160;
-const HEIGHT: usize = 140;
 
 fn u16_to_u8s(input: u16) -> (u8, u8) {
     let hs = (input >> 8) as u8;
@@ -31,7 +29,8 @@ fn u8s_to_u16(ls: u8, hs: u8) -> u16 {
     (hs as u16) << 8 | ls as u16
 }
 
-struct Cpu {
+struct GameBoy {
+    display: Display,
     registers: Registers,
     memory: Memory,
     cpu_cycles: u32,
@@ -46,8 +45,6 @@ struct Cpu {
 
     // debug stuff
     debug_counter: i32,
-    screen: Vec<u32>,
-    window: Window,
 }
 
 fn load_rom() -> io::Result<Vec<u8>> {
@@ -61,7 +58,7 @@ fn load_rom() -> io::Result<Vec<u8>> {
     Ok(buffer)
 }
 
-impl Cpu {
+impl GameBoy {
     fn step(&mut self) {
         if self.interrupt_step() {
             self.cpu_cycles += 16; // todo 16 or 12?
@@ -217,13 +214,7 @@ impl Cpu {
                     self.draw_background();
                     self.draw_sprites(line);
 
-                    if self.window.is_open() && !self.window.is_key_down(Key::Escape) {
-                        self.window
-                            .update_with_buffer(&self.screen, WIDTH, HEIGHT)
-                            .unwrap();
-                    } else {
-                        panic!("window deado")
-                    }
+                    self.display.refresh_buffer();
 
                     self.gpu_mode = gpu::Mode::Zero;
                     self.cpu_cycles -= 172;
@@ -261,7 +252,7 @@ impl Cpu {
                     (16 + line as usize - tile.y as usize) % 8,
                 ); // todo double size
 
-                self.draw_tile(tile.x - 8, line, byte1, byte2, true);
+                self.display.draw_tile(tile.x - 8, line, byte1, byte2, true);
                 if object_counter > 10 {
                     todo!("too many sprites on the line. Is it a bug?")
                     //     println!("sleeping");
@@ -281,7 +272,7 @@ impl Cpu {
             .has_lcd_flag(gpu::LcdStatusFlag::BgWindowEnabled)
         {
             trace!("bg/window is disabled. must draw white :sadge:");
-            self.wipe_screen();
+            self.display.wipe_screen();
         }
         let bottom = self.memory.io_registers.scy.wrapping_add(143); // ) % 256;
         let right = self.memory.io_registers.scx.wrapping_add(159); // % 256;
@@ -337,7 +328,7 @@ impl Cpu {
                 trace!("bytes: {} - {}", byte1, byte2);
 
                 // if byte1 != 0 && byte2 != 0 {
-                self.draw_tile(x * 8, line, byte1, byte2, false);
+                self.display.draw_tile(x * 8, line, byte1, byte2, false);
                 // }
             }
         }
@@ -368,58 +359,8 @@ impl Cpu {
                     byte2
                 );
                 // panic!("TileData {:#x} {:#x}", byte1, byte2);
-                self.draw_tile(x * 8, line, byte1, byte2, false);
+                self.display.draw_tile(x * 8, line, byte1, byte2, false);
             }
-        }
-    }
-
-    fn wipe_screen(&mut self) {
-        for elem in self.screen.iter_mut() {
-            *elem = 0xffffff;
-        }
-    }
-
-    fn draw_tile(&mut self, x: u8, y: u8, lsb_byte: u8, msb_byte: u8, is_sprite: bool) {
-        if is_sprite {
-            println!("DRAWING: ({},{}) {:#x} {:#x}", x, y, lsb_byte, msb_byte)
-        }
-        if x < 0 {
-            panic!("negative x :(");
-        }
-        for pixel in (0..8).rev() {
-            let x = x + 7 - pixel;
-            let lsb = lsb_byte & (1 << pixel) > 0;
-            let msb = msb_byte & (1 << pixel) > 0;
-
-            let color_code = (msb as u8) << 1 | lsb as u8;
-            if is_sprite && color_code == 0 {
-                trace!("skiping transparent for sprite");
-                continue;
-            }
-
-            let color = if color_code == 1 {
-                0xCDC392
-            } else if color_code == 2 {
-                0xE8E5DA
-            } else if color_code == 3 {
-                0x9EB7E5
-            } else {
-                0xffffff
-            };
-            if is_sprite {
-                println!(
-                    "({}, {}) Color: {:#x} All: {:#x}",
-                    x,
-                    y,
-                    color,
-                    y as usize * WIDTH + x as usize
-                );
-            }
-            if y as usize >= HEIGHT || x as usize >= WIDTH {
-                return;
-            }
-
-            self.screen[y as usize * WIDTH + x as usize] = color
         }
     }
 
@@ -2101,20 +2042,6 @@ fn main() {
         .target(env_logger::Target::Stdout)
         .init();
 
-    let mut screen_buffer: Vec<u32> = vec![0; WIDTH * HEIGHT];
-
-    let mut window_opts = WindowOptions::default();
-    window_opts.scale = minifb::Scale::X2;
-
-    let mut window =
-        Window::new("Test - ESC to exit", WIDTH, HEIGHT, window_opts).unwrap_or_else(|e| {
-            panic!("{}", e);
-        });
-
-    // Limit to max ~60 fps update rate
-    window.limit_update_rate(Some(std::time::Duration::from_nanos(119714)));
-    // window.limit_update_rate(None);
-
     let result = load_rom();
 
     let buffer = result.unwrap();
@@ -2151,7 +2078,7 @@ fn main() {
         println!("ROM size Bytes = {}", expected_rom_size);
     }
 
-    let mut cpu = Cpu {
+    let mut cpu = GameBoy {
         registers: Registers {
             // Classic
             pc: 0x100,
@@ -2174,8 +2101,7 @@ fn main() {
         halt: false,
         cpu_cycles: 0,
         gpu_mode: gpu::Mode::Two,
-        screen: screen_buffer,
-        window: window,
+        display: Display::default(),
 
         debug_counter: 0,
     };
