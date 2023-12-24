@@ -225,6 +225,7 @@ pub fn get_ticks(instruction: u8) -> u32 {
         0x1d => 4,
         0x25 => 4,
         0x2d => 4,
+        0x35 => 12,
 
         // AND n
         0xa7 => 4,

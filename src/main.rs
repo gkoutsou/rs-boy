@@ -1357,6 +1357,14 @@ impl GameBoy {
                 self.registers.f = self.registers.l.dec(self.registers.f);
             }
 
+            0x35 => {
+                trace!("DEC (HL)");
+                let location = self.registers.get_hl() as usize;
+                let mut value = self.memory.get(location);
+                self.registers.f = value.dec(self.registers.f);
+                self.memory.write(location, value);
+            }
+
             // AND n
             0xa7 => {
                 trace!("AND A");
@@ -2033,9 +2041,19 @@ impl GameBoy {
                 self.registers.f = value.bit(0, self.registers.f);
                 self.memory.write(self.registers.get_hl() as usize, value);
             }
+            0x4e => {
+                let value = self.memory.get(self.registers.get_hl() as usize);
+                self.registers.f = value.bit(1, self.registers.f);
+                self.memory.write(self.registers.get_hl() as usize, value);
+            }
             0x56 => {
                 let value = self.memory.get(self.registers.get_hl() as usize);
                 self.registers.f = value.bit(2, self.registers.f);
+                self.memory.write(self.registers.get_hl() as usize, value);
+            }
+            0x5e => {
+                let value = self.memory.get(self.registers.get_hl() as usize);
+                self.registers.f = value.bit(3, self.registers.f);
                 self.memory.write(self.registers.get_hl() as usize, value);
             }
             0x66 => {
@@ -2043,9 +2061,19 @@ impl GameBoy {
                 self.registers.f = value.bit(4, self.registers.f);
                 self.memory.write(self.registers.get_hl() as usize, value);
             }
+            0x6e => {
+                let value = self.memory.get(self.registers.get_hl() as usize);
+                self.registers.f = value.bit(5, self.registers.f);
+                self.memory.write(self.registers.get_hl() as usize, value);
+            }
             0x76 => {
                 let value = self.memory.get(self.registers.get_hl() as usize);
                 self.registers.f = value.bit(6, self.registers.f);
+                self.memory.write(self.registers.get_hl() as usize, value);
+            }
+            0x7e => {
+                let value = self.memory.get(self.registers.get_hl() as usize);
+                self.registers.f = value.bit(7, self.registers.f);
                 self.memory.write(self.registers.get_hl() as usize, value);
             }
 
