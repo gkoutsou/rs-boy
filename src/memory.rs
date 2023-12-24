@@ -136,6 +136,9 @@ impl Memory {
             self.rom[actual_loc]
         } else if location >= 0xff80 && location <= 0xfffe {
             self.high_ram[location - 0xff80]
+        } else if location >= 0xc000 && location <= 0xDFFF {
+            // todo temporary to try test framework
+            self.work_ram[location - 0xc000]
         } else {
             panic!("not a rom location! {:#x}", location)
         }

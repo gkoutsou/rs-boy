@@ -60,7 +60,7 @@ impl Display {
     }
 
     pub fn default() -> Display {
-        let mut screen_buffer: Vec<u32> = vec![0; WIDTH * HEIGHT];
+        let screen_buffer: Vec<u32> = vec![0; WIDTH * HEIGHT];
 
         let mut window_opts = WindowOptions::default();
         window_opts.scale = minifb::Scale::X2;

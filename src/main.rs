@@ -38,10 +38,10 @@ struct GameBoy {
 
     halt: bool,
 
+    // lcd_prev_state: bool,
     /// Interrupt Master Enable
     ime: bool,
     set_ei: bool,
-    set_di: bool,
 
     // debug stuff
     debug_counter: i32,
@@ -50,6 +50,8 @@ struct GameBoy {
 fn load_rom() -> io::Result<Vec<u8>> {
     // let mut f = File::open("Adventure Island II - Aliens in Paradise (USA, Europe).gb")?;
     let mut f = File::open("PokemonRed.gb")?;
+    // let mut f = File::open("test/07-jr,jp,call,ret,rst.gb")?;
+    // let mut f = File::open("test/10-bit ops.gb")?;
     let mut buffer = Vec::new();
 
     // read the whole file
@@ -61,7 +63,7 @@ fn load_rom() -> io::Result<Vec<u8>> {
 impl GameBoy {
     fn step(&mut self) {
         if self.interrupt_step() {
-            self.cpu_cycles += 16; // todo 16 or 12?
+            self.cpu_cycles += 20; // todo 16 or 12?
             return;
             // todo should an interrupt still run gpu?
         }
@@ -77,11 +79,6 @@ impl GameBoy {
     }
 
     fn interrupt_step(&mut self) -> bool {
-        if self.set_di {
-            self.ime = false;
-            self.set_di = false;
-            return false;
-        }
         if self.set_ei {
             self.ime = true;
             self.set_ei = false;
@@ -103,7 +100,7 @@ impl GameBoy {
             info!("VBlank Interrupt Handler from: {:#x}", self.registers.pc);
             self.registers.set_pc(0x40);
             self.halt = false;
-            self.memory.dump_tile_data();
+            // self.memory.dump_tile_data();
             return true;
         }
 
@@ -120,11 +117,11 @@ impl GameBoy {
         let location = self.registers.step_pc();
         trace!("Running location {:#x}", location);
 
-        if location >= 0xFF80 && location <= 0xFFFE {
-            trace!("Running code in HRAM!")
-        } else if location > 0x7FFF {
-            panic!("moving outside of bank 2")
-        }
+        // if location >= 0xFF80 && location <= 0xFFFE {
+        // trace!("Running code in HRAM!")
+        // } else if location > 0x7FFF {
+        // panic!("moving outside of bank 2: {:#x}", location)
+        // }
 
         let op = self.memory.get_rom(location);
         debug!("operator: {:#x}", op);
@@ -147,7 +144,13 @@ impl GameBoy {
             trace!("LCD disabled!");
             self.cpu_cycles = 0;
             self.memory.io_registers.ly = 0;
+            // self.gpu_mode = gpu::Mode::Two;
+            // self.lcd_prev_state = false;
+            // todo this probably needs to wipe_screen
             return;
+            // } else if !self.lcd_prev_state {
+            // self.cpu_cycles = 4;
+            // self.lcd_prev_state = true;
         }
 
         match self.gpu_mode {
@@ -272,7 +275,9 @@ impl GameBoy {
             .has_lcd_flag(gpu::LcdStatusFlag::BgWindowEnabled)
         {
             trace!("bg/window is disabled. must draw white :sadge:");
+            // todo is this correct? why would it wipe? at least wipe-row?
             self.display.wipe_screen();
+            return;
         }
         let bottom = self.memory.io_registers.scy.wrapping_add(143); // ) % 256;
         let right = self.memory.io_registers.scx.wrapping_add(159); // % 256;
@@ -652,6 +657,17 @@ impl GameBoy {
                 self.memory
                     .write(self.registers.get_hl() as usize, self.registers.a);
                 self.registers.set_hl(self.registers.get_hl() + 1)
+            }
+            // LDD (HL), A
+            0x32 => {
+                trace!(
+                    "LDI (HL), A {:#x} => {:#x}",
+                    self.registers.get_hl(),
+                    self.registers.a
+                );
+                self.memory
+                    .write(self.registers.get_hl() as usize, self.registers.a);
+                self.registers.set_hl(self.registers.get_hl() - 1)
             }
 
             // LDD A, (HL)
@@ -1238,14 +1254,17 @@ impl GameBoy {
 
             // INC nn
             0x03 => {
-                self.registers.set_bc(self.registers.get_bc() + 1);
+                self.registers
+                    .set_bc(self.registers.get_bc().wrapping_add(1));
             }
             0x13 => {
-                self.registers.set_de(self.registers.get_de() + 1);
+                self.registers
+                    .set_de(self.registers.get_de().wrapping_add(1));
             }
             0x23 => {
                 trace!("INC HL");
-                self.registers.set_hl(self.registers.get_hl() + 1);
+                self.registers
+                    .set_hl(self.registers.get_hl().wrapping_add(1));
             }
             0x33 => {
                 trace!("INC SP");
@@ -1367,6 +1386,11 @@ impl GameBoy {
                 trace!("AND L");
                 self.registers.f = self.registers.a.and(self.registers.l);
             }
+            0xa6 => {
+                trace!("AND (HL)");
+                let value = self.memory.get(self.registers.get_hl() as usize);
+                self.registers.f = self.registers.a.and(value);
+            }
             0xe6 => {
                 let n = self.get_u8();
                 trace!("AND # -> {}", n);
@@ -1442,15 +1466,15 @@ impl GameBoy {
                 trace!("XOR L");
                 self.registers.f = self.registers.a.xor(self.registers.l);
             }
-            0xa6 => {
+            0xae => {
                 trace!("XOR (HL)");
-                let value = self.get_u8();
+                let value = self.memory.get(self.registers.get_hl() as usize);
                 self.registers.f = self.registers.a.xor(value);
             }
 
             0xee => {
                 trace!("XOR n");
-                let value = self.memory.get(self.registers.get_hl() as usize);
+                let value = self.get_u8();
                 self.registers.f = self.registers.a.xor(value);
             }
 
@@ -1501,7 +1525,8 @@ impl GameBoy {
                 // immediately. Interrupts are disabled after
                 // instruction after DI is executed.
                 info!("Warning: DI");
-                self.set_di = true;
+                self.ime = false;
+                self.set_ei = false;
             }
 
             0xfb => {
@@ -2061,10 +2086,14 @@ fn main() {
 
     info!("Type = {:#x}", buffer[0x143]);
     info!("GB/SGB Indicator = {:#x}", buffer[0x146]);
-    info!("Cartridge type = {:#x}", buffer[0x147]);
+    let cartridge_type = buffer[0x147];
+    info!("Cartridge type = {:#x}", cartridge_type);
     let rom_size = buffer[0x148];
     info!("ROM size = {:#x}", rom_size);
     info!("RAM size = {:#x}", buffer[0x149]);
+    // if cartridge_type != 0x13 {
+    // panic!("Usupported Cartridge Type: {:#x}", cartridge_type);
+    // }
 
     let expected_rom_size = 32 * (2u32.pow(rom_size as u32)) * 1024u32;
 
@@ -2095,14 +2124,13 @@ fn main() {
         memory: Memory::default_with_rom(buffer),
 
         ime: false,
-        set_di: false,
         set_ei: false,
 
         halt: false,
         cpu_cycles: 0,
         gpu_mode: gpu::Mode::Two,
         display: Display::default(),
-
+        // lcd_prev_state: true,
         debug_counter: 0,
     };
 

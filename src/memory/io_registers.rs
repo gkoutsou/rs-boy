@@ -1,6 +1,6 @@
 use std::{thread, time};
 
-use log::{debug, trace};
+use log::{debug, info, trace};
 
 use crate::gpu;
 
@@ -117,10 +117,12 @@ impl IORegisters {
             0xFF06 => self.tma = value,
             0xFF07 => self.tac = value,
             0xff40 => {
+                if value & (1 << 7) == 0 && self.lcd_control & (1 << 7) != 0 {
+                    info!("Disabling LCD {:#b}", value)
+                } else if value & (1 << 7) != 0 && self.lcd_control & (1 << 7) == 0 {
+                    info!("Enabling LCD {:#b}", value)
+                }
                 self.lcd_control = value;
-                // if value != 1 << 7 {
-                // panic!("{:#b}", value)
-                // }
             }
             0xff41 => self.lcd_status = value,
             0xff42 => self.scy = value,
