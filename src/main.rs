@@ -49,8 +49,8 @@ struct GameBoy {
 
 fn load_rom() -> io::Result<Vec<u8>> {
     // let mut f = File::open("Adventure Island II - Aliens in Paradise (USA, Europe).gb")?;
-    // let mut f = File::open("PokemonRed.gb")?;
-    let mut f = File::open("test/03-op sp,hl.gb")?;
+    let mut f = File::open("PokemonRed.gb")?;
+    // let mut f = File::open("test/03-op sp,hl.gb")?;
     // let mut f = File::open("test/07-jr,jp,call,ret,rst.gb")?;
     // let mut f = File::open("test/10-bit ops.gb")?;
     let mut buffer = Vec::new();
@@ -346,10 +346,9 @@ impl GameBoy {
 
         // draw background
         for x in 0..20u8 {
-            let tile_id = self
-                .memory
-                .get(tilemap_location + tiley / 8 * 32 + x as usize / 8)
-                as usize;
+            let tile_id =
+                self.memory
+                    .get(tilemap_location + tiley / 8 * 32 + x as usize) as usize;
             let tiledata_location = self.get_tile_data_baseline(tile_id);
             // let tile = self.memory.get(tiledata_location + tile_id as usize);
             let (byte1, byte2) = self
