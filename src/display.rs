@@ -19,9 +19,6 @@ impl Display {
         if is_sprite {
             println!("DRAWING: ({},{}) {:#x} {:#x}", x, y, lsb_byte, msb_byte)
         }
-        if x < 0 {
-            panic!("negative x :(");
-        }
         for pixel in (0..8).rev() {
             let x = x + 7 - pixel;
             let lsb = lsb_byte & (1 << pixel) > 0;
@@ -52,7 +49,7 @@ impl Display {
                 );
             }
             if y as usize >= HEIGHT || x as usize >= WIDTH {
-                return;
+                continue;
             }
 
             self.screen[y as usize * WIDTH + x as usize] = color

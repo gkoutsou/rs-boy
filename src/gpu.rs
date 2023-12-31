@@ -22,10 +22,10 @@
 
 #[derive(Copy, Clone)]
 pub enum Mode {
-    Zero,
-    One,
-    Two,
-    Three,
+    Zero = 0,
+    One = 1,
+    Two = 2,
+    Three = 3,
 }
 
 pub enum LcdStatusFlag {

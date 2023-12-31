@@ -50,6 +50,7 @@ struct GameBoy {
 fn load_rom() -> io::Result<Vec<u8>> {
     // let mut f = File::open("Adventure Island II - Aliens in Paradise (USA, Europe).gb")?;
     let mut f = File::open("PokemonRed.gb")?;
+    // let mut f = File::open("test/03-op sp,hl.gb")?;
     // let mut f = File::open("test/07-jr,jp,call,ret,rst.gb")?;
     // let mut f = File::open("test/10-bit ops.gb")?;
     let mut buffer = Vec::new();
@@ -161,7 +162,7 @@ impl GameBoy {
                 if self.cpu_cycles >= 80 {
                     // scan pixels TODO ideally I should follow the ticks, not do it at once
                     self.cpu_cycles -= 80;
-                    self.gpu_mode = gpu::Mode::Three;
+                    self.set_gpu_mode(gpu::Mode::Three);
                 }
             }
             gpu::Mode::One => {
@@ -176,7 +177,7 @@ impl GameBoy {
                     self.cpu_cycles -= 456;
 
                     if self.memory.io_registers.ly > 153 {
-                        self.gpu_mode = gpu::Mode::Two;
+                        self.set_gpu_mode(gpu::Mode::Two);
                         self.memory.io_registers.ly = 0;
                         // self.memory.dump_tile_data();
                     }
@@ -198,9 +199,9 @@ impl GameBoy {
                     if self.memory.io_registers.ly == 144 {
                         //todo should this be 143?
                         self.memory.io_registers.enable_video_interrupt();
-                        self.gpu_mode = gpu::Mode::One;
+                        self.set_gpu_mode(gpu::Mode::One);
                     } else {
-                        self.gpu_mode = gpu::Mode::Two;
+                        self.set_gpu_mode(gpu::Mode::Two);
                     }
                 }
             }
@@ -219,7 +220,7 @@ impl GameBoy {
 
                     self.display.refresh_buffer();
 
-                    self.gpu_mode = gpu::Mode::Zero;
+                    self.set_gpu_mode(gpu::Mode::Zero);
                     self.cpu_cycles -= 172;
                 }
             }
@@ -255,7 +256,7 @@ impl GameBoy {
                     (16 + line as usize - tile.y as usize) % 8,
                 ); // todo double size
 
-                self.display.draw_tile(tile.x - 8, line, byte1, byte2, true);
+                self.display.draw_tile(tile.x, line, byte1, byte2, true);
                 if object_counter > 10 {
                     todo!("too many sprites on the line. Is it a bug?")
                     //     println!("sleeping");
@@ -1186,6 +1187,10 @@ impl GameBoy {
                 trace!("SUB B");
                 self.registers.f = self.registers.a.sub(self.registers.b);
             }
+            0x92 => {
+                trace!("SUB D");
+                self.registers.f = self.registers.a.sub(self.registers.d);
+            }
 
             0xd6 => {
                 trace!("SUB #");
@@ -1750,8 +1755,8 @@ impl GameBoy {
                 debug!("Info for debugging");
                 self.memory.dump_tile_data();
 
-                let ten_millis = time::Duration::from_secs(10);
-                thread::sleep(ten_millis);
+                let time = time::Duration::from_secs(5);
+                thread::sleep(time);
                 panic!("missing operator {:#x}", op);
             }
         };
@@ -1801,14 +1806,17 @@ impl GameBoy {
                 self.registers.f = f;
             }
 
+            // SWAP
             0x37 => {
-                trace!("SWAP nimble A");
                 self.registers.a = (self.registers.a >> 4) | (self.registers.a << 4);
-                let mut f = cpu_ops::set_flag(self.registers.f, CpuFlag::Z, self.registers.a == 0);
-                f = cpu_ops::set_flag(f, CpuFlag::N, false);
-                f = cpu_ops::set_flag(f, CpuFlag::H, false);
-                f = cpu_ops::set_flag(f, CpuFlag::C, false);
-                self.registers.f = f;
+                self.registers.f = cpu_ops::set_flag(0x0, CpuFlag::Z, self.registers.a == 0);
+            }
+
+            0x36 => {
+                let mut value = self.memory.get(self.registers.get_hl() as usize);
+                value = (value >> 4) | (value << 4);
+                self.memory.write(self.registers.get_hl() as usize, value);
+                self.registers.f = cpu_ops::set_flag(0x0, CpuFlag::Z, value == 0);
             }
 
             // SLA
@@ -1849,19 +1857,18 @@ impl GameBoy {
                 self.registers.f = f;
             }
 
-            // SRL n
+            // SRL A
             0x3f => {
-                trace!("SRL A");
                 let c = self.registers.a & 0x01;
-                let shifted = self.registers.a >> 1;
-
-                trace!("FROM: {:#b}", self.registers.a);
-
-                let mut f = cpu_ops::set_flag(0x0, CpuFlag::C, c == 1);
-                f = cpu_ops::set_flag(f, CpuFlag::Z, self.registers.a == 0);
-                self.registers.f = f;
-                self.registers.a = shifted;
-                trace!("TO: {:#b} F: {:#b}", self.registers.a, self.registers.f);
+                self.registers.a = self.registers.a >> 1;
+                let f = cpu_ops::set_flag(0x0, CpuFlag::C, c == 1);
+                self.registers.f = cpu_ops::set_flag(f, CpuFlag::Z, self.registers.a == 0);
+            }
+            0x38 => {
+                let c = self.registers.b & 0x01;
+                self.registers.b = self.registers.b >> 1;
+                let f = cpu_ops::set_flag(0x0, CpuFlag::C, c == 1);
+                self.registers.f = cpu_ops::set_flag(f, CpuFlag::Z, self.registers.b == 0);
             }
 
             // RES
@@ -2087,6 +2094,12 @@ impl GameBoy {
             }
         }
     }
+
+    fn set_gpu_mode(&mut self, mode: gpu::Mode) {
+        self.gpu_mode = mode;
+        self.memory.io_registers.lcd_status &= !3; // wipe 2 first digits
+        self.memory.io_registers.lcd_status |= mode as u8;
+    }
 }
 
 fn main() {
@@ -2156,7 +2169,7 @@ fn main() {
 
         halt: false,
         cpu_cycles: 0,
-        gpu_mode: gpu::Mode::Two,
+        gpu_mode: gpu::Mode::Two, //todo should this set the ff41?
         display: Display::default(),
         // lcd_prev_state: true,
         debug_counter: 0,

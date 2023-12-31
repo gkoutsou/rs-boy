@@ -45,7 +45,19 @@ pub struct IORegisters {
     /// 0 - BG & Window enable / priority [Different meaning in CGB Mode]: 0 = Off; 1 = On
     pub lcd_control: u8,
     /// ff41
-    lcd_status: u8,
+    ///
+    /// 6 - LYC int select
+    ///
+    /// 5 - Mode 2 int select
+    ///
+    /// 4 - Mode 1 int select
+    ///
+    /// 3 - Mode 0 int select
+    ///
+    /// 2 - LYC == LY
+    ///
+    /// 0-1 - PPU mode
+    pub lcd_status: u8,
     /// ff42
     pub scy: u8,
     /// ff43
