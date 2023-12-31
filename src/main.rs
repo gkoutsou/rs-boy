@@ -215,6 +215,7 @@ impl GameBoy {
                 //todo hack
 
                 if self.cpu_cycles >= 172 {
+                    self.display.wipe_line(line);
                     self.draw_background();
                     self.draw_sprites(line);
 

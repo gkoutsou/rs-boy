@@ -2,13 +2,20 @@ use log::trace;
 use minifb::{Key, Window, WindowOptions};
 
 const WIDTH: usize = 160;
-const HEIGHT: usize = 140;
+const HEIGHT: usize = 144;
 
 pub struct Display {
     screen: Vec<u32>,
     window: Window,
 }
 impl Display {
+    pub fn wipe_line(&mut self, line: u8) {
+        println!("line:: {}", line);
+        for p in 0..WIDTH {
+            self.screen[line as usize * WIDTH + p] = 0xffffff;
+        }
+    }
+
     pub fn wipe_screen(&mut self) {
         for elem in self.screen.iter_mut() {
             *elem = 0xffffff;
