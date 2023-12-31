@@ -49,8 +49,8 @@ struct GameBoy {
 
 fn load_rom() -> io::Result<Vec<u8>> {
     // let mut f = File::open("Adventure Island II - Aliens in Paradise (USA, Europe).gb")?;
-    let mut f = File::open("PokemonRed.gb")?;
-    // let mut f = File::open("test/03-op sp,hl.gb")?;
+    // let mut f = File::open("PokemonRed.gb")?;
+    let mut f = File::open("test/03-op sp,hl.gb")?;
     // let mut f = File::open("test/07-jr,jp,call,ret,rst.gb")?;
     // let mut f = File::open("test/10-bit ops.gb")?;
     let mut buffer = Vec::new();
@@ -286,9 +286,9 @@ impl GameBoy {
         let tilemap_location = self.get_tile_map_baseline();
         let w_tilemap_location = self.get_window_tile_map_baseline();
 
-        if self.memory.io_registers.scy != 0 {
-            panic!("scy!")
-        }
+        // if self.memory.io_registers.scy != 0 {
+        //     panic!("scy!")
+        // }
 
         let wx = self.memory.io_registers.wx;
         let wy = self.memory.io_registers.wy;
@@ -625,6 +625,15 @@ impl GameBoy {
                 self.memory.write(target as usize, self.registers.a);
             }
 
+            // LD (nn), SP
+            0x8 => {
+                trace!("LD (nn), SP");
+                let loc = self.get_u16() as usize;
+                let (msb, lsb) = u16_to_u8s(self.registers.sp);
+                self.memory.write(loc, lsb);
+                self.memory.write(loc + 1, msb);
+            }
+
             // LD SP, HL
             0xf9 => {
                 trace!("LD SP, HL");
@@ -689,10 +698,6 @@ impl GameBoy {
                 trace!("LDHL SP,n -> {}", steps);
                 let old_val = self.registers.sp;
                 let new_val = old_val.wrapping_add_signed(steps);
-                // panic!(
-                //     "SP: {:#x}, steps: {}, new {:#x}",
-                //     old_val, steps, new_val
-                // )
                 let steps = steps as u16;
 
                 let mut f = cpu_ops::set_flag(
@@ -1115,6 +1120,26 @@ impl GameBoy {
                 self.registers.set_hl(hl);
             }
 
+            0xe8 => {
+                trace!("ADD SP, n");
+                let n = self.get_u8() as i8;
+                let old_val = self.registers.sp;
+                self.registers.sp = self.registers.sp.wrapping_add_signed(n as i16);
+
+                let steps = n as u16;
+
+                let f = cpu_ops::set_flag(
+                    0,
+                    CpuFlag::H,
+                    (old_val & 0x000F) + (steps & 0x000F) > 0x000F,
+                );
+                self.registers.f = cpu_ops::set_flag(
+                    f,
+                    CpuFlag::C,
+                    (old_val & 0x00FF) + (steps & 0x00FF) > 0x00FF,
+                );
+            }
+
             // ADC
             0x8f => {
                 trace!("ADC A, A");
@@ -1273,7 +1298,7 @@ impl GameBoy {
             }
             0x33 => {
                 trace!("INC SP");
-                self.registers.sp += 1;
+                self.registers.sp = self.registers.sp.wrapping_add(1);
             }
 
             // DEC nn
@@ -1291,7 +1316,7 @@ impl GameBoy {
             }
             0x3B => {
                 trace!("DEC SP");
-                self.registers.sp -= 1;
+                self.registers.sp = self.registers.sp.wrapping_sub(1);
             }
 
             // INC n
@@ -1765,23 +1790,14 @@ impl GameBoy {
     fn do_cb(&mut self, cb_instruction: u8) {
         match cb_instruction {
             // RR
+            0x19 => {
+                let new_c = self.registers.c & 0x01;
+                let old_c = (self.registers.f.has_flag(registers::Flag::C) as u8) << 7;
+                self.registers.c = self.registers.c >> 1 | old_c;
+                let f = cpu_ops::set_flag(0x0, CpuFlag::C, new_c == 1);
+                self.registers.f = cpu_ops::set_flag(f, CpuFlag::Z, self.registers.c == 0);
+            }
             0x1a => {
-                /*
-                let new_c = self.registers.d & 0x01;
-                let msb = (self.registers.f.has_flag(registers::Flag::C) as u8) << 7;
-                let shifted = self.registers.d >> 1;
-
-                trace!("FROM: {:#b} - {:#b}", self.registers.d, self.registers.f);
-                self.registers.d = shifted | msb;
-
-                let mut f = cpu_ops::set_flag(self.registers.f, CpuFlag::C, new_c == 1); //
-                f = cpu_ops::set_flag(f, CpuFlag::H, false);
-                f = cpu_ops::set_flag(f, CpuFlag::Z, self.registers.d == 0);
-                f = cpu_ops::set_flag(f, CpuFlag::N, false);
-                self.registers.f = f;
-                trace!("  TO: {:#b} - {:#b}", self.registers.d, self.registers.f);
-                // panic!("TEST RR")
-                */
                 let new_c = self.registers.d & 0x01;
                 let old_c = (self.registers.f.has_flag(registers::Flag::C) as u8) << 7;
                 self.registers.d = self.registers.d >> 1 | old_c;

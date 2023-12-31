@@ -29,6 +29,9 @@ pub fn get_ticks(instruction: u8) -> u32 {
         0x21 => 12,
         0x31 => 12,
 
+        // LD (nn), SP
+        0x08 => 20,
+
         // LD NN, A
         0x02 => 8,
         0x12 => 8,
@@ -239,6 +242,8 @@ pub fn get_ticks(instruction: u8) -> u32 {
         0xa6 => 8,
         0xe6 => 8,
 
+        0xe8 => 16,
+
         // OR n
         0xb7 => 4,
         0xb0 => 4,
@@ -348,7 +353,9 @@ pub fn get_ticks(instruction: u8) -> u32 {
 
 pub fn get_cb_ticks(cb_instruction: u8) -> u32 {
     match cb_instruction {
-        0x1a | 0x1b => 8,
+        // RR
+        0x1e => 16,
+        0x18..=0x1f => 8,
 
         // RL
         0x12 => 8,
