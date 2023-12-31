@@ -49,10 +49,18 @@ struct GameBoy {
 
 fn load_rom() -> io::Result<Vec<u8>> {
     // let mut f = File::open("Adventure Island II - Aliens in Paradise (USA, Europe).gb")?;
-    let mut f = File::open("PokemonRed.gb")?;
-    // let mut f = File::open("test/03-op sp,hl.gb")?;
+    // let mut f = File::open("PokemonRed.gb")?;
+    // let mut f = File::open("test/01-special.gb")?;
+    // let mut f = File::open("test/02-interrupts.gb")?;
+    // let mut f = File::open("test/03-op sp,hl.gb")?; // passes
+    // let mut f = File::open("test/04-op r,imm.gb")?;
+    // let mut f = File::open("test/05-op rp.gb")?; // passes
+    // let mut f = File::open("test/06-ld r,r.gb")?; // passes
     // let mut f = File::open("test/07-jr,jp,call,ret,rst.gb")?;
+    // let mut f = File::open("test/08-misc instrs.gb")?;
+    // let mut f = File::open("test/09-op r,r.gb")?;
     // let mut f = File::open("test/10-bit ops.gb")?;
+    // let mut f = File::open("test/11-op a,(hl).gb")?;
     let mut buffer = Vec::new();
 
     // read the whole file
@@ -1304,15 +1312,18 @@ impl GameBoy {
             // DEC nn
             0x0B => {
                 trace!("DEC BC");
-                self.registers.set_bc(self.registers.get_bc() - 1);
+                self.registers
+                    .set_bc(self.registers.get_bc().wrapping_sub(1));
             }
             0x1B => {
                 trace!("DEC DE");
-                self.registers.set_de(self.registers.get_de() - 1);
+                self.registers
+                    .set_de(self.registers.get_de().wrapping_sub(1));
             }
             0x2B => {
                 trace!("DEC HL");
-                self.registers.set_hl(self.registers.get_hl() - 1);
+                self.registers
+                    .set_hl(self.registers.get_hl().wrapping_sub(1));
             }
             0x3B => {
                 trace!("DEC SP");

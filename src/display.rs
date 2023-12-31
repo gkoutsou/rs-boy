@@ -10,7 +10,6 @@ pub struct Display {
 }
 impl Display {
     pub fn wipe_line(&mut self, line: u8) {
-        println!("line:: {}", line);
         for p in 0..WIDTH {
             self.screen[line as usize * WIDTH + p] = 0xffffff;
         }
