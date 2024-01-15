@@ -376,10 +376,12 @@ pub fn get_cb_ticks(cb_instruction: u8) -> u32 {
         0x37 => 8,
 
         // SLA
-        0x23 | 0x27 => 8,
+        0x26 => 16,
+        0x20..=0x27 => 8,
 
         // SRA n
-        0x28 | 0x2a => 8,
+        0x2e => 16,
+        0x28..=0x2f => 8,
 
         // SRL n
         0x3e => 16,

@@ -2024,42 +2024,22 @@ impl GameBoy {
             }
 
             // SLA
-            0x23 => {
-                let c = self.registers.e & (1 << 7) > 0;
-                self.registers.e = self.registers.e << 1;
-                let mut f = cpu_ops::set_flag(0, CpuFlag::Z, self.registers.e == 0);
-                f = cpu_ops::set_flag(f, CpuFlag::C, c);
-                self.registers.f = f;
-            }
-            0x27 => {
-                let c = self.registers.a & (1 << 7) > 0;
-                self.registers.a = self.registers.a << 1;
-                let mut f = cpu_ops::set_flag(0, CpuFlag::Z, self.registers.a == 0);
-                f = cpu_ops::set_flag(f, CpuFlag::C, c);
-                self.registers.f = f;
-            }
+            0x20 => self.registers.f = self.registers.b.sla(),
+            0x21 => self.registers.f = self.registers.c.sla(),
+            0x22 => self.registers.f = self.registers.d.sla(),
+            0x23 => self.registers.f = self.registers.e.sla(),
+            0x24 => self.registers.f = self.registers.h.sla(),
+            0x25 => self.registers.f = self.registers.l.sla(),
+            0x27 => self.registers.f = self.registers.a.sla(),
 
-            // SRA n
-            0x28 => {
-                trace!("SRA B");
-                let new_c = self.registers.b & 0x01 > 0;
-                let msb = self.registers.b & (1 << 7);
-                self.registers.b = self.registers.b >> 1 | msb;
-
-                let mut f = cpu_ops::set_flag(0x0, CpuFlag::C, new_c);
-                f = cpu_ops::set_flag(f, CpuFlag::Z, self.registers.b == 0);
-                self.registers.f = f;
-            }
-            0x2a => {
-                trace!("SRA D");
-                let new_c = self.registers.d & 0x01 > 0;
-                let msb = self.registers.d & (1 << 7);
-                self.registers.d = self.registers.d >> 1 | msb;
-
-                let mut f = cpu_ops::set_flag(0x0, CpuFlag::C, new_c);
-                f = cpu_ops::set_flag(f, CpuFlag::Z, self.registers.d == 0);
-                self.registers.f = f;
-            }
+            // SRA
+            0x28 => self.registers.f = self.registers.b.sra(),
+            0x29 => self.registers.f = self.registers.c.sra(),
+            0x2a => self.registers.f = self.registers.d.sra(),
+            0x2b => self.registers.f = self.registers.e.sra(),
+            0x2c => self.registers.f = self.registers.h.sra(),
+            0x2d => self.registers.f = self.registers.l.sra(),
+            0x2f => self.registers.f = self.registers.a.sra(),
 
             // SRL A
             0x3f => {
