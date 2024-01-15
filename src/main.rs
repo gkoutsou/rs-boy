@@ -56,11 +56,11 @@ fn load_rom() -> io::Result<Vec<u8>> {
     // let mut f = File::open("test/04-op r,imm.gb")?;
     // let mut f = File::open("test/05-op rp.gb")?; // passes
     // let mut f = File::open("test/06-ld r,r.gb")?; // passes
-    // let mut f = File::open("test/07-jr,jp,call,ret,rst.gb")?;
+    let mut f = File::open("test/07-jr,jp,call,ret,rst.gb")?;
     // let mut f = File::open("test/08-misc instrs.gb")?;
     // let mut f = File::open("test/09-op r,r.gb")?;
     // let mut f = File::open("test/10-bit ops.gb")?;
-    let mut f = File::open("test/11-op a,(hl).gb")?;
+    // let mut f = File::open("test/11-op a,(hl).gb")?;
     let mut buffer = Vec::new();
 
     // read the whole file
@@ -1685,6 +1685,48 @@ impl GameBoy {
                     self.cpu_cycles += 12;
                     self.registers.set_pc(new_loc);
                 }
+            }
+
+            // RST n
+            0xc7 => {
+                debug!("RST 00");
+                self.push_stack(self.registers.pc);
+                self.registers.pc = 0x00;
+            }
+            0xcf => {
+                debug!("RST 08");
+                self.push_stack(self.registers.pc);
+                self.registers.pc = 0x08;
+            }
+            0xd7 => {
+                debug!("RST 10");
+                self.push_stack(self.registers.pc);
+                self.registers.pc = 0x10;
+            }
+            0xdf => {
+                debug!("RST 18");
+                self.push_stack(self.registers.pc);
+                self.registers.pc = 0x18;
+            }
+            0xe7 => {
+                debug!("RST 20");
+                self.push_stack(self.registers.pc);
+                self.registers.pc = 0x20;
+            }
+            0xef => {
+                debug!("RST 28");
+                self.push_stack(self.registers.pc);
+                self.registers.pc = 0x28;
+            }
+            0xf7 => {
+                debug!("RST 30");
+                self.push_stack(self.registers.pc);
+                self.registers.pc = 0x30;
+            }
+            0xff => {
+                debug!("RST 38");
+                self.push_stack(self.registers.pc);
+                self.registers.pc = 0x38;
             }
 
             // PUSH
