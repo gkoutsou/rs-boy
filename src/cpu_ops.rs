@@ -184,9 +184,8 @@ pub fn get_ticks(instruction: u8) -> u32 {
         0xce => 8,
 
         // SUB n
-        0x90 => 4,
-        0x92 => 4,
         0x96 => 8,
+        0x90..=0x97 => 4,
 
         0xd6 => 8,
 
@@ -343,6 +342,7 @@ pub fn get_ticks(instruction: u8) -> u32 {
         0x07 => 4,
         0x0f => 4,
         0x1f => 4,
+        0x17 => 4,
 
         0x3f => 4, // CCF
 
@@ -368,7 +368,8 @@ pub fn get_cb_ticks(cb_instruction: u8) -> u32 {
         0x18..=0x1f => 8,
 
         // RL
-        0x12 => 8,
+        0x16 => 16,
+        0x10..=0x17 => 8,
 
         // SWAP
         0x36 => 16,

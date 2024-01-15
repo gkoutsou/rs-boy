@@ -105,8 +105,8 @@ impl RegisterOperation for u8 {
         let result = a.wrapping_add(b).wrapping_add(c as u8);
         let mut f = set_flag(0x0, Flag::Z, result == 0);
         f = set_flag(f, Flag::N, false);
-        f = set_flag(f, Flag::H, (a & 0xF) + (b & 0xF) > 0xF);
-        f = set_flag(f, Flag::C, (a as u16) + (b as u16) > 0xFF);
+        f = set_flag(f, Flag::H, (a & 0xF) + (b & 0xF) + c as u8 > 0xF);
+        f = set_flag(f, Flag::C, (a as u16) + (b as u16) + c as u16 > 0xFF);
         *self = result;
         f
     }
@@ -124,8 +124,8 @@ impl RegisterOperation for u8 {
 
     fn sbc(&mut self, b: u8, c: bool) -> u8 {
         let a = *self;
-        let mut f = set_flag(0x0, Flag::C, a < b);
-        f = set_flag(f, Flag::H, (b & 0x0f) > (a & 0x0f));
+        let mut f = set_flag(0x0, Flag::C, (a as u16) < b as u16 + c as u16);
+        f = set_flag(f, Flag::H, (b & 0x0f) + c as u8 > (a & 0x0f));
         let result = a.wrapping_sub(b).wrapping_sub(c as u8);
         f = set_flag(f, Flag::Z, result == 0);
         f = set_flag(f, Flag::N, true);
