@@ -60,7 +60,7 @@ fn load_rom() -> io::Result<Vec<u8>> {
     // let mut f = File::open("test/08-misc instrs.gb")?;
     // let mut f = File::open("test/09-op r,r.gb")?;
     // let mut f = File::open("test/10-bit ops.gb")?;
-    // let mut f = File::open("test/11-op a,(hl).gb")?;
+    let mut f = File::open("test/11-op a,(hl).gb")?;
     let mut buffer = Vec::new();
 
     // read the whole file
@@ -1151,52 +1151,52 @@ impl GameBoy {
             // ADC
             0x8f => {
                 trace!("ADC A, A");
-                self.registers.f = self
-                    .registers
-                    .a
-                    .add(self.registers.a + self.registers.f.has_flag(registers::Flag::C) as u8);
+                self.registers.f = self.registers.a.adc(
+                    self.registers.a,
+                    self.registers.f.has_flag(registers::Flag::C),
+                );
             }
             0x88 => {
                 trace!("ADC A, B");
-                self.registers.f = self
-                    .registers
-                    .a
-                    .add(self.registers.b + self.registers.f.has_flag(registers::Flag::C) as u8);
+                self.registers.f = self.registers.a.adc(
+                    self.registers.b,
+                    self.registers.f.has_flag(registers::Flag::C),
+                );
             }
             0x89 => {
                 trace!("ADC A, C");
-                self.registers.f = self
-                    .registers
-                    .a
-                    .add(self.registers.c + self.registers.f.has_flag(registers::Flag::C) as u8);
+                self.registers.f = self.registers.a.adc(
+                    self.registers.c,
+                    self.registers.f.has_flag(registers::Flag::C),
+                );
             }
             0x8a => {
                 trace!("ADC A, D");
-                self.registers.f = self
-                    .registers
-                    .a
-                    .add(self.registers.d + self.registers.f.has_flag(registers::Flag::C) as u8);
+                self.registers.f = self.registers.a.adc(
+                    self.registers.d,
+                    self.registers.f.has_flag(registers::Flag::C),
+                );
             }
             0x8b => {
                 trace!("ADC A, E");
-                self.registers.f = self
-                    .registers
-                    .a
-                    .add(self.registers.e + self.registers.f.has_flag(registers::Flag::C) as u8);
+                self.registers.f = self.registers.a.adc(
+                    self.registers.e,
+                    self.registers.f.has_flag(registers::Flag::C),
+                );
             }
             0x8c => {
                 trace!("ADC A, H");
-                self.registers.f = self
-                    .registers
-                    .a
-                    .add(self.registers.h + self.registers.f.has_flag(registers::Flag::C) as u8);
+                self.registers.f = self.registers.a.adc(
+                    self.registers.h,
+                    self.registers.f.has_flag(registers::Flag::C),
+                );
             }
             0x8d => {
                 trace!("ADC A, L");
-                self.registers.f = self
-                    .registers
-                    .a
-                    .add(self.registers.l + self.registers.f.has_flag(registers::Flag::C) as u8);
+                self.registers.f = self.registers.a.adc(
+                    self.registers.l,
+                    self.registers.f.has_flag(registers::Flag::C),
+                );
             }
             0x8e => {
                 trace!("ADC A, (HL)");
@@ -1204,7 +1204,7 @@ impl GameBoy {
                 self.registers.f = self
                     .registers
                     .a
-                    .add(v + self.registers.f.has_flag(registers::Flag::C) as u8);
+                    .adc(v, self.registers.f.has_flag(registers::Flag::C));
             }
             0xce => {
                 trace!("ADC A, #");
@@ -1212,7 +1212,7 @@ impl GameBoy {
                 self.registers.f = self
                     .registers
                     .a
-                    .add(v + self.registers.f.has_flag(registers::Flag::C) as u8);
+                    .adc(v, self.registers.f.has_flag(registers::Flag::C));
             }
 
             // SUB n
@@ -1224,6 +1224,11 @@ impl GameBoy {
                 trace!("SUB D");
                 self.registers.f = self.registers.a.sub(self.registers.d);
             }
+            0x96 => {
+                trace!("SUB (HL)");
+                let v = self.memory.get(self.registers.get_hl() as usize);
+                self.registers.f = self.registers.a.sub(v);
+            }
 
             0xd6 => {
                 trace!("SUB #");
@@ -1234,52 +1239,52 @@ impl GameBoy {
             // SBC
             0x9f => {
                 trace!("SBC A, A");
-                self.registers.f = self
-                    .registers
-                    .a
-                    .sub(self.registers.a + self.registers.f.has_flag(registers::Flag::C) as u8);
+                self.registers.f = self.registers.a.sbc(
+                    self.registers.a,
+                    self.registers.f.has_flag(registers::Flag::C),
+                );
             }
             0x98 => {
                 trace!("SBC A, B");
-                self.registers.f = self
-                    .registers
-                    .a
-                    .sub(self.registers.b + self.registers.f.has_flag(registers::Flag::C) as u8);
+                self.registers.f = self.registers.a.sbc(
+                    self.registers.b,
+                    self.registers.f.has_flag(registers::Flag::C),
+                );
             }
             0x99 => {
                 trace!("SBC A, C");
-                self.registers.f = self
-                    .registers
-                    .a
-                    .sub(self.registers.c + self.registers.f.has_flag(registers::Flag::C) as u8);
+                self.registers.f = self.registers.a.sbc(
+                    self.registers.c,
+                    self.registers.f.has_flag(registers::Flag::C),
+                );
             }
             0x9a => {
                 trace!("SBC A, D");
-                self.registers.f = self
-                    .registers
-                    .a
-                    .sub(self.registers.d + self.registers.f.has_flag(registers::Flag::C) as u8);
+                self.registers.f = self.registers.a.sbc(
+                    self.registers.d,
+                    self.registers.f.has_flag(registers::Flag::C),
+                );
             }
             0x9b => {
                 trace!("SBC A, E");
-                self.registers.f = self
-                    .registers
-                    .a
-                    .sub(self.registers.e + self.registers.f.has_flag(registers::Flag::C) as u8);
+                self.registers.f = self.registers.a.sbc(
+                    self.registers.e,
+                    self.registers.f.has_flag(registers::Flag::C),
+                );
             }
             0x9c => {
                 trace!("SBC A, H");
-                self.registers.f = self
-                    .registers
-                    .a
-                    .sub(self.registers.h + self.registers.f.has_flag(registers::Flag::C) as u8);
+                self.registers.f = self.registers.a.sbc(
+                    self.registers.h,
+                    self.registers.f.has_flag(registers::Flag::C),
+                );
             }
             0x9d => {
                 trace!("SBC A, L");
-                self.registers.f = self
-                    .registers
-                    .a
-                    .sub(self.registers.l + self.registers.f.has_flag(registers::Flag::C) as u8);
+                self.registers.f = self.registers.a.sbc(
+                    self.registers.l,
+                    self.registers.f.has_flag(registers::Flag::C),
+                );
             }
             0x9e => {
                 trace!("SBC A, (HL)");
@@ -1287,7 +1292,7 @@ impl GameBoy {
                 self.registers.f = self
                     .registers
                     .a
-                    .sub(v + self.registers.f.has_flag(registers::Flag::C) as u8);
+                    .sbc(v, self.registers.f.has_flag(registers::Flag::C));
             }
 
             // INC nn
@@ -1800,6 +1805,32 @@ impl GameBoy {
 
     fn do_cb(&mut self, cb_instruction: u8) {
         match cb_instruction {
+            // RLC
+            0x00 => self.registers.f = self.registers.b.rlc(),
+            0x01 => self.registers.f = self.registers.c.rlc(),
+            0x02 => self.registers.f = self.registers.d.rlc(),
+            0x03 => self.registers.f = self.registers.e.rlc(),
+            0x04 => self.registers.f = self.registers.h.rlc(),
+            0x05 => self.registers.f = self.registers.l.rlc(),
+            0x06 => {
+                let v = self.memory.get(self.registers.get_hl() as usize).rlc();
+                self.memory.write(self.registers.get_hl() as usize, v);
+            }
+            0x07 => self.registers.f = self.registers.a.rlc(),
+
+            // RRC
+            0x08 => self.registers.f = self.registers.b.rrc(),
+            0x09 => self.registers.f = self.registers.c.rrc(),
+            0x0a => self.registers.f = self.registers.d.rrc(),
+            0x0b => self.registers.f = self.registers.e.rrc(),
+            0x0c => self.registers.f = self.registers.h.rrc(),
+            0x0d => self.registers.f = self.registers.l.rrc(),
+            0x0e => {
+                let v = self.memory.get(self.registers.get_hl() as usize).rrc();
+                self.memory.write(self.registers.get_hl() as usize, v);
+            }
+            0x0f => self.registers.f = self.registers.a.rrc(),
+
             // RR
             0x19 => {
                 let new_c = self.registers.c & 0x01;

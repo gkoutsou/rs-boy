@@ -16,7 +16,9 @@ pub trait RegisterOperation {
     fn or(&mut self, b: u8) -> u8;
     fn and(&mut self, b: u8) -> u8;
     fn add(&mut self, b: u8) -> u8;
+    fn adc(&mut self, b: u8, c: bool) -> u8;
     fn sub(&mut self, b: u8) -> u8;
+    fn sbc(&mut self, b: u8, c: bool) -> u8;
     fn cp(self, b: u8) -> u8;
 
     fn inc(&mut self, f: u8) -> u8;
@@ -28,6 +30,8 @@ pub trait RegisterOperation {
 
     // cb operations
     fn bit(self, bit: u8, f: u8) -> u8;
+    fn rlc(&mut self) -> u8;
+    fn rrc(&mut self) -> u8;
 }
 
 impl RegisterOperation for u8 {
@@ -96,11 +100,33 @@ impl RegisterOperation for u8 {
         f
     }
 
+    fn adc(&mut self, b: u8, c: bool) -> u8 {
+        let a = *self;
+        let result = a.wrapping_add(b).wrapping_add(c as u8);
+        let mut f = set_flag(0x0, Flag::Z, result == 0);
+        f = set_flag(f, Flag::N, false);
+        f = set_flag(f, Flag::H, (a & 0xF) + (b & 0xF) > 0xF);
+        f = set_flag(f, Flag::C, (a as u16) + (b as u16) > 0xFF);
+        *self = result;
+        f
+    }
+
     fn sub(&mut self, b: u8) -> u8 {
         let a = *self;
         let mut f = set_flag(0x0, Flag::C, a < b);
         f = set_flag(f, Flag::H, (b & 0x0f) > (a & 0x0f));
         let result = a.wrapping_sub(b);
+        f = set_flag(f, Flag::Z, result == 0);
+        f = set_flag(f, Flag::N, true);
+        *self = result;
+        f
+    }
+
+    fn sbc(&mut self, b: u8, c: bool) -> u8 {
+        let a = *self;
+        let mut f = set_flag(0x0, Flag::C, a < b);
+        f = set_flag(f, Flag::H, (b & 0x0f) > (a & 0x0f));
+        let result = a.wrapping_sub(b).wrapping_sub(c as u8);
         f = set_flag(f, Flag::Z, result == 0);
         f = set_flag(f, Flag::N, true);
         *self = result;
@@ -124,6 +150,26 @@ impl RegisterOperation for u8 {
         let mut f = set_flag(f, Flag::Z, res == 0);
         f = set_flag(f, Flag::N, false);
         f = set_flag(f, Flag::H, true);
+        f
+    }
+
+    fn rlc(&mut self) -> u8 {
+        let mut a = *self;
+        let new_c = a & (1 << 7) > 0;
+        a = a << 1 | (new_c as u8);
+        let mut f = set_flag(0, Flag::C, new_c);
+        f = set_flag(f, Flag::Z, a == 0);
+        *self = a;
+        f
+    }
+
+    fn rrc(&mut self) -> u8 {
+        let mut a = *self;
+        let new_c = a & 1 > 0;
+        a = a >> 1 | ((new_c as u8) << 7);
+        let mut f = set_flag(0, Flag::C, new_c);
+        f = set_flag(f, Flag::Z, a == 0);
+        *self = a;
         f
     }
 }

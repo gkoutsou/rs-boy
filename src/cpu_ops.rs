@@ -186,6 +186,7 @@ pub fn get_ticks(instruction: u8) -> u32 {
         // SUB n
         0x90 => 4,
         0x92 => 4,
+        0x96 => 8,
 
         0xd6 => 8,
 
@@ -353,6 +354,12 @@ pub fn get_ticks(instruction: u8) -> u32 {
 
 pub fn get_cb_ticks(cb_instruction: u8) -> u32 {
     match cb_instruction {
+        // RLC
+        0x06 => 16,
+        0x00..=0x07 => 8,
+        // RRC
+        0x0e => 16,
+        0x08..=0x0f => 8,
         // RR
         0x1e => 16,
         0x18..=0x1f => 8,
