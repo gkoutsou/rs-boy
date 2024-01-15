@@ -57,8 +57,8 @@ fn load_rom() -> io::Result<Vec<u8>> {
     // let mut f = File::open("test/05-op rp.gb")?; // passes
     // let mut f = File::open("test/06-ld r,r.gb")?; // passes
     // let mut f = File::open("test/07-jr,jp,call,ret,rst.gb")?; // passes
-    // let mut f = File::open("test/08-misc instrs.gb")?;
-    let mut f = File::open("test/09-op r,r.gb")?;
+    // let mut f = File::open("test/08-misc instrs.gb")?; // passes
+    // let mut f = File::open("test/09-op r,r.gb")?;
     // let mut f = File::open("test/10-bit ops.gb")?;
     // let mut f = File::open("test/11-op a,(hl).gb")?;
     let mut buffer = Vec::new();
@@ -1771,7 +1771,7 @@ impl GameBoy {
             0xf1 => {
                 trace!("POP AF");
                 let v = self.pop_stack();
-                self.registers.set_af(v);
+                self.registers.set_af(v & 0xfff0);
             }
 
             0xc1 => {
