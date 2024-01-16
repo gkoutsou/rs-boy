@@ -58,7 +58,7 @@ fn load_rom() -> io::Result<Vec<u8>> {
     // let mut f = File::open("test/06-ld r,r.gb")?; // passes
     // let mut f = File::open("test/07-jr,jp,call,ret,rst.gb")?; // passes
     // let mut f = File::open("test/08-misc instrs.gb")?; // passes
-    // let mut f = File::open("test/09-op r,r.gb")?;
+    let mut f = File::open("test/09-op r,r.gb")?;
     // let mut f = File::open("test/10-bit ops.gb")?;
     // let mut f = File::open("test/11-op a,(hl).gb")?;
     let mut buffer = Vec::new();
@@ -1835,9 +1835,9 @@ impl GameBoy {
 
             0x17 => {
                 trace!("RLA");
-                let new_c = self.registers.d & (1 << 7) > 0;
+                let new_c = self.registers.a & (1 << 7) > 0;
                 let old_c = self.registers.f.has_flag(registers::Flag::C);
-                self.registers.d = self.registers.d << 1 | old_c as u8;
+                self.registers.a = self.registers.a << 1 | old_c as u8;
                 self.registers.f = cpu_ops::set_flag(0, CpuFlag::C, new_c);
             }
 
@@ -2011,17 +2011,18 @@ impl GameBoy {
             }
 
             // SWAP
-            0x37 => {
-                self.registers.a = (self.registers.a >> 4) | (self.registers.a << 4);
-                self.registers.f = cpu_ops::set_flag(0x0, CpuFlag::Z, self.registers.a == 0);
-            }
-
+            0x30 => self.registers.f = self.registers.b.swap(),
+            0x31 => self.registers.f = self.registers.c.swap(),
+            0x32 => self.registers.f = self.registers.d.swap(),
+            0x33 => self.registers.f = self.registers.e.swap(),
+            0x34 => self.registers.f = self.registers.h.swap(),
+            0x35 => self.registers.f = self.registers.l.swap(),
             0x36 => {
                 let mut value = self.memory.get(self.registers.get_hl() as usize);
-                value = (value >> 4) | (value << 4);
+                self.registers.f = value.swap();
                 self.memory.write(self.registers.get_hl() as usize, value);
-                self.registers.f = cpu_ops::set_flag(0x0, CpuFlag::Z, value == 0);
             }
+            0x37 => self.registers.f = self.registers.a.swap(),
 
             // SLA
             0x20 => self.registers.f = self.registers.b.sla(),
@@ -2041,19 +2042,15 @@ impl GameBoy {
             0x2d => self.registers.f = self.registers.l.sra(),
             0x2f => self.registers.f = self.registers.a.sra(),
 
-            // SRL A
-            0x3f => {
-                let c = self.registers.a & 0x01;
-                self.registers.a = self.registers.a >> 1;
-                let f = cpu_ops::set_flag(0x0, CpuFlag::C, c == 1);
-                self.registers.f = cpu_ops::set_flag(f, CpuFlag::Z, self.registers.a == 0);
-            }
-            0x38 => {
-                let c = self.registers.b & 0x01;
-                self.registers.b = self.registers.b >> 1;
-                let f = cpu_ops::set_flag(0x0, CpuFlag::C, c == 1);
-                self.registers.f = cpu_ops::set_flag(f, CpuFlag::Z, self.registers.b == 0);
-            }
+            // SRL
+            0x38 => self.registers.f = self.registers.b.srl(),
+            0x39 => self.registers.f = self.registers.c.srl(),
+            0x3a => self.registers.f = self.registers.d.srl(),
+            0x3b => self.registers.f = self.registers.e.srl(),
+            0x3c => self.registers.f = self.registers.h.srl(),
+            0x3d => self.registers.f = self.registers.l.srl(),
+
+            0x3f => self.registers.f = self.registers.a.srl(),
 
             // RES
             // 0 byte

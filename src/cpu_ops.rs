@@ -373,7 +373,7 @@ pub fn get_cb_ticks(cb_instruction: u8) -> u32 {
 
         // SWAP
         0x36 => 16,
-        0x37 => 8,
+        0x30..=0x37 => 8,
 
         // SLA
         0x26 => 16,

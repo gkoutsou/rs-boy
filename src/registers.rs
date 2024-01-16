@@ -35,6 +35,9 @@ pub trait RegisterOperation {
 
     fn sla(&mut self) -> u8;
     fn sra(&mut self) -> u8;
+    fn srl(&mut self) -> u8;
+
+    fn swap(&mut self) -> u8;
 }
 
 impl RegisterOperation for u8 {
@@ -193,6 +196,24 @@ impl RegisterOperation for u8 {
         a = a >> 1 | msb;
         let mut f = set_flag(0x0, Flag::C, new_c);
         f = set_flag(f, Flag::Z, a == 0);
+        *self = a;
+        f
+    }
+
+    fn swap(&mut self) -> u8 {
+        let mut a = *self;
+        a = (a >> 4) | (a << 4);
+        let f = set_flag(0x0, Flag::Z, a == 0);
+        *self = a;
+        f
+    }
+
+    fn srl(&mut self) -> u8 {
+        let mut a = *self;
+        let c = a & 0x01;
+        a = a >> 1;
+        let f = set_flag(0x0, Flag::C, c == 1);
+        let f = set_flag(f, Flag::Z, a == 0);
         *self = a;
         f
     }
