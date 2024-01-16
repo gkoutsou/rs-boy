@@ -58,8 +58,8 @@ fn load_rom() -> io::Result<Vec<u8>> {
     // let mut f = File::open("test/06-ld r,r.gb")?; // passes
     // let mut f = File::open("test/07-jr,jp,call,ret,rst.gb")?; // passes
     // let mut f = File::open("test/08-misc instrs.gb")?; // passes
-    let mut f = File::open("test/09-op r,r.gb")?;
-    // let mut f = File::open("test/10-bit ops.gb")?;
+    // let mut f = File::open("test/09-op r,r.gb")?; // passes
+    let mut f = File::open("test/10-bit ops.gb")?;
     // let mut f = File::open("test/11-op a,(hl).gb")?;
     let mut buffer = Vec::new();
 
@@ -2078,6 +2078,22 @@ impl GameBoy {
             0x94 => self.registers.h.set_bit(2, false),
             0x95 => self.registers.l.set_bit(2, false),
 
+            0x9f => self.registers.a.set_bit(3, false),
+            0x98 => self.registers.b.set_bit(3, false),
+            0x99 => self.registers.c.set_bit(3, false),
+            0x9a => self.registers.d.set_bit(3, false),
+            0x9b => self.registers.e.set_bit(3, false),
+            0x9c => self.registers.h.set_bit(3, false),
+            0x9d => self.registers.l.set_bit(3, false),
+
+            0xa7 => self.registers.a.set_bit(4, false),
+            0xa0 => self.registers.b.set_bit(4, false),
+            0xa1 => self.registers.c.set_bit(4, false),
+            0xa2 => self.registers.d.set_bit(4, false),
+            0xa3 => self.registers.e.set_bit(4, false),
+            0xa4 => self.registers.h.set_bit(4, false),
+            0xa5 => self.registers.l.set_bit(4, false),
+
             0xaf => self.registers.a.set_bit(5, false),
             0xa8 => self.registers.b.set_bit(5, false),
             0xa9 => self.registers.c.set_bit(5, false),
@@ -2085,6 +2101,23 @@ impl GameBoy {
             0xab => self.registers.e.set_bit(5, false),
             0xac => self.registers.h.set_bit(5, false),
             0xad => self.registers.l.set_bit(5, false),
+
+            0xb7 => self.registers.a.set_bit(6, false),
+            0xb0 => self.registers.b.set_bit(6, false),
+            0xb1 => self.registers.c.set_bit(6, false),
+            0xb2 => self.registers.d.set_bit(6, false),
+            0xb3 => self.registers.e.set_bit(6, false),
+            0xb4 => self.registers.h.set_bit(6, false),
+            0xb5 => self.registers.l.set_bit(6, false),
+
+            0xbf => self.registers.a.set_bit(7, false),
+            0xb8 => self.registers.b.set_bit(7, false),
+            0xb9 => self.registers.c.set_bit(7, false),
+            0xba => self.registers.d.set_bit(7, false),
+            0xbb => self.registers.e.set_bit(7, false),
+            0xbc => self.registers.h.set_bit(7, false),
+            0xbd => self.registers.l.set_bit(7, false),
+
             0x86 => {
                 let mut value = self.memory.get(self.registers.get_hl() as usize);
                 value.set_bit(0, false);
@@ -2127,6 +2160,62 @@ impl GameBoy {
             }
 
             // SET
+            0xc7 => self.registers.a.set_bit(0, true),
+            0xc0 => self.registers.b.set_bit(0, true),
+            0xc1 => self.registers.c.set_bit(0, true),
+            0xc2 => self.registers.d.set_bit(0, true),
+            0xc3 => self.registers.e.set_bit(0, true),
+            0xc4 => self.registers.h.set_bit(0, true),
+            0xc5 => self.registers.l.set_bit(0, true),
+
+            0xcf => self.registers.a.set_bit(1, true),
+            0xc8 => self.registers.b.set_bit(1, true),
+            0xc9 => self.registers.c.set_bit(1, true),
+            0xca => self.registers.d.set_bit(1, true),
+            0xcb => self.registers.e.set_bit(1, true),
+            0xcc => self.registers.h.set_bit(1, true),
+            0xcd => self.registers.l.set_bit(1, true),
+
+            0xd7 => self.registers.a.set_bit(2, true),
+            0xd0 => self.registers.b.set_bit(2, true),
+            0xd1 => self.registers.c.set_bit(2, true),
+            0xd2 => self.registers.d.set_bit(2, true),
+            0xd3 => self.registers.e.set_bit(2, true),
+            0xd4 => self.registers.h.set_bit(2, true),
+            0xd5 => self.registers.l.set_bit(2, true),
+
+            0xdf => self.registers.a.set_bit(3, true),
+            0xd8 => self.registers.b.set_bit(3, true),
+            0xd9 => self.registers.c.set_bit(3, true),
+            0xda => self.registers.d.set_bit(3, true),
+            0xdb => self.registers.e.set_bit(3, true),
+            0xdc => self.registers.h.set_bit(3, true),
+            0xdd => self.registers.l.set_bit(3, true),
+
+            0xe7 => self.registers.a.set_bit(4, true),
+            0xe0 => self.registers.b.set_bit(4, true),
+            0xe1 => self.registers.c.set_bit(4, true),
+            0xe2 => self.registers.d.set_bit(4, true),
+            0xe3 => self.registers.e.set_bit(4, true),
+            0xe4 => self.registers.h.set_bit(4, true),
+            0xe5 => self.registers.l.set_bit(4, true),
+
+            0xef => self.registers.a.set_bit(5, true),
+            0xe8 => self.registers.b.set_bit(5, true),
+            0xe9 => self.registers.c.set_bit(5, true),
+            0xea => self.registers.d.set_bit(5, true),
+            0xeb => self.registers.e.set_bit(5, true),
+            0xec => self.registers.h.set_bit(5, true),
+            0xed => self.registers.l.set_bit(5, true),
+
+            0xf7 => self.registers.a.set_bit(6, true),
+            0xf0 => self.registers.b.set_bit(6, true),
+            0xf1 => self.registers.c.set_bit(6, true),
+            0xf2 => self.registers.d.set_bit(6, true),
+            0xf3 => self.registers.e.set_bit(6, true),
+            0xf4 => self.registers.h.set_bit(6, true),
+            0xf5 => self.registers.l.set_bit(6, true),
+
             0xff => self.registers.a.set_bit(7, true),
             0xf8 => self.registers.b.set_bit(7, true),
             0xf9 => self.registers.c.set_bit(7, true),
@@ -2199,6 +2288,22 @@ impl GameBoy {
             0x53 => self.registers.f = self.registers.e.bit(2, self.registers.f),
             0x54 => self.registers.f = self.registers.h.bit(2, self.registers.f),
             0x55 => self.registers.f = self.registers.l.bit(2, self.registers.f),
+
+            0x5f => self.registers.f = self.registers.a.bit(3, self.registers.f),
+            0x58 => self.registers.f = self.registers.b.bit(3, self.registers.f),
+            0x59 => self.registers.f = self.registers.c.bit(3, self.registers.f),
+            0x5a => self.registers.f = self.registers.d.bit(3, self.registers.f),
+            0x5b => self.registers.f = self.registers.e.bit(3, self.registers.f),
+            0x5c => self.registers.f = self.registers.h.bit(3, self.registers.f),
+            0x5d => self.registers.f = self.registers.l.bit(3, self.registers.f),
+
+            0x67 => self.registers.f = self.registers.a.bit(4, self.registers.f),
+            0x60 => self.registers.f = self.registers.b.bit(4, self.registers.f),
+            0x61 => self.registers.f = self.registers.c.bit(4, self.registers.f),
+            0x62 => self.registers.f = self.registers.d.bit(4, self.registers.f),
+            0x63 => self.registers.f = self.registers.e.bit(4, self.registers.f),
+            0x64 => self.registers.f = self.registers.h.bit(4, self.registers.f),
+            0x65 => self.registers.f = self.registers.l.bit(4, self.registers.f),
 
             0x6f => self.registers.f = self.registers.a.bit(5, self.registers.f),
             0x68 => self.registers.f = self.registers.b.bit(5, self.registers.f),
