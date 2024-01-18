@@ -198,6 +198,7 @@ pub fn get_ticks(instruction: u8) -> u32 {
         0x9c => 4,
         0x9d => 4,
         0x9e => 8,
+        0xde => 8,
 
         // INC nn
         0x03 => 8,

@@ -53,14 +53,14 @@ fn load_rom() -> io::Result<Vec<u8>> {
     // let mut f = File::open("test/01-special.gb")?;
     // let mut f = File::open("test/02-interrupts.gb")?;
     // let mut f = File::open("test/03-op sp,hl.gb")?; // passes
-    // let mut f = File::open("test/04-op r,imm.gb")?;
+    // let mut f = File::open("test/04-op r,imm.gb")?; // passes
     // let mut f = File::open("test/05-op rp.gb")?; // passes
     // let mut f = File::open("test/06-ld r,r.gb")?; // passes
     // let mut f = File::open("test/07-jr,jp,call,ret,rst.gb")?; // passes
     // let mut f = File::open("test/08-misc instrs.gb")?; // passes
-    // let mut f = File::open("test/09-op r,r.gb")?; // passes
-    let mut f = File::open("test/10-bit ops.gb")?;
-    // let mut f = File::open("test/11-op a,(hl).gb")?;
+    let mut f = File::open("test/09-op r,r.gb")?; // passes
+                                                  // let mut f = File::open("test/10-bit ops.gb")?; // passes
+                                                  // let mut f = File::open("test/11-op a,(hl).gb")?;
     let mut buffer = Vec::new();
 
     // read the whole file
@@ -1315,6 +1315,15 @@ impl GameBoy {
                     .sbc(v, self.registers.f.has_flag(registers::Flag::C));
             }
 
+            0xde => {
+                trace!("SBC #");
+                let v = self.get_u8();
+                self.registers.f = self
+                    .registers
+                    .a
+                    .sbc(v, self.registers.f.has_flag(registers::Flag::C));
+            }
+
             // INC nn
             0x03 => {
                 self.registers
@@ -1902,113 +1911,22 @@ impl GameBoy {
             0x0f => self.registers.f = self.registers.a.rrc(),
 
             // RR
-            0x18 => {
-                let new_c = self.registers.b & 0x01;
-                let old_c = (self.registers.f.has_flag(registers::Flag::C) as u8) << 7;
-                self.registers.b = self.registers.b >> 1 | old_c;
-                let f = cpu_ops::set_flag(0x0, CpuFlag::C, new_c == 1);
-                self.registers.f = cpu_ops::set_flag(f, CpuFlag::Z, self.registers.b == 0);
-            }
-            0x19 => {
-                let new_c = self.registers.c & 0x01;
-                let old_c = (self.registers.f.has_flag(registers::Flag::C) as u8) << 7;
-                self.registers.c = self.registers.c >> 1 | old_c;
-                let f = cpu_ops::set_flag(0x0, CpuFlag::C, new_c == 1);
-                self.registers.f = cpu_ops::set_flag(f, CpuFlag::Z, self.registers.c == 0);
-            }
-            0x1a => {
-                let new_c = self.registers.d & 0x01;
-                let old_c = (self.registers.f.has_flag(registers::Flag::C) as u8) << 7;
-                self.registers.d = self.registers.d >> 1 | old_c;
-                let f = cpu_ops::set_flag(0x0, CpuFlag::C, new_c == 1);
-                self.registers.f = cpu_ops::set_flag(f, CpuFlag::Z, self.registers.d == 0);
-            }
-            0x1b => {
-                let new_c = self.registers.e & 0x01;
-                let old_c = (self.registers.f.has_flag(registers::Flag::C) as u8) << 7;
-                self.registers.e = self.registers.e >> 1 | old_c;
-                let f = cpu_ops::set_flag(0x0, CpuFlag::C, new_c == 1);
-                self.registers.f = cpu_ops::set_flag(f, CpuFlag::Z, self.registers.e == 0);
-            }
-            0x1c => {
-                let new_c = self.registers.h & 0x01;
-                let old_c = (self.registers.f.has_flag(registers::Flag::C) as u8) << 7;
-                self.registers.h = self.registers.h >> 1 | old_c;
-                let f = cpu_ops::set_flag(0x0, CpuFlag::C, new_c == 1);
-                self.registers.f = cpu_ops::set_flag(f, CpuFlag::Z, self.registers.h == 0);
-            }
-            0x1d => {
-                let new_c = self.registers.l & 0x01;
-                let old_c = (self.registers.f.has_flag(registers::Flag::C) as u8) << 7;
-                self.registers.l = self.registers.l >> 1 | old_c;
-                let f = cpu_ops::set_flag(0x0, CpuFlag::C, new_c == 1);
-                self.registers.f = cpu_ops::set_flag(f, CpuFlag::Z, self.registers.l == 0);
-            }
-            0x1f => {
-                let new_c = self.registers.a & 0x01;
-                let old_c = (self.registers.f.has_flag(registers::Flag::C) as u8) << 7;
-                self.registers.a = self.registers.a >> 1 | old_c;
-                let f = cpu_ops::set_flag(0x0, CpuFlag::C, new_c == 1);
-                self.registers.f = cpu_ops::set_flag(f, CpuFlag::Z, self.registers.a == 0);
-            }
+            0x18 => Registers::rr(&mut self.registers.b, &mut self.registers.f),
+            0x19 => Registers::rr(&mut self.registers.c, &mut self.registers.f),
+            0x1a => Registers::rr(&mut self.registers.d, &mut self.registers.f),
+            0x1b => Registers::rr(&mut self.registers.e, &mut self.registers.f),
+            0x1c => Registers::rr(&mut self.registers.h, &mut self.registers.f),
+            0x1d => Registers::rr(&mut self.registers.l, &mut self.registers.f),
+            0x1f => Registers::rr(&mut self.registers.a, &mut self.registers.f),
 
             // RL
-            0x10 => {
-                let new_c = self.registers.b & (1 << 7) > 0;
-                let old_c = self.registers.f.has_flag(registers::Flag::C);
-                self.registers.b = self.registers.b << 1 | old_c as u8;
-                let mut f = cpu_ops::set_flag(0, CpuFlag::Z, self.registers.b == 0);
-                f = cpu_ops::set_flag(f, CpuFlag::C, new_c);
-                self.registers.f = f;
-            }
-            0x11 => {
-                let new_c = self.registers.c & (1 << 7) > 0;
-                let old_c = self.registers.f.has_flag(registers::Flag::C);
-                self.registers.c = self.registers.c << 1 | old_c as u8;
-                let mut f = cpu_ops::set_flag(0, CpuFlag::Z, self.registers.c == 0);
-                f = cpu_ops::set_flag(f, CpuFlag::C, new_c);
-                self.registers.f = f;
-            }
-            0x12 => {
-                let new_c = self.registers.d & (1 << 7) > 0;
-                let old_c = self.registers.f.has_flag(registers::Flag::C);
-                self.registers.d = self.registers.d << 1 | old_c as u8;
-                let mut f = cpu_ops::set_flag(0, CpuFlag::Z, self.registers.d == 0);
-                f = cpu_ops::set_flag(f, CpuFlag::C, new_c);
-                self.registers.f = f;
-            }
-            0x13 => {
-                let new_c = self.registers.e & (1 << 7) > 0;
-                let old_c = self.registers.f.has_flag(registers::Flag::C);
-                self.registers.e = self.registers.e << 1 | old_c as u8;
-                let mut f = cpu_ops::set_flag(0, CpuFlag::Z, self.registers.e == 0);
-                f = cpu_ops::set_flag(f, CpuFlag::C, new_c);
-                self.registers.f = f;
-            }
-            0x14 => {
-                let new_c = self.registers.h & (1 << 7) > 0;
-                let old_c = self.registers.f.has_flag(registers::Flag::C);
-                self.registers.h = self.registers.h << 1 | old_c as u8;
-                let mut f = cpu_ops::set_flag(0, CpuFlag::Z, self.registers.h == 0);
-                f = cpu_ops::set_flag(f, CpuFlag::C, new_c);
-                self.registers.f = f;
-            }
-            0x15 => {
-                let new_c = self.registers.l & (1 << 7) > 0;
-                let old_c = self.registers.f.has_flag(registers::Flag::C);
-                self.registers.l = self.registers.l << 1 | old_c as u8;
-                let mut f = cpu_ops::set_flag(0, CpuFlag::Z, self.registers.l == 0);
-                f = cpu_ops::set_flag(f, CpuFlag::C, new_c);
-                self.registers.f = f;
-            }
-            0x17 => {
-                let new_c = self.registers.a & (1 << 7) > 0;
-                let old_c = self.registers.f.has_flag(registers::Flag::C);
-                self.registers.a = self.registers.a << 1 | old_c as u8;
-                let mut f = cpu_ops::set_flag(0, CpuFlag::Z, self.registers.a == 0);
-                f = cpu_ops::set_flag(f, CpuFlag::C, new_c);
-                self.registers.f = f;
-            }
+            0x10 => Registers::rl(&mut self.registers.b, &mut self.registers.f),
+            0x11 => Registers::rl(&mut self.registers.c, &mut self.registers.f),
+            0x12 => Registers::rl(&mut self.registers.d, &mut self.registers.f),
+            0x13 => Registers::rl(&mut self.registers.e, &mut self.registers.f),
+            0x14 => Registers::rl(&mut self.registers.h, &mut self.registers.f),
+            0x15 => Registers::rl(&mut self.registers.l, &mut self.registers.f),
+            0x17 => Registers::rl(&mut self.registers.a, &mut self.registers.f),
 
             // SWAP
             0x30 => self.registers.f = self.registers.b.swap(),

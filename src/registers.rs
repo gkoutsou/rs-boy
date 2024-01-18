@@ -297,4 +297,25 @@ impl Registers {
         f = set_flag(f, Flag::N, false);
         (result, f)
     }
+
+    pub fn rr(register: &mut u8, register_f: &mut u8) {
+        let mut a = *register;
+
+        let new_c = a & 0x01;
+        let old_c = (register_f.has_flag(Flag::C) as u8) << 7;
+        a = a >> 1 | old_c;
+        let f = set_flag(0x0, Flag::C, new_c == 1);
+        *register_f = set_flag(f, Flag::Z, a == 0);
+        *register = a;
+    }
+
+    pub fn rl(register: &mut u8, register_f: &mut u8) {
+        let mut a = *register;
+        let new_c = a & (1 << 7) > 0;
+        let old_c = register_f.has_flag(Flag::C);
+        a = a << 1 | old_c as u8;
+        let f = set_flag(0, Flag::Z, a == 0);
+        *register_f = set_flag(f, Flag::C, new_c);
+        *register = a;
+    }
 }
