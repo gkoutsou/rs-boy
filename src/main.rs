@@ -355,13 +355,14 @@ impl GameBoy {
         let tiley = (line as usize + self.memory.io_registers.scy as usize) % 256;
 
         // debug!("Tiley: {}", tiley);
-        let tilex = 0;
 
         // draw background
         for x in 0..20u8 {
-            let tile_id =
-                self.memory
-                    .get(tilemap_location + tiley / 8 * 32 + x as usize) as usize;
+            let tilex = (self.memory.io_registers.scx as usize + (x * 8) as usize) % 256;
+            let tile_id = self
+                .memory
+                .get(tilemap_location + tiley / 8 * 32 + tilex as usize / 8)
+                as usize;
             let tiledata_location = self.get_tile_data_baseline(tile_id);
             // let tile = self.memory.get(tiledata_location + tile_id as usize);
             let (byte1, byte2) = self
