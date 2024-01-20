@@ -3,3 +3,4 @@ output
 *.gbsave
 *.gb
 .vscode
+.DS_Store

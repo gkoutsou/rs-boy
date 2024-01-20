@@ -49,7 +49,7 @@ struct GameBoy {
 
 fn load_rom() -> io::Result<Vec<u8>> {
     // let mut f = File::open("Adventure Island II - Aliens in Paradise (USA, Europe).gb")?;
-    // let mut f = File::open("PokemonRed.gb")?;
+    let mut f = File::open("PokemonRed.gb")?;
     // let mut f = File::open("test/01-special.gb")?; // passes
     // let mut f = File::open("test/02-interrupts.gb")?;
     // let mut f = File::open("test/03-op sp,hl.gb")?; // passes
@@ -60,7 +60,11 @@ fn load_rom() -> io::Result<Vec<u8>> {
     // let mut f = File::open("test/08-misc instrs.gb")?; // passes
     // let mut f = File::open("test/09-op r,r.gb")?; // passes
     // let mut f = File::open("test/10-bit ops.gb")?; // passes
-    let mut f = File::open("test/11-op a,(hl).gb")?; // passes
+    // let mut f = File::open("test/11-op a,(hl).gb")?; // passes
+    // let mut f = File::open("test/instr_timing.gb")?;
+    // let mut f = File::open("test/interrupt_time.gb")?;
+    // let mut f = File::open("test/mem_timing_1.gb")?;
+    // let mut f = File::open("test/mem_timing_2.gb")?;
     let mut buffer = Vec::new();
 
     // read the whole file
