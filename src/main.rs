@@ -60,7 +60,7 @@ fn load_rom() -> io::Result<Vec<u8>> {
     // let mut f = File::open("test/08-misc instrs.gb")?; // passes
     // let mut f = File::open("test/09-op r,r.gb")?; // passes
     // let mut f = File::open("test/10-bit ops.gb")?; // passes
-    let mut f = File::open("test/11-op a,(hl).gb")?;
+    let mut f = File::open("test/11-op a,(hl).gb")?; // passes
     let mut buffer = Vec::new();
 
     // read the whole file
@@ -1917,7 +1917,8 @@ impl GameBoy {
             0x04 => self.registers.f = self.registers.h.rlc(),
             0x05 => self.registers.f = self.registers.l.rlc(),
             0x06 => {
-                let v = self.memory.get(self.registers.get_hl() as usize).rlc();
+                let mut v = self.memory.get(self.registers.get_hl() as usize);
+                self.registers.f = v.rlc();
                 self.memory.write(self.registers.get_hl() as usize, v);
             }
             0x07 => self.registers.f = self.registers.a.rlc(),
@@ -1930,7 +1931,8 @@ impl GameBoy {
             0x0c => self.registers.f = self.registers.h.rrc(),
             0x0d => self.registers.f = self.registers.l.rrc(),
             0x0e => {
-                let v = self.memory.get(self.registers.get_hl() as usize).rrc();
+                let mut v = self.memory.get(self.registers.get_hl() as usize);
+                self.registers.f = v.rrc();
                 self.memory.write(self.registers.get_hl() as usize, v);
             }
             0x0f => self.registers.f = self.registers.a.rrc(),
@@ -2428,7 +2430,7 @@ fn main() {
         debug_counter: 0,
     };
 
-    for _i in 0..7500000 {
+    loop {
         // println!("Iteration {}", _i);
         cpu.step();
     }
