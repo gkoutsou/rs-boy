@@ -219,7 +219,7 @@ impl RegisterOperation for u8 {
     }
 }
 
-fn set_flag(f: u8, flag: Flag, value: bool) -> u8 {
+pub fn set_flag(f: u8, flag: Flag, value: bool) -> u8 {
     if value {
         f | flag as u8
     } else {

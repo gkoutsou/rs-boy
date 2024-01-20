@@ -302,6 +302,8 @@ pub fn get_ticks(instruction: u8) -> u32 {
         // SCF
         0x37 => 4,
 
+        // DAA
+        0x27 => 4,
         // HALT
         0x76 => 4,
 

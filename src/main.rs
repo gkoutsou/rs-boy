@@ -50,7 +50,7 @@ struct GameBoy {
 fn load_rom() -> io::Result<Vec<u8>> {
     // let mut f = File::open("Adventure Island II - Aliens in Paradise (USA, Europe).gb")?;
     // let mut f = File::open("PokemonRed.gb")?;
-    // let mut f = File::open("test/01-special.gb")?;
+    // let mut f = File::open("test/01-special.gb")?; // passes
     // let mut f = File::open("test/02-interrupts.gb")?;
     // let mut f = File::open("test/03-op sp,hl.gb")?; // passes
     // let mut f = File::open("test/04-op r,imm.gb")?; // passes
@@ -1815,6 +1815,31 @@ impl GameBoy {
             }
 
             // MISC
+            0x27 => {
+                let mut a = self.registers.a;
+                let mut adjust = 0x60 * self.registers.f.has_flag(registers::Flag::C) as u8;
+                if self.registers.f.has_flag(registers::Flag::H) {
+                    adjust |= 0x06;
+                };
+                if !self.registers.f.has_flag(registers::Flag::N) {
+                    if a & 0x0F > 0x09 {
+                        adjust |= 0x06;
+                    };
+                    if a > 0x99 {
+                        adjust |= 0x60;
+                    };
+                    a = a.wrapping_add(adjust);
+                } else {
+                    a = a.wrapping_sub(adjust);
+                }
+
+                self.registers.f =
+                    registers::set_flag(self.registers.f, registers::Flag::C, adjust >= 0x60);
+                self.registers.f = registers::set_flag(self.registers.f, registers::Flag::H, false);
+                self.registers.f =
+                    registers::set_flag(self.registers.f, registers::Flag::Z, a == 0);
+                self.registers.a = a;
+            }
             0x76 => {
                 self.halt = true;
                 debug!("HALT");
