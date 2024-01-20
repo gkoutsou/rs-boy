@@ -58,9 +58,9 @@ fn load_rom() -> io::Result<Vec<u8>> {
     // let mut f = File::open("test/06-ld r,r.gb")?; // passes
     // let mut f = File::open("test/07-jr,jp,call,ret,rst.gb")?; // passes
     // let mut f = File::open("test/08-misc instrs.gb")?; // passes
-    let mut f = File::open("test/09-op r,r.gb")?; // passes
-                                                  // let mut f = File::open("test/10-bit ops.gb")?; // passes
-                                                  // let mut f = File::open("test/11-op a,(hl).gb")?;
+    // let mut f = File::open("test/09-op r,r.gb")?; // passes
+    // let mut f = File::open("test/10-bit ops.gb")?; // passes
+    let mut f = File::open("test/11-op a,(hl).gb")?;
     let mut buffer = Vec::new();
 
     // read the whole file
@@ -1917,6 +1917,11 @@ impl GameBoy {
             0x1b => Registers::rr(&mut self.registers.e, &mut self.registers.f),
             0x1c => Registers::rr(&mut self.registers.h, &mut self.registers.f),
             0x1d => Registers::rr(&mut self.registers.l, &mut self.registers.f),
+            0x1e => {
+                let mut value = self.memory.get(self.registers.get_hl() as usize);
+                Registers::rr(&mut value, &mut self.registers.f);
+                self.memory.write(self.registers.get_hl() as usize, value);
+            }
             0x1f => Registers::rr(&mut self.registers.a, &mut self.registers.f),
 
             // RL
@@ -1926,6 +1931,11 @@ impl GameBoy {
             0x13 => Registers::rl(&mut self.registers.e, &mut self.registers.f),
             0x14 => Registers::rl(&mut self.registers.h, &mut self.registers.f),
             0x15 => Registers::rl(&mut self.registers.l, &mut self.registers.f),
+            0x16 => {
+                let mut value = self.memory.get(self.registers.get_hl() as usize);
+                Registers::rl(&mut value, &mut self.registers.f);
+                self.memory.write(self.registers.get_hl() as usize, value);
+            }
             0x17 => Registers::rl(&mut self.registers.a, &mut self.registers.f),
 
             // SWAP
@@ -1949,6 +1959,11 @@ impl GameBoy {
             0x23 => self.registers.f = self.registers.e.sla(),
             0x24 => self.registers.f = self.registers.h.sla(),
             0x25 => self.registers.f = self.registers.l.sla(),
+            0x26 => {
+                let mut value = self.memory.get(self.registers.get_hl() as usize);
+                self.registers.f = value.sla();
+                self.memory.write(self.registers.get_hl() as usize, value);
+            }
             0x27 => self.registers.f = self.registers.a.sla(),
 
             // SRA
@@ -1958,6 +1973,11 @@ impl GameBoy {
             0x2b => self.registers.f = self.registers.e.sra(),
             0x2c => self.registers.f = self.registers.h.sra(),
             0x2d => self.registers.f = self.registers.l.sra(),
+            0x2e => {
+                let mut value = self.memory.get(self.registers.get_hl() as usize);
+                self.registers.f = value.sra();
+                self.memory.write(self.registers.get_hl() as usize, value);
+            }
             0x2f => self.registers.f = self.registers.a.sra(),
 
             // SRL
@@ -1967,7 +1987,11 @@ impl GameBoy {
             0x3b => self.registers.f = self.registers.e.srl(),
             0x3c => self.registers.f = self.registers.h.srl(),
             0x3d => self.registers.f = self.registers.l.srl(),
-
+            0x3e => {
+                let mut value = self.memory.get(self.registers.get_hl() as usize);
+                self.registers.f = value.srl();
+                self.memory.write(self.registers.get_hl() as usize, value);
+            }
             0x3f => self.registers.f = self.registers.a.srl(),
 
             // RES
