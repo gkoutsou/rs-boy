@@ -68,7 +68,7 @@ impl Memory {
                     // todo 20, 40 etc also step
                     self.rom_bank = 1;
                 }
-                info!(
+                debug!(
                     "###### Changing to bank: {} (value: {})",
                     self.rom_bank,
                     value & 0b11111
@@ -203,21 +203,21 @@ impl Memory {
     }
 
     pub fn dump_tile(&self, tile_id: u8) {
-        println!("DUMPING TILE DATA");
-        for i in 0..16 {
-            print!("{:#04x} ", self.tile_data[tile_id as usize * 16 + i]);
-        }
-        println!();
-        println!("DUMPING TILE DATA COMPLETED");
+        // println!("DUMPING TILE DATA");
+        // for i in 0..16 {
+        //     print!("{:#04x} ", self.tile_data[tile_id as usize * 16 + i]);
+        // }
+        // println!();
+        // println!("DUMPING TILE DATA COMPLETED");
     }
 
     pub fn dump_oam(&self) {
-        println!("DUMPING OAM DATA");
-        for object in 0..40 {
-            let tile = self.get_oam_object(object);
-            println!("{:?}", tile)
-        }
-        println!("DUMPING OAM DATA COMPLETED");
+        // println!("DUMPING OAM DATA");
+        // for object in 0..40 {
+        //     let tile = self.get_oam_object(object);
+        //     println!("{:?}", tile)
+        // }
+        // println!("DUMPING OAM DATA COMPLETED");
     }
 
     pub fn get_oam_object(&self, object: usize) -> gpu::Tile {
