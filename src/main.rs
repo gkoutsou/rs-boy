@@ -1,12 +1,10 @@
-use std::{
-    fs::File,
-    io::{self, Read},
-    str, thread, time,
-};
+use std::{thread, time};
 
+mod cartridge;
 mod cpu_ops;
 mod display;
 mod registers;
+pub use cartridge::Cartridge;
 use cpu_ops::CpuFlag;
 pub use display::Display;
 use env_logger::Env;
@@ -30,9 +28,11 @@ fn u8s_to_u16(ls: u8, hs: u8) -> u16 {
 }
 
 struct GameBoy {
+    cartridge: Cartridge,
     display: Display,
     registers: Registers,
     memory: Memory,
+
     cpu_cycles: u32,
     gpu_mode: gpu::Mode,
 
@@ -45,32 +45,6 @@ struct GameBoy {
 
     // debug stuff
     debug_counter: i32,
-}
-
-fn load_rom() -> io::Result<Vec<u8>> {
-    // let mut f = File::open("Adventure Island II - Aliens in Paradise (USA, Europe).gb")?;
-    let mut f = File::open("PokemonRed.gb")?;
-    // let mut f = File::open("test/01-special.gb")?; // passes
-    // let mut f = File::open("test/02-interrupts.gb")?;
-    // let mut f = File::open("test/03-op sp,hl.gb")?; // passes
-    // let mut f = File::open("test/04-op r,imm.gb")?; // passes
-    // let mut f = File::open("test/05-op rp.gb")?; // passes
-    // let mut f = File::open("test/06-ld r,r.gb")?; // passes
-    // let mut f = File::open("test/07-jr,jp,call,ret,rst.gb")?; // passes
-    // let mut f = File::open("test/08-misc instrs.gb")?; // passes
-    // let mut f = File::open("test/09-op r,r.gb")?; // passes
-    // let mut f = File::open("test/10-bit ops.gb")?; // passes
-    // let mut f = File::open("test/11-op a,(hl).gb")?; // passes
-    // let mut f = File::open("test/instr_timing.gb")?;
-    // let mut f = File::open("test/interrupt_time.gb")?;
-    // let mut f = File::open("test/mem_timing_1.gb")?;
-    // let mut f = File::open("test/mem_timing_2.gb")?;
-    let mut buffer = Vec::new();
-
-    // read the whole file
-    f.read_to_end(&mut buffer)?;
-
-    Ok(buffer)
 }
 
 impl GameBoy {
@@ -130,13 +104,7 @@ impl GameBoy {
         let location = self.registers.step_pc();
         trace!("Running location {:#x}", location);
 
-        // if location >= 0xFF80 && location <= 0xFFFE {
-        // trace!("Running code in HRAM!")
-        // } else if location > 0x7FFF {
-        // panic!("moving outside of bank 2: {:#x}", location)
-        // }
-
-        let op = self.memory.get_rom(location);
+        let op = self.memory_read(location);
         debug!("operator: {:#x}", op);
         match op {
             0xcb => {
@@ -438,10 +406,29 @@ impl GameBoy {
         }
     }
 
+    pub fn memory_read(&self, location: usize) -> u8 {
+        match location {
+            0x0000..=0x7FFF => self.cartridge.get(location),
+
+            0xA000..=0xBFFF => self.cartridge.get(location),
+
+            _ => self.memory.get(location),
+        }
+    }
+    pub fn memory_write(&mut self, location: usize, value: u8) {
+        match location {
+            0x0000..=0x7FFF => self.cartridge.write(location, value),
+
+            0xA000..=0xBFFF => self.cartridge.write(location, value),
+
+            _ => self.memory.write(location, value),
+        }
+    }
+
     fn pop_stack(&mut self) -> u16 {
-        let ls = self.memory.get(self.registers.sp as usize);
+        let ls = self.memory_read(self.registers.sp as usize);
         self.registers.sp += 1;
-        let hs = self.memory.get(self.registers.sp as usize);
+        let hs = self.memory_read(self.registers.sp as usize);
         self.registers.sp += 1;
         return u8s_to_u16(ls, hs);
     }
@@ -449,22 +436,22 @@ impl GameBoy {
     fn push_stack(&mut self, value: u16) {
         let (hs, ls) = u16_to_u8s(value);
         self.registers.sp -= 1;
-        self.memory.write(self.registers.sp as usize, hs);
+        self.memory_write(self.registers.sp as usize, hs);
         self.registers.sp -= 1;
-        self.memory.write(self.registers.sp as usize, ls);
+        self.memory_write(self.registers.sp as usize, ls);
     }
 
     fn get_u16(&mut self) -> u16 {
         let location = self.registers.step_pc();
-        let v1 = self.memory.get_rom(location) as u16;
+        let v1 = self.memory_read(location) as u16;
         let location = self.registers.step_pc();
-        let v2 = self.memory.get_rom(location) as u16;
+        let v2 = self.memory_read(location) as u16;
         v2 << 8 | v1
     }
 
     fn get_u8(&mut self) -> u8 {
         let location = self.registers.step_pc();
-        self.memory.get_rom(location)
+        self.memory_read(location)
     }
 
     fn run_instruction(&mut self, op: u8) {
@@ -624,18 +611,16 @@ impl GameBoy {
             // LD NN, A
             0x02 => {
                 trace!("LD (BC), A");
-                self.memory
-                    .write(self.registers.get_bc() as usize, self.registers.a);
+                self.memory_write(self.registers.get_bc() as usize, self.registers.a);
             }
             0x12 => {
                 trace!("LD (DE), A");
-                self.memory
-                    .write(self.registers.get_de() as usize, self.registers.a);
+                self.memory_write(self.registers.get_de() as usize, self.registers.a);
             }
             0xea => {
                 trace!("LD (nn),A");
                 let target = self.get_u16();
-                self.memory.write(target as usize, self.registers.a);
+                self.memory_write(target as usize, self.registers.a);
             }
 
             // LD (nn), SP
@@ -643,8 +628,8 @@ impl GameBoy {
                 trace!("LD (nn), SP");
                 let loc = self.get_u16() as usize;
                 let (msb, lsb) = u16_to_u8s(self.registers.sp);
-                self.memory.write(loc, lsb);
-                self.memory.write(loc + 1, msb);
+                self.memory_write(loc, lsb);
+                self.memory_write(loc + 1, msb);
             }
 
             // LD SP, HL
@@ -657,7 +642,7 @@ impl GameBoy {
             0xe0 => {
                 let steps = self.get_u8();
                 trace!("LDH (n),A --> {} value: {}", steps, self.registers.a);
-                self.memory.write(0xff00 + steps as usize, self.registers.a);
+                self.memory_write(0xff00 + steps as usize, self.registers.a);
             }
 
             // LDH A,(n)
@@ -677,8 +662,7 @@ impl GameBoy {
                 // if self.registers.get_hl() == 0xc300 {
                 //     panic!("tmp")
                 // }
-                self.memory
-                    .write(self.registers.get_hl() as usize, self.registers.a);
+                self.memory_write(self.registers.get_hl() as usize, self.registers.a);
                 self.registers.set_hl(self.registers.get_hl() + 1)
             }
             // LDD (HL), A
@@ -688,21 +672,20 @@ impl GameBoy {
                     self.registers.get_hl(),
                     self.registers.a
                 );
-                self.memory
-                    .write(self.registers.get_hl() as usize, self.registers.a);
+                self.memory_write(self.registers.get_hl() as usize, self.registers.a);
                 self.registers.set_hl(self.registers.get_hl() - 1)
             }
 
             // LDD A, (HL)
             0x3a => {
                 trace!("LDD A, (HL)");
-                self.registers.a = self.memory.get(self.registers.get_hl() as usize);
+                self.registers.a = self.memory_read(self.registers.get_hl() as usize);
                 self.registers.set_hl(self.registers.get_hl() - 1)
             }
             // LDI A, (HL)
             0x2a => {
                 trace!("LDI A, (HL)");
-                self.registers.a = self.memory.get(self.registers.get_hl() as usize);
+                self.registers.a = self.memory_read(self.registers.get_hl() as usize);
                 self.registers.set_hl(self.registers.get_hl() + 1)
             }
 
@@ -757,15 +740,15 @@ impl GameBoy {
             }
             0x0a => {
                 trace!("LD A, (BC)");
-                self.registers.a = self.memory.get(self.registers.get_bc() as usize);
+                self.registers.a = self.memory_read(self.registers.get_bc() as usize);
             }
             0x1a => {
                 trace!("LD A, (DE)");
-                self.registers.a = self.memory.get(self.registers.get_de() as usize);
+                self.registers.a = self.memory_read(self.registers.get_de() as usize);
             }
             0x7e => {
                 trace!("LD A, (HL)");
-                self.registers.a = self.memory.get(self.registers.get_hl() as usize);
+                self.registers.a = self.memory_read(self.registers.get_hl() as usize);
                 debug!(
                     "LD A,(HL): {:#x} hl: {:#x}",
                     self.registers.a,
@@ -806,7 +789,7 @@ impl GameBoy {
             }
             0x46 => {
                 trace!("LD B, (HL)");
-                self.registers.b = self.memory.get(self.registers.get_hl() as usize);
+                self.registers.b = self.memory_read(self.registers.get_hl() as usize);
             }
             0x06 => {
                 let value = self.get_u8();
@@ -842,7 +825,7 @@ impl GameBoy {
             }
             0x4e => {
                 trace!("LD C, (HL)");
-                self.registers.c = self.memory.get(self.registers.get_hl() as usize);
+                self.registers.c = self.memory_read(self.registers.get_hl() as usize);
             }
             0x0e => {
                 let value = self.get_u8();
@@ -878,7 +861,7 @@ impl GameBoy {
             }
             0x56 => {
                 trace!("LD D, (HL)");
-                self.registers.d = self.memory.get(self.registers.get_hl() as usize);
+                self.registers.d = self.memory_read(self.registers.get_hl() as usize);
             }
             0x16 => {
                 let value = self.get_u8();
@@ -914,7 +897,7 @@ impl GameBoy {
             }
             0x5e => {
                 trace!("LD E, (HL)");
-                self.registers.e = self.memory.get(self.registers.get_hl() as usize);
+                self.registers.e = self.memory_read(self.registers.get_hl() as usize);
             }
             0x1e => {
                 let value = self.get_u8();
@@ -950,7 +933,7 @@ impl GameBoy {
             }
             0x66 => {
                 trace!("LD H, (HL)");
-                self.registers.h = self.memory.get(self.registers.get_hl() as usize);
+                self.registers.h = self.memory_read(self.registers.get_hl() as usize);
             }
             0x26 => {
                 let value = self.get_u8();
@@ -986,7 +969,7 @@ impl GameBoy {
             0x6D => {}
             0x6E => {
                 trace!("LD L, (HL)");
-                self.registers.l = self.memory.get(self.registers.get_hl() as usize);
+                self.registers.l = self.memory_read(self.registers.get_hl() as usize);
             }
             0x2e => {
                 let value = self.get_u8();
@@ -997,49 +980,42 @@ impl GameBoy {
             // (HL)
             0x77 => {
                 trace!("LD (HL), A");
-                self.memory
-                    .write(self.registers.get_hl() as usize, self.registers.a);
+                self.memory_write(self.registers.get_hl() as usize, self.registers.a);
             }
             0x70 => {
                 trace!("LD (HL), B");
-                self.memory
-                    .write(self.registers.get_hl() as usize, self.registers.b);
+                self.memory_write(self.registers.get_hl() as usize, self.registers.b);
             }
             0x71 => {
                 trace!("LD (HL), C");
-                self.memory
-                    .write(self.registers.get_hl() as usize, self.registers.c);
+                self.memory_write(self.registers.get_hl() as usize, self.registers.c);
             }
             0x72 => {
                 trace!("LD (HL), D");
-                self.memory
-                    .write(self.registers.get_hl() as usize, self.registers.d);
+                self.memory_write(self.registers.get_hl() as usize, self.registers.d);
             }
             0x73 => {
                 trace!("LD (HL), E");
-                self.memory
-                    .write(self.registers.get_hl() as usize, self.registers.e);
+                self.memory_write(self.registers.get_hl() as usize, self.registers.e);
             }
             0x74 => {
                 trace!("LD (HL), H");
-                self.memory
-                    .write(self.registers.get_hl() as usize, self.registers.h);
+                self.memory_write(self.registers.get_hl() as usize, self.registers.h);
             }
             0x75 => {
                 trace!("LD (HL), L");
-                self.memory
-                    .write(self.registers.get_hl() as usize, self.registers.l);
+                self.memory_write(self.registers.get_hl() as usize, self.registers.l);
             }
             0x36 => {
                 trace!("LD (HL), n");
                 let v = self.get_u8();
-                self.memory.write(self.registers.get_hl() as usize, v);
+                self.memory_write(self.registers.get_hl() as usize, v);
             }
 
             0xfa => {
                 trace!("LD A, nn");
                 let source = self.get_u16();
-                self.registers.a = self.memory.get(source as usize);
+                self.registers.a = self.memory_read(source as usize);
             }
 
             // LD A, (C)
@@ -1086,7 +1062,7 @@ impl GameBoy {
             }
             0x86 => {
                 trace!("ADD A, (HL)");
-                let v = self.memory.get(self.registers.get_hl() as usize);
+                let v = self.memory_read(self.registers.get_hl() as usize);
                 self.registers.f = self.registers.a.add(v);
             }
             0xc6 => {
@@ -1205,7 +1181,7 @@ impl GameBoy {
             }
             0x8e => {
                 trace!("ADC A, (HL)");
-                let v = self.memory.get(self.registers.get_hl() as usize);
+                let v = self.memory_read(self.registers.get_hl() as usize);
                 self.registers.f = self
                     .registers
                     .a
@@ -1251,7 +1227,7 @@ impl GameBoy {
             }
             0x96 => {
                 trace!("SUB (HL)");
-                let v = self.memory.get(self.registers.get_hl() as usize);
+                let v = self.memory_read(self.registers.get_hl() as usize);
                 self.registers.f = self.registers.a.sub(v);
             }
 
@@ -1313,7 +1289,7 @@ impl GameBoy {
             }
             0x9e => {
                 trace!("SBC A, (HL)");
-                let v = self.memory.get(self.registers.get_hl() as usize);
+                let v = self.memory_read(self.registers.get_hl() as usize);
                 self.registers.f = self
                     .registers
                     .a
@@ -1401,10 +1377,10 @@ impl GameBoy {
             0x34 => {
                 trace!("INC (HL)");
                 let location = self.registers.get_hl() as usize;
-                let mut value = self.memory.get(location);
+                let mut value = self.memory_read(location);
                 let f = value.inc(self.registers.f);
                 self.registers.f = f;
-                self.memory.write(location, value);
+                self.memory_write(location, value);
             }
 
             // DEC
@@ -1440,9 +1416,9 @@ impl GameBoy {
             0x35 => {
                 trace!("DEC (HL)");
                 let location = self.registers.get_hl() as usize;
-                let mut value = self.memory.get(location);
+                let mut value = self.memory_read(location);
                 self.registers.f = value.dec(self.registers.f);
-                self.memory.write(location, value);
+                self.memory_write(location, value);
             }
 
             // AND n
@@ -1476,7 +1452,7 @@ impl GameBoy {
             }
             0xa6 => {
                 trace!("AND (HL)");
-                let value = self.memory.get(self.registers.get_hl() as usize);
+                let value = self.memory_read(self.registers.get_hl() as usize);
                 self.registers.f = self.registers.a.and(value);
             }
             0xe6 => {
@@ -1516,7 +1492,7 @@ impl GameBoy {
             }
             0xb6 => {
                 trace!("OR (HL)");
-                let value = self.memory.get(self.registers.get_hl() as usize);
+                let value = self.memory_read(self.registers.get_hl() as usize);
                 self.registers.f = self.registers.a.or(value);
             }
             0xf6 => {
@@ -1556,7 +1532,7 @@ impl GameBoy {
             }
             0xae => {
                 trace!("XOR (HL)");
-                let value = self.memory.get(self.registers.get_hl() as usize);
+                let value = self.memory_read(self.registers.get_hl() as usize);
                 self.registers.f = self.registers.a.xor(value);
             }
 
@@ -1599,7 +1575,7 @@ impl GameBoy {
             0xbe => {
                 trace!("CP (HL)");
                 let mem_loc = self.registers.get_hl() as usize;
-                self.registers.f = self.registers.a.cp(self.memory.get(mem_loc));
+                self.registers.f = self.registers.a.cp(self.memory_read(mem_loc));
             }
 
             0xfe => {
@@ -1922,9 +1898,9 @@ impl GameBoy {
             0x04 => self.registers.f = self.registers.h.rlc(),
             0x05 => self.registers.f = self.registers.l.rlc(),
             0x06 => {
-                let mut v = self.memory.get(self.registers.get_hl() as usize);
+                let mut v = self.memory_read(self.registers.get_hl() as usize);
                 self.registers.f = v.rlc();
-                self.memory.write(self.registers.get_hl() as usize, v);
+                self.memory_write(self.registers.get_hl() as usize, v);
             }
             0x07 => self.registers.f = self.registers.a.rlc(),
 
@@ -1936,9 +1912,9 @@ impl GameBoy {
             0x0c => self.registers.f = self.registers.h.rrc(),
             0x0d => self.registers.f = self.registers.l.rrc(),
             0x0e => {
-                let mut v = self.memory.get(self.registers.get_hl() as usize);
+                let mut v = self.memory_read(self.registers.get_hl() as usize);
                 self.registers.f = v.rrc();
-                self.memory.write(self.registers.get_hl() as usize, v);
+                self.memory_write(self.registers.get_hl() as usize, v);
             }
             0x0f => self.registers.f = self.registers.a.rrc(),
 
@@ -1950,9 +1926,9 @@ impl GameBoy {
             0x1c => Registers::rr(&mut self.registers.h, &mut self.registers.f),
             0x1d => Registers::rr(&mut self.registers.l, &mut self.registers.f),
             0x1e => {
-                let mut value = self.memory.get(self.registers.get_hl() as usize);
+                let mut value = self.memory_read(self.registers.get_hl() as usize);
                 Registers::rr(&mut value, &mut self.registers.f);
-                self.memory.write(self.registers.get_hl() as usize, value);
+                self.memory_write(self.registers.get_hl() as usize, value);
             }
             0x1f => Registers::rr(&mut self.registers.a, &mut self.registers.f),
 
@@ -1964,9 +1940,9 @@ impl GameBoy {
             0x14 => Registers::rl(&mut self.registers.h, &mut self.registers.f),
             0x15 => Registers::rl(&mut self.registers.l, &mut self.registers.f),
             0x16 => {
-                let mut value = self.memory.get(self.registers.get_hl() as usize);
+                let mut value = self.memory_read(self.registers.get_hl() as usize);
                 Registers::rl(&mut value, &mut self.registers.f);
-                self.memory.write(self.registers.get_hl() as usize, value);
+                self.memory_write(self.registers.get_hl() as usize, value);
             }
             0x17 => Registers::rl(&mut self.registers.a, &mut self.registers.f),
 
@@ -1978,9 +1954,9 @@ impl GameBoy {
             0x34 => self.registers.f = self.registers.h.swap(),
             0x35 => self.registers.f = self.registers.l.swap(),
             0x36 => {
-                let mut value = self.memory.get(self.registers.get_hl() as usize);
+                let mut value = self.memory_read(self.registers.get_hl() as usize);
                 self.registers.f = value.swap();
-                self.memory.write(self.registers.get_hl() as usize, value);
+                self.memory_write(self.registers.get_hl() as usize, value);
             }
             0x37 => self.registers.f = self.registers.a.swap(),
 
@@ -1992,9 +1968,9 @@ impl GameBoy {
             0x24 => self.registers.f = self.registers.h.sla(),
             0x25 => self.registers.f = self.registers.l.sla(),
             0x26 => {
-                let mut value = self.memory.get(self.registers.get_hl() as usize);
+                let mut value = self.memory_read(self.registers.get_hl() as usize);
                 self.registers.f = value.sla();
-                self.memory.write(self.registers.get_hl() as usize, value);
+                self.memory_write(self.registers.get_hl() as usize, value);
             }
             0x27 => self.registers.f = self.registers.a.sla(),
 
@@ -2006,9 +1982,9 @@ impl GameBoy {
             0x2c => self.registers.f = self.registers.h.sra(),
             0x2d => self.registers.f = self.registers.l.sra(),
             0x2e => {
-                let mut value = self.memory.get(self.registers.get_hl() as usize);
+                let mut value = self.memory_read(self.registers.get_hl() as usize);
                 self.registers.f = value.sra();
-                self.memory.write(self.registers.get_hl() as usize, value);
+                self.memory_write(self.registers.get_hl() as usize, value);
             }
             0x2f => self.registers.f = self.registers.a.sra(),
 
@@ -2020,9 +1996,9 @@ impl GameBoy {
             0x3c => self.registers.f = self.registers.h.srl(),
             0x3d => self.registers.f = self.registers.l.srl(),
             0x3e => {
-                let mut value = self.memory.get(self.registers.get_hl() as usize);
+                let mut value = self.memory_read(self.registers.get_hl() as usize);
                 self.registers.f = value.srl();
-                self.memory.write(self.registers.get_hl() as usize, value);
+                self.memory_write(self.registers.get_hl() as usize, value);
             }
             0x3f => self.registers.f = self.registers.a.srl(),
 
@@ -2093,44 +2069,44 @@ impl GameBoy {
             0xbd => self.registers.l.set_bit(7, false),
 
             0x86 => {
-                let mut value = self.memory.get(self.registers.get_hl() as usize);
+                let mut value = self.memory_read(self.registers.get_hl() as usize);
                 value.set_bit(0, false);
-                self.memory.write(self.registers.get_hl() as usize, value);
+                self.memory_write(self.registers.get_hl() as usize, value);
             }
             0x8e => {
-                let mut value = self.memory.get(self.registers.get_hl() as usize);
+                let mut value = self.memory_read(self.registers.get_hl() as usize);
                 value.set_bit(1, false);
-                self.memory.write(self.registers.get_hl() as usize, value);
+                self.memory_write(self.registers.get_hl() as usize, value);
             }
             0x96 => {
-                let mut value = self.memory.get(self.registers.get_hl() as usize);
+                let mut value = self.memory_read(self.registers.get_hl() as usize);
                 value.set_bit(2, false);
-                self.memory.write(self.registers.get_hl() as usize, value);
+                self.memory_write(self.registers.get_hl() as usize, value);
             }
             0x9e => {
-                let mut value = self.memory.get(self.registers.get_hl() as usize);
+                let mut value = self.memory_read(self.registers.get_hl() as usize);
                 value.set_bit(3, false);
-                self.memory.write(self.registers.get_hl() as usize, value);
+                self.memory_write(self.registers.get_hl() as usize, value);
             }
             0xa6 => {
-                let mut value = self.memory.get(self.registers.get_hl() as usize);
+                let mut value = self.memory_read(self.registers.get_hl() as usize);
                 value.set_bit(4, false);
-                self.memory.write(self.registers.get_hl() as usize, value);
+                self.memory_write(self.registers.get_hl() as usize, value);
             }
             0xae => {
-                let mut value = self.memory.get(self.registers.get_hl() as usize);
+                let mut value = self.memory_read(self.registers.get_hl() as usize);
                 value.set_bit(5, false);
-                self.memory.write(self.registers.get_hl() as usize, value);
+                self.memory_write(self.registers.get_hl() as usize, value);
             }
             0xb6 => {
-                let mut value = self.memory.get(self.registers.get_hl() as usize);
+                let mut value = self.memory_read(self.registers.get_hl() as usize);
                 value.set_bit(6, false);
-                self.memory.write(self.registers.get_hl() as usize, value);
+                self.memory_write(self.registers.get_hl() as usize, value);
             }
             0xbe => {
-                let mut value = self.memory.get(self.registers.get_hl() as usize);
+                let mut value = self.memory_read(self.registers.get_hl() as usize);
                 value.set_bit(7, false);
-                self.memory.write(self.registers.get_hl() as usize, value);
+                self.memory_write(self.registers.get_hl() as usize, value);
             }
 
             // SET
@@ -2198,44 +2174,44 @@ impl GameBoy {
             0xfc => self.registers.h.set_bit(7, true),
             0xfd => self.registers.l.set_bit(7, true),
             0xc6 => {
-                let mut value = self.memory.get(self.registers.get_hl() as usize);
+                let mut value = self.memory_read(self.registers.get_hl() as usize);
                 value.set_bit(0, true);
-                self.memory.write(self.registers.get_hl() as usize, value);
+                self.memory_write(self.registers.get_hl() as usize, value);
             }
             0xce => {
-                let mut value = self.memory.get(self.registers.get_hl() as usize);
+                let mut value = self.memory_read(self.registers.get_hl() as usize);
                 value.set_bit(1, true);
-                self.memory.write(self.registers.get_hl() as usize, value);
+                self.memory_write(self.registers.get_hl() as usize, value);
             }
             0xd6 => {
-                let mut value = self.memory.get(self.registers.get_hl() as usize);
+                let mut value = self.memory_read(self.registers.get_hl() as usize);
                 value.set_bit(2, true);
-                self.memory.write(self.registers.get_hl() as usize, value);
+                self.memory_write(self.registers.get_hl() as usize, value);
             }
             0xde => {
-                let mut value = self.memory.get(self.registers.get_hl() as usize);
+                let mut value = self.memory_read(self.registers.get_hl() as usize);
                 value.set_bit(3, true);
-                self.memory.write(self.registers.get_hl() as usize, value);
+                self.memory_write(self.registers.get_hl() as usize, value);
             }
             0xe6 => {
-                let mut value = self.memory.get(self.registers.get_hl() as usize);
+                let mut value = self.memory_read(self.registers.get_hl() as usize);
                 value.set_bit(4, true);
-                self.memory.write(self.registers.get_hl() as usize, value);
+                self.memory_write(self.registers.get_hl() as usize, value);
             }
             0xee => {
-                let mut value = self.memory.get(self.registers.get_hl() as usize);
+                let mut value = self.memory_read(self.registers.get_hl() as usize);
                 value.set_bit(5, true);
-                self.memory.write(self.registers.get_hl() as usize, value);
+                self.memory_write(self.registers.get_hl() as usize, value);
             }
             0xf6 => {
-                let mut value = self.memory.get(self.registers.get_hl() as usize);
+                let mut value = self.memory_read(self.registers.get_hl() as usize);
                 value.set_bit(6, true);
-                self.memory.write(self.registers.get_hl() as usize, value);
+                self.memory_write(self.registers.get_hl() as usize, value);
             }
             0xfe => {
-                let mut value = self.memory.get(self.registers.get_hl() as usize);
+                let mut value = self.memory_read(self.registers.get_hl() as usize);
                 value.set_bit(7, true);
-                self.memory.write(self.registers.get_hl() as usize, value);
+                self.memory_write(self.registers.get_hl() as usize, value);
             }
 
             // BIT b,r
@@ -2304,44 +2280,44 @@ impl GameBoy {
             0x7d => self.registers.f = self.registers.l.bit(7, self.registers.f),
 
             0x46 => {
-                let value = self.memory.get(self.registers.get_hl() as usize);
+                let value = self.memory_read(self.registers.get_hl() as usize);
                 self.registers.f = value.bit(0, self.registers.f);
-                self.memory.write(self.registers.get_hl() as usize, value);
+                self.memory_write(self.registers.get_hl() as usize, value);
             }
             0x4e => {
-                let value = self.memory.get(self.registers.get_hl() as usize);
+                let value = self.memory_read(self.registers.get_hl() as usize);
                 self.registers.f = value.bit(1, self.registers.f);
-                self.memory.write(self.registers.get_hl() as usize, value);
+                self.memory_write(self.registers.get_hl() as usize, value);
             }
             0x56 => {
-                let value = self.memory.get(self.registers.get_hl() as usize);
+                let value = self.memory_read(self.registers.get_hl() as usize);
                 self.registers.f = value.bit(2, self.registers.f);
-                self.memory.write(self.registers.get_hl() as usize, value);
+                self.memory_write(self.registers.get_hl() as usize, value);
             }
             0x5e => {
-                let value = self.memory.get(self.registers.get_hl() as usize);
+                let value = self.memory_read(self.registers.get_hl() as usize);
                 self.registers.f = value.bit(3, self.registers.f);
-                self.memory.write(self.registers.get_hl() as usize, value);
+                self.memory_write(self.registers.get_hl() as usize, value);
             }
             0x66 => {
-                let value = self.memory.get(self.registers.get_hl() as usize);
+                let value = self.memory_read(self.registers.get_hl() as usize);
                 self.registers.f = value.bit(4, self.registers.f);
-                self.memory.write(self.registers.get_hl() as usize, value);
+                self.memory_write(self.registers.get_hl() as usize, value);
             }
             0x6e => {
-                let value = self.memory.get(self.registers.get_hl() as usize);
+                let value = self.memory_read(self.registers.get_hl() as usize);
                 self.registers.f = value.bit(5, self.registers.f);
-                self.memory.write(self.registers.get_hl() as usize, value);
+                self.memory_write(self.registers.get_hl() as usize, value);
             }
             0x76 => {
-                let value = self.memory.get(self.registers.get_hl() as usize);
+                let value = self.memory_read(self.registers.get_hl() as usize);
                 self.registers.f = value.bit(6, self.registers.f);
-                self.memory.write(self.registers.get_hl() as usize, value);
+                self.memory_write(self.registers.get_hl() as usize, value);
             }
             0x7e => {
-                let value = self.memory.get(self.registers.get_hl() as usize);
+                let value = self.memory_read(self.registers.get_hl() as usize);
                 self.registers.f = value.bit(7, self.registers.f);
-                self.memory.write(self.registers.get_hl() as usize, value);
+                self.memory_write(self.registers.get_hl() as usize, value);
             }
 
             _ => {
@@ -2368,56 +2344,30 @@ fn main() {
         .target(env_logger::Target::Stdout)
         .init();
 
-    let result = load_rom();
+    let path = "PokemonRed.gb";
+    // let mut f = File::open("Adventure Island II - Aliens in Paradise (USA, Europe).gb")?;
 
-    let buffer = result.unwrap();
-    // match result {
-    //     Err(e) => panic!("Error: {}", e),
-    //     Ok(buffer)  => {
+    // Testsuites
+    // let mut f = File::open("test/01-special.gb")?;
+    // let mut f = File::open("test/02-interrupts.gb")?; // fails
+    // let mut f = File::open("test/03-op sp,hl.gb")?;
+    // let mut f = File::open("test/04-op r,imm.gb")?;
+    // let mut f = File::open("test/05-op rp.gb")?;
+    // let mut f = File::open("test/06-ld r,r.gb")?;
+    // let mut f = File::open("test/07-jr,jp,call,ret,rst.gb")?;
+    // let mut f = File::open("test/08-misc instrs.gb")?;
+    // let mut f = File::open("test/09-op r,r.gb")?;
+    // let mut f = File::open("test/10-bit ops.gb")?;
+    // let mut f = File::open("test/11-op a,(hl).gb")?;
 
-    //     }
-    // }
-    if buffer.len() < 0x150 {
-        panic!("Rom size to small");
-    }
-
-    let title = str::from_utf8(&buffer[0x134..0x142]).unwrap();
-
-    // println!("Title = {}", title);
-
-    info!("Type = {:#x}", buffer[0x143]);
-    info!("GB/SGB Indicator = {:#x}", buffer[0x146]);
-    let cartridge_type = buffer[0x147];
-    info!("Cartridge type = {:#x}", cartridge_type);
-    let rom_size = buffer[0x148];
-    info!("ROM size = {:#x}", rom_size);
-    let ram_size = buffer[0x149];
-    info!("RAM size = {:#x}", ram_size);
-    // if cartridge_type != 0x13 {
-    // panic!("Usupported Cartridge Type: {:#x}", cartridge_type);
-    // }
-
-    let expected_rom_size = 32 * (2u32.pow(rom_size as u32)) * 1024u32;
-
-    if buffer.len() as u32 != expected_rom_size {
-        panic!(
-            "Wrong length found. Expected {} - Found {}",
-            expected_rom_size,
-            buffer.len()
-        );
-    } else {
-        println!("ROM size Bytes = {}", expected_rom_size);
-    }
-
-    let external_ram = match ram_size {
-        0x03 => Some(vec![0; 32 * 1024]),
-        _ => panic!("not handled this ram size: {:#x}", ram_size),
-    };
-
-    let mut memory = Memory::default_with_rom(buffer);
-    memory.external_memory = external_ram;
+    // untested
+    // let mut f = File::open("test/instr_timing.gb")?;
+    // let mut f = File::open("test/interrupt_time.gb")?;
+    // let mut f = File::open("test/mem_timing_1.gb")?;
+    // let mut f = File::open("test/mem_timing_2.gb")?;
 
     let mut cpu = GameBoy {
+        cartridge: Cartridge::default(path),
         registers: Registers {
             // Classic
             pc: 0x100,
@@ -2431,7 +2381,7 @@ fn main() {
             e: 0xd8,
             h: 0x01,
         },
-        memory: memory,
+        memory: Memory::default(),
 
         ime: false,
         set_ei: false,

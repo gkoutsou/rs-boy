@@ -6,9 +6,6 @@ use log::{debug, info, trace};
 use crate::gpu;
 
 pub struct Memory {
-    rom: Vec<u8>,
-    rom_bank: u8,
-    // ram: &'a mut Vec<u8>,
     high_ram: Vec<u8>,
     work_ram: Vec<u8>,
 
@@ -24,18 +21,12 @@ pub struct Memory {
     pub interrupt_enable: u8,
 
     // Cartridge
-    cartridge_memory_enabled: bool,
-    pub external_memory: Option<Vec<u8>>,
-    pub external_memory_bank: u8,
-
     debug_counter: u8,
 }
 
 impl Memory {
     pub fn get(&self, location: usize) -> u8 {
-        if location <= 0x7fff {
-            self.get_rom(location)
-        } else if location <= 0xfffe && location >= 0xff80 {
+        if location <= 0xfffe && location >= 0xff80 {
             trace!("HRAM Read: {:#x}", location);
             self.high_ram[location - 0xff80]
         } else if location <= 0xdfff && location >= 0xc000 {
@@ -47,8 +38,6 @@ impl Memory {
         } else if location <= 0x9FFF && location >= 0x9800 {
             debug!("Reading Tile Map");
             self.tile_maps[location - 0x9800]
-        } else if location >= 0xa000 && location <= 0xbfff {
-            self.get_external_ram(location)
         } else if location <= 0xff77 && location >= 0xff00 {
             self.io_registers.get(location)
         } else if location == 0xffff {
@@ -61,40 +50,6 @@ impl Memory {
 
     pub fn write(&mut self, location: usize, value: u8) {
         match location {
-            0x0000..=0x1fff => self.cartridge_memory_enabled = value & 0x0f == 0x0a,
-            0x2000..=0x3fff => {
-                self.rom_bank = value & 0b11111;
-                if self.rom_bank == 0 {
-                    // todo 20, 40 etc also step
-                    self.rom_bank = 1;
-                }
-                debug!(
-                    "###### Changing to bank: {} (value: {})",
-                    self.rom_bank,
-                    value & 0b11111
-                );
-            }
-            0x4000..=0x5fff => {
-                if value <= 0x3 {
-                    info!("Changing to external bank: {}", self.external_memory_bank);
-                    self.external_memory_bank = value
-                } else {
-                    todo!("support RTC registers");
-                }
-            }
-            0xa000..=0xbfff => {
-                if !self.cartridge_memory_enabled {
-                    panic!("writing on cartridge when ram is disabled");
-                }
-                if self.external_memory.is_none() {
-                    panic!("no external memory defined");
-                }
-                let relative_loc = location - 0xa000;
-                let actual_loc = relative_loc + (self.external_memory_bank as usize) * 0x2000;
-                self.external_memory
-                    .as_mut()
-                    .expect("there should be some cartridge memory now..")[actual_loc];
-            }
             0xc000..=0xdfff => {
                 // in CGB mode, the 2nd 4k are rotatable
                 trace!("Writting to WRAM: {:#x}", location);
@@ -146,33 +101,6 @@ impl Memory {
         }
 
         // panic!("how can I write to ROM?! {:#x}:{:0b}", location, value)
-    }
-
-    fn get_external_ram(&self, location: usize) -> u8 {
-        let relative_loc = location - 0xA000;
-        let actual_loc = relative_loc + (self.external_memory_bank as usize) * 0x2000;
-        self.rom[actual_loc]
-    }
-
-    pub fn get_rom(&self, location: usize) -> u8 {
-        if location <= 0x3fff {
-            self.rom[location as usize]
-        } else if location <= 0x7fff && location >= 0x4000 {
-            let relative_loc = location - 0x4000;
-            let actual_loc = relative_loc + (self.rom_bank as usize) * 0x4000;
-            // println!(
-            // "Read from bank {} - location: {:#x}",
-            // self.rom_bank, actual_loc
-            // );
-            self.rom[actual_loc]
-        } else if location >= 0xff80 && location <= 0xfffe {
-            self.high_ram[location - 0xff80]
-        } else if location >= 0xc000 && location <= 0xDFFF {
-            // todo temporary to try test framework
-            self.work_ram[location - 0xc000]
-        } else {
-            panic!("not a rom location! {:#x}", location)
-        }
     }
 
     pub fn get_ffxx(&self, steps: usize) -> u8 {
@@ -234,11 +162,8 @@ impl Memory {
         (a, b)
     }
 
-    pub fn default_with_rom(buffer: Vec<u8>) -> Memory {
+    pub fn default() -> Memory {
         Memory {
-            rom: buffer,
-            rom_bank: 1,
-
             high_ram: vec![0; 0xfffe - 0xff80 + 1],
             work_ram: vec![0; 0xdfff - 0xc000 + 1], // 4+4 but half could be rotatable..
 
@@ -249,10 +174,6 @@ impl Memory {
             tile_data: vec![0; 0x97FF - 0x8000 + 1],
             tile_maps: vec![0; 0x9FFF - 0x9800 + 1],
             oam: vec![0; 0xFE9F - 0xFE00 + 1],
-
-            cartridge_memory_enabled: false,
-            external_memory: None,
-            external_memory_bank: 0,
 
             debug_counter: 0,
         }
