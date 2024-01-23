@@ -2368,19 +2368,7 @@ fn main() {
 
     let mut cpu = GameBoy {
         cartridge: Cartridge::default(path),
-        registers: Registers {
-            // Classic
-            pc: 0x100,
-            sp: 0xFFFE,
-            a: 0x01, // $01-GB/SGB, $FF-GBP, $11-GBC
-            l: 0x4d,
-            f: 0xB0,
-            b: 0x00,
-            c: 0x13,
-            d: 0x00,
-            e: 0xd8,
-            h: 0x01,
-        },
+        registers: Registers::default(),
         memory: Memory::default(),
 
         ime: false,

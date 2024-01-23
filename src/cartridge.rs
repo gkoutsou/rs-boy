@@ -18,12 +18,10 @@ pub struct Cartridge {
 
 impl Cartridge {
     pub fn get(&self, location: usize) -> u8 {
-        if location <= 0x7fff {
-            self.get_rom(location)
-        } else if location >= 0xa000 && location <= 0xbfff {
-            self.get_external_ram(location)
-        } else {
-            panic!("Unknown location: {:#x}", location)
+        match location {
+            0x000..=0x7fff => self.get_rom(location),
+            0xa000..=0xbfff => self.get_external_ram(location),
+            _ => panic!("Unknown location: {:#x}", location),
         }
     }
 
@@ -36,8 +34,11 @@ impl Cartridge {
                     // todo 20, 40 etc also step
                     self.rom_bank = 1;
                 }
+                if self.rom_bank == 20 || self.rom_bank == 40 {
+                    todo!("handle rom_banks")
+                }
                 debug!(
-                    "###### Changing to bank: {} (value: {})",
+                    "Changing to bank: {} (value: {})",
                     self.rom_bank,
                     value & 0b11111
                 );
@@ -88,14 +89,11 @@ impl Cartridge {
         self.rom[actual_loc]
     }
 
-    //todo move to cartridge?
     fn load_rom(file_path: &str) -> io::Result<Vec<u8>> {
         let mut f = File::open(file_path)?;
         let mut buffer = Vec::new();
 
-        // read the whole file
         f.read_to_end(&mut buffer)?;
-
         Ok(buffer)
     }
 
@@ -119,6 +117,7 @@ impl Cartridge {
         info!("ROM size = {:#x}", rom_size);
         let ram_size = buffer[0x149];
         info!("RAM size = {:#x}", ram_size);
+
         // if cartridge_type != 0x13 {
         // panic!("Usupported Cartridge Type: {:#x}", cartridge_type);
         // }
