@@ -2391,7 +2391,8 @@ fn main() {
     info!("Cartridge type = {:#x}", cartridge_type);
     let rom_size = buffer[0x148];
     info!("ROM size = {:#x}", rom_size);
-    info!("RAM size = {:#x}", buffer[0x149]);
+    let ram_size = buffer[0x149];
+    info!("RAM size = {:#x}", ram_size);
     // if cartridge_type != 0x13 {
     // panic!("Usupported Cartridge Type: {:#x}", cartridge_type);
     // }
@@ -2408,6 +2409,14 @@ fn main() {
         println!("ROM size Bytes = {}", expected_rom_size);
     }
 
+    let external_ram = match ram_size {
+        0x03 => Some(vec![0; 32 * 1024]),
+        _ => panic!("not handled this ram size: {:#x}", ram_size),
+    };
+
+    let mut memory = Memory::default_with_rom(buffer);
+    memory.external_memory = external_ram;
+
     let mut cpu = GameBoy {
         registers: Registers {
             // Classic
@@ -2422,7 +2431,7 @@ fn main() {
             e: 0xd8,
             h: 0x01,
         },
-        memory: Memory::default_with_rom(buffer),
+        memory: memory,
 
         ime: false,
         set_ei: false,
