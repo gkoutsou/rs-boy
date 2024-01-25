@@ -264,10 +264,10 @@ impl GameBoy {
 
         for x in 0..20u8 {
             let tile_id = self.get_tile(x, line);
+            let baseline = self.get_tile_data_baseline(tile_id);
+            let row = line as usize % 8;
 
-            let tdl = self.get_tile_data_baseline(tile_id);
-
-            let (byte1, byte2) = self.memory.get_tile_data(tdl, tile_id, line as usize % 8);
+            let (byte1, byte2) = self.memory.get_tile_data(baseline, tile_id, row);
 
             self.display.draw_tile(x * 8, line, byte1, byte2, false);
         }
@@ -341,55 +341,18 @@ impl GameBoy {
             .get(tilemap + tile_y as usize / 8 * 32 + tile_x as usize)
     }
 
-    /// This step determines which background/window tile to fetch pixels from.
-    /// By default the tilemap used is the one at $9800 but certain conditions can change that.
-    ///
-    /// When LCDC.3 is enabled and the X coordinate of the current scanline is not inside the
-    // window then tilemap $9C00 is used.
-    ///
-    /// When LCDC.6 is enabled and the X coordinate of the current scanline is inside the window
-    //then tilemap $9C00 is used.
-    fn get_tile_map_baseline(&self) -> usize {
-        if self
-            .memory
-            .io_registers
-            .has_lcd_flag(gpu::LcdStatusFlag::BGTileMapArea)
-        {
-            return 0x9c00;
-        }
-
-        return 0x9800;
-    }
-
-    /// When it’s clear (0), the $9800 tilemap is used, otherwise it’s the $9C00 one.
-    fn get_window_tile_map_baseline(&self) -> usize {
-        if self
-            .memory
-            .io_registers
-            .has_lcd_flag(gpu::LcdStatusFlag::WindowTileMapArea)
-        {
-            return 0x9c00;
-        }
-
-        return 0x9800;
-    }
-
     /// For window/background only
-    /// 0 = 8800–97FF; 1 = 8000–8FFF
     fn get_tile_data_baseline(&self, tile_id: u8) -> usize {
-        let tiledata_location = if !self
+        if self
             .memory
             .io_registers
             .has_lcd_flag(gpu::LcdStatusFlag::TileDataArea)
         {
-            0x8800
-        } else {
-            0x8000
-        };
+            return 0x8000;
+        }
 
-        if tiledata_location == 0x8000 {
-            tiledata_location
-        } else if tile_id < 128 {
+        // 0x9000 base operation
+        if tile_id < 128 {
             0x9000 // id 0
         } else {
             0x8000 // 8800 has id 128
