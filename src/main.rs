@@ -197,7 +197,7 @@ impl GameBoy {
                 if self.cpu_cycles >= 172 {
                     self.display.wipe_line(line);
                     self.draw_background();
-                    self.draw_sprites(line);
+                    // self.draw_sprites(line);
 
                     self.display.refresh_buffer();
 
@@ -233,7 +233,7 @@ impl GameBoy {
                 println!("line: {} tile.y: {}", line, tile.y);
                 let (byte1, byte2) = self.memory.get_tile_data(
                     0x8000,
-                    index as usize,
+                    index,
                     (16 + line as usize - tile.y as usize) % 8,
                 ); // todo double size
 
@@ -261,94 +261,84 @@ impl GameBoy {
             self.display.wipe_screen();
             return;
         }
-        let bottom = self.memory.io_registers.scy.wrapping_add(143); // ) % 256;
-        let right = self.memory.io_registers.scx.wrapping_add(159); // % 256;
 
-        let tilemap_location = self.get_tile_map_baseline();
-        let w_tilemap_location = self.get_window_tile_map_baseline();
+        for x in 0..20u8 {
+            let tile_id = self.get_tile(x, line);
 
-        // if self.memory.io_registers.scy != 0 {
-        //     panic!("scy!")
-        // }
+            let tdl = self.get_tile_data_baseline(tile_id);
+
+            let (byte1, byte2) = self.memory.get_tile_data(tdl, tile_id, line as usize % 8);
+
+            self.display.draw_tile(x * 8, line, byte1, byte2, false);
+        }
+    }
+
+    fn in_window(&self, x: u8, y: u8) -> bool {
+        if !self
+            .memory
+            .io_registers
+            .has_lcd_flag(gpu::LcdStatusFlag::WindowEnabled)
+        {
+            return false;
+        }
 
         let wx = self.memory.io_registers.wx;
         let wy = self.memory.io_registers.wy;
-        for x in 0..20u8 {
-            // Window
-            if self
+        if x == 0 {
+            println!(
+                "wx: {} wy: {} x: {} y: {} -> {}",
+                wx,
+                wy,
+                x,
+                y,
+                wx <= x * 8 + 7 && wy <= y
+            );
+        }
+        wx <= x * 8 + 7 && wy <= y
+    }
+
+    fn get_tile(&self, x: u8, y: u8) -> u8 {
+        let mut tilemap = 0x9800;
+        let in_window = self.in_window(x, y);
+
+        // When LCDC.3 is enabled and the X coordinate of the current scanline is not inside the window then tilemap $9C00 is used.
+        if !in_window
+            && self
                 .memory
                 .io_registers
-                .has_lcd_flag(gpu::LcdStatusFlag::WindowEnabled)
-                && wy <= line
-                && wx < x + 7
-            // todo this have issue if hiding half tile
-            {
-                // panic!("overlapping window!");
-                let tiley = line - wy;
-                let tilex = x * 8 - wx + 7; // todo half-tile
-                trace!(
-                    "wx:{} wy:{} line:{} tilex:{} tiley:{}",
-                    wx,
-                    wy,
-                    line,
-                    tilex,
-                    tiley
-                );
-                debug!(
-                    "bl {:#x}, rest: {}",
-                    w_tilemap_location,
-                    tiley as usize / 8 * 32
-                );
-
-                let tile_id = self
-                    .memory
-                    .get(w_tilemap_location + tiley as usize / 8 * 32 + tilex as usize / 8) // todo ignoring wx..
-                    as usize; // todo yolo
-
-                let tdl = self.get_tile_data_baseline(tile_id);
-
-                if tile_id != 0 {
-                    // println!("ID not 0! {}", tile_id);
-                    trace!("{:#x} - tile {} - row {}", tdl, tile_id, tiley as usize % 8)
-                }
-                let (byte1, byte2) = self.memory.get_tile_data(tdl, tile_id, tiley as usize % 8); // todo yolo
-                trace!("bytes: {} - {}", byte1, byte2);
-
-                // if byte1 != 0 && byte2 != 0 {
-                self.display.draw_tile(x * 8, line, byte1, byte2, false);
-                // }
-            }
+                .has_lcd_flag(gpu::LcdStatusFlag::BGTileMapArea)
+        {
+            tilemap = 0x9c00;
         }
 
-        let tiley = (line as usize + self.memory.io_registers.scy as usize) % 256;
-
-        // debug!("Tiley: {}", tiley);
-
-        // draw background
-        for x in 0..20u8 {
-            let tilex = (self.memory.io_registers.scx as usize + (x * 8) as usize) % 256;
-            let tile_id = self
+        // When LCDC.6 is enabled and the X coordinate of the current scanline is inside the window then tilemap $9C00 is used.
+        if in_window
+            && self
                 .memory
-                .get(tilemap_location + tiley / 8 * 32 + tilex as usize / 8)
-                as usize;
-            let tiledata_location = self.get_tile_data_baseline(tile_id);
-            // let tile = self.memory.get(tiledata_location + tile_id as usize);
-            let (byte1, byte2) = self
-                .memory
-                .get_tile_data(tiledata_location, tile_id, tiley % 8);
-            if byte1 != 0 && byte2 != 0 {
-                trace!(
-                    "{:#x} - tile {} - row {} - {:#x} {:#x}",
-                    tiledata_location,
-                    tile_id,
-                    tiley as usize % 8,
-                    byte1,
-                    byte2
-                );
-                // panic!("TileData {:#x} {:#x}", byte1, byte2);
-                self.display.draw_tile(x * 8, line, byte1, byte2, false);
-            }
+                .io_registers
+                .has_lcd_flag(gpu::LcdStatusFlag::WindowTileMapArea)
+        {
+            tilemap = 0x9c00;
         }
+
+        // If the current tile is a window tile, the X coordinate for the window tile is used, otherwise the
+        // following formula is used to calculate the X coordinate: ((SCX / 8) + fetcher’s X coordinate) & $1F.
+        // Because of this formula, fetcherX can be between 0 and 31.
+
+        // If the current tile is a window tile, the Y coordinate for the window tile is used, otherwise the following
+        // formula is used to calculate the Y coordinate: (currentScanline + SCY) & 255. Because of this formula, fetcherY
+        //can be between 0 and 255.
+        let (tile_x, tile_y) = if in_window {
+            (x, y)
+        } else {
+            (
+                ((self.memory.io_registers.scx / 8) + x) & 0x1F,
+                (y + self.memory.io_registers.scy) & 255,
+            )
+        };
+
+        self.memory
+            .get(tilemap + tile_y as usize / 8 * 32 + tile_x as usize)
     }
 
     /// This step determines which background/window tile to fetch pixels from.
@@ -386,7 +376,7 @@ impl GameBoy {
 
     /// For window/background only
     /// 0 = 8800–97FF; 1 = 8000–8FFF
-    fn get_tile_data_baseline(&self, tile_id: usize) -> usize {
+    fn get_tile_data_baseline(&self, tile_id: u8) -> usize {
         let tiledata_location = if !self
             .memory
             .io_registers

@@ -156,7 +156,8 @@ impl Memory {
         gpu::Tile::new(y, x, tile_index, flags)
     }
 
-    pub fn get_tile_data(&self, baseline: usize, id: usize, row: usize) -> (u8, u8) {
+    pub fn get_tile_data(&self, baseline: usize, id: u8, row: usize) -> (u8, u8) {
+        let id = id as usize;
         let a = self.tile_data[baseline - 0x8000 + id * 16 + row * 2];
         let b = self.tile_data[baseline - 0x8000 + id * 16 + row * 2 + 1];
         (a, b)
