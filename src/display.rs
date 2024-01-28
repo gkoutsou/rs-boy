@@ -75,8 +75,8 @@ impl Display {
             });
 
         // Limit to max ~60 fps update rate
-        window.limit_update_rate(Some(std::time::Duration::from_nanos(119714)));
-        // window.limit_update_rate(None);
+        // window.limit_update_rate(Some(std::time::Duration::from_nanos(119714)));
+        window.limit_update_rate(None);
 
         Display {
             screen: screen_buffer,

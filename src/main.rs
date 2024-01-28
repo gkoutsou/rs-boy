@@ -84,7 +84,7 @@ impl GameBoy {
             self.ime = false;
             self.memory.io_registers.interrupt_flag &= 0b11111110;
             self.push_stack(self.registers.pc);
-            info!("VBlank Interrupt Handler from: {:#x}", self.registers.pc);
+            debug!("VBlank Interrupt Handler from: {:#x}", self.registers.pc);
             self.registers.set_pc(0x40);
             self.halt = false;
             // self.memory.dump_tile_data();
@@ -196,7 +196,7 @@ impl GameBoy {
 
                 if self.cpu_cycles >= 172 {
                     self.display.wipe_line(line);
-                    self.draw_background();
+                    // self.draw_background();
                     self.draw_sprites(line);
 
                     self.display.refresh_buffer();
@@ -290,7 +290,7 @@ impl GameBoy {
         let wx = self.memory.io_registers.wx;
         let wy = self.memory.io_registers.wy;
         if x == 0 {
-            println!(
+            trace!(
                 "wx: {} wy: {} x: {} y: {} -> {}",
                 wx,
                 wy,
@@ -336,9 +336,10 @@ impl GameBoy {
         let (tile_x, tile_y) = if in_window {
             (x, y)
         } else {
+            // println!("{} = {}", y, self.memory.io_registers.scy);
             (
                 ((self.memory.io_registers.scx / 8) + x) & 0x1F,
-                (y + self.memory.io_registers.scy) & 255,
+                y.wrapping_add(self.memory.io_registers.scy) & 255, // todo is %255 useless?
             )
         };
 
@@ -2303,26 +2304,26 @@ fn main() {
         .init();
 
     let path = "PokemonRed.gb";
-    // let mut f = File::open("Adventure Island II - Aliens in Paradise (USA, Europe).gb")?;
+    let path = "Adventure Island II - Aliens in Paradise (USA, Europe).gb";
 
     // Testsuites
-    // let mut f = File::open("test/01-special.gb")?;
-    // let mut f = File::open("test/02-interrupts.gb")?; // fails
-    // let mut f = File::open("test/03-op sp,hl.gb")?;
-    // let mut f = File::open("test/04-op r,imm.gb")?;
-    // let mut f = File::open("test/05-op rp.gb")?;
-    // let mut f = File::open("test/06-ld r,r.gb")?;
-    // let mut f = File::open("test/07-jr,jp,call,ret,rst.gb")?;
-    // let mut f = File::open("test/08-misc instrs.gb")?;
-    // let mut f = File::open("test/09-op r,r.gb")?;
-    // let mut f = File::open("test/10-bit ops.gb")?;
-    // let mut f = File::open("test/11-op a,(hl).gb")?;
+    // let path = "test/01-special.gb";
+    // let path = "test/02-interrupts.gb"; // fails
+    // let path = "test/03-op sp,hl.gb";
+    // let path = "test/04-op r,imm.gb";
+    // let path = "test/05-op rp.gb";
+    // let path = "test/06-ld r,r.gb";
+    // let path = "test/07-jr,jp,call,ret,rst.gb";
+    // let path = "test/08-misc instrs.gb";
+    // let path = "test/09-op r,r.gb";
+    // let path = "test/10-bit ops.gb";
+    // let path = "test/11-op a,(hl).gb";
 
     // untested
-    // let mut f = File::open("test/instr_timing.gb")?;
-    // let mut f = File::open("test/interrupt_time.gb")?;
-    // let mut f = File::open("test/mem_timing_1.gb")?;
-    // let mut f = File::open("test/mem_timing_2.gb")?;
+    // let path = "test/instr_timing.gb";
+    // let path = ("test/interrupt_time.gb");
+    // let path = ("test/mem_timing_1.gb");
+    // let path = ("test/mem_timing_2.gb");
 
     let mut cpu = GameBoy {
         cartridge: Cartridge::default(path),

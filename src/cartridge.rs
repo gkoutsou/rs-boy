@@ -27,7 +27,11 @@ impl Cartridge {
 
     pub fn write(&mut self, location: usize, value: u8) {
         match location {
-            0x0000..=0x1fff => self.cartridge_memory_enabled = value & 0x0f == 0x0a,
+            0x0000..=0x1fff => {
+                info!("Setting external ram: {}", value & 0x0f == 0x0a);
+                self.cartridge_memory_enabled = value & 0x0f == 0x0a
+            }
+
             0x2000..=0x3fff => {
                 self.rom_bank = value & 0b11111;
                 if self.rom_bank == 0 {
@@ -45,7 +49,7 @@ impl Cartridge {
             }
             0x4000..=0x5fff => {
                 if value <= 0x3 {
-                    info!("Changing to external bank: {}", self.external_memory_bank);
+                    info!("Changing to memory bank: {}", self.external_memory_bank);
                     self.external_memory_bank = value
                 } else {
                     todo!("support RTC registers");
