@@ -21,7 +21,15 @@ impl Display {
         }
     }
 
-    pub fn draw_tile(&mut self, x: u8, y: u8, lsb_byte: u8, msb_byte: u8, is_sprite: bool) {
+    pub fn draw_tile(
+        &mut self,
+        x: u8,
+        y: u8,
+        lsb_byte: u8,
+        msb_byte: u8,
+        palette: u8,
+        is_sprite: bool,
+    ) {
         if is_sprite {
             println!("DRAWING: ({},{}) {:#x} {:#x}", x, y, lsb_byte, msb_byte)
         }
@@ -36,15 +44,8 @@ impl Display {
                 continue;
             }
 
-            let color = if color_code == 1 {
-                0xCDC392
-            } else if color_code == 2 {
-                0xE8E5DA
-            } else if color_code == 3 {
-                0x9EB7E5
-            } else {
-                0xffffff
-            };
+            let color_code = use_palette(palette, color_code);
+            let color = get_color(color_code);
             if is_sprite {
                 println!(
                     "({}, {}) Color: {:#x} All: {:#x}",
@@ -92,4 +93,26 @@ impl Display {
             panic!("window deado")
         }
     }
+}
+
+fn get_color(color_code: u8) -> u32 {
+    let color = if color_code == 0 {
+        0xffffff // white
+    } else if color_code == 1 {
+        0xa9a9a9 // light gray
+    } else if color_code == 2 {
+        0x545454 // dark gray
+    } else {
+        0x000000 // black
+    };
+    color
+}
+
+pub fn use_palette(palette: u8, id: u8) -> u8 {
+    let bit = 1 << (id * 2);
+    let l = ((palette & bit) != 0) as u8;
+    let m = ((palette & (bit << 1)) != 0) as u8;
+    let color_id = m << 1 | l;
+
+    return color_id;
 }

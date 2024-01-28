@@ -70,9 +70,9 @@ pub struct IORegisters {
     /// ff45
     lyc: u8,
     /// FF47
-    bgp: u8,
+    pub bgp: u8,
     /// FF48
-    obp0: u8,
+    pub obp0: u8,
     /// FF49
     obp1: u8,
     /// ff4a

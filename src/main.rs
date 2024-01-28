@@ -197,7 +197,7 @@ impl GameBoy {
                 if self.cpu_cycles >= 172 {
                     self.display.wipe_line(line);
                     self.draw_background();
-                    // self.draw_sprites(line);
+                    self.draw_sprites(line);
 
                     self.display.refresh_buffer();
 
@@ -237,7 +237,10 @@ impl GameBoy {
                     (16 + line as usize - tile.y as usize) % 8,
                 ); // todo double size
 
-                self.display.draw_tile(tile.x, line, byte1, byte2, true);
+                // todo palette
+                let palette = self.memory.io_registers.obp0;
+                self.display
+                    .draw_tile(tile.x, line, byte1, byte2, palette, true);
                 if object_counter > 10 {
                     todo!("too many sprites on the line. Is it a bug?")
                     //     println!("sleeping");
@@ -268,8 +271,10 @@ impl GameBoy {
             let row = line as usize % 8;
 
             let (byte1, byte2) = self.memory.get_tile_data(baseline, tile_id, row);
+            let palette = self.memory.io_registers.bgp;
 
-            self.display.draw_tile(x * 8, line, byte1, byte2, false);
+            self.display
+                .draw_tile(x * 8, line, byte1, byte2, palette, false);
         }
     }
 
