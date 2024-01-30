@@ -196,8 +196,8 @@ impl GameBoy {
 
                 if self.cpu_cycles >= 172 {
                     self.display.wipe_line(line);
-                    // self.draw_background();
-                    self.draw_sprites(line);
+                    self.draw_background();
+                    // self.draw_sprites(line);
 
                     self.display.refresh_buffer();
 
@@ -231,7 +231,7 @@ impl GameBoy {
                 };
 
                 println!("line: {} tile.y: {}", line, tile.y);
-                let (byte1, byte2) = self.memory.get_tile_data(
+                let tile_data = self.memory.get_tile_data(
                     0x8000,
                     index,
                     (16 + line as usize - tile.y as usize) % 8,
@@ -240,7 +240,7 @@ impl GameBoy {
                 // todo palette
                 let palette = self.memory.io_registers.obp0;
                 self.display
-                    .draw_tile(tile.x, line, byte1, byte2, palette, true);
+                    .draw_tile(tile.x, line, tile_data, palette, true);
                 if object_counter > 10 {
                     todo!("too many sprites on the line. Is it a bug?")
                     //     println!("sleeping");
@@ -270,11 +270,11 @@ impl GameBoy {
             let baseline = self.get_tile_data_baseline(tile_id);
             let row = line as usize % 8;
 
-            let (byte1, byte2) = self.memory.get_tile_data(baseline, tile_id, row);
+            let tile_data = self.memory.get_tile_data(baseline, tile_id, row);
             let palette = self.memory.io_registers.bgp;
 
             self.display
-                .draw_tile(x * 8, line, byte1, byte2, palette, false);
+                .draw_tile(x * 8, line, tile_data, palette, false);
         }
     }
 
@@ -2304,7 +2304,7 @@ fn main() {
         .init();
 
     let path = "PokemonRed.gb";
-    let path = "Adventure Island II - Aliens in Paradise (USA, Europe).gb";
+    // let path = "Adventure Island II - Aliens in Paradise (USA, Europe).gb";
 
     // Testsuites
     // let path = "test/01-special.gb";
@@ -2324,6 +2324,7 @@ fn main() {
     // let path = ("test/interrupt_time.gb");
     // let path = ("test/mem_timing_1.gb");
     // let path = ("test/mem_timing_2.gb");
+    // let path = "test/Acid2 Test for Game Boy.gb";
 
     let mut cpu = GameBoy {
         cartridge: Cartridge::default(path),

@@ -21,22 +21,17 @@ impl Display {
         }
     }
 
-    pub fn draw_tile(
-        &mut self,
-        x: u8,
-        y: u8,
-        lsb_byte: u8,
-        msb_byte: u8,
-        palette: u8,
-        is_sprite: bool,
-    ) {
+    pub fn draw_tile(&mut self, x: u8, y: u8, tile_data: (u8, u8), palette: u8, is_sprite: bool) {
         if is_sprite {
-            println!("DRAWING: ({},{}) {:#x} {:#x}", x, y, lsb_byte, msb_byte)
+            println!(
+                "DRAWING: ({},{}) {:#x} {:#x}",
+                x, y, tile_data.0, tile_data.1
+            )
         }
         for pixel in (0..8).rev() {
             let x = x + 7 - pixel;
-            let lsb = lsb_byte & (1 << pixel) > 0;
-            let msb = msb_byte & (1 << pixel) > 0;
+            let lsb = tile_data.0 & (1 << pixel) > 0;
+            let msb = tile_data.1 & (1 << pixel) > 0;
 
             let color_code = (msb as u8) << 1 | lsb as u8;
             if is_sprite && color_code == 0 {
