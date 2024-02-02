@@ -103,16 +103,6 @@ impl Memory {
         // panic!("how can I write to ROM?! {:#x}:{:0b}", location, value)
     }
 
-    pub fn get_ffxx(&self, steps: usize) -> u8 {
-        let location = 0xff00 + steps as usize;
-        self.get(location)
-    }
-
-    pub fn write_ffxx(&mut self, steps: u8, value: u8) {
-        let location = 0xff00 + steps as usize;
-        self.write(location, value);
-    }
-
     pub fn dump_tile_data(&self) {
         // println!("DUMPING TILE DATA");
         // for tile in 0..384 {

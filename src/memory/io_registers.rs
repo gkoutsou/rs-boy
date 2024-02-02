@@ -10,9 +10,6 @@ pub struct IORegisters {
     // pub scanline: u8,
     pub interrupt_flag: u8,
 
-    /// ff00
-    joypad: u8,
-
     /// ff01
     serial_transfer_data: u8,
     /// ff02
@@ -84,15 +81,6 @@ pub struct IORegisters {
 impl IORegisters {
     pub fn get(&self, location: usize) -> u8 {
         match location {
-            0xff00 => {
-                // If neither buttons nor d-pad is selected ($30 was written), then the low nibble
-                // reads $F (all buttons released).
-                if self.joypad == 0x30 {
-                    self.joypad | 0xf
-                } else {
-                    self.joypad
-                }
-            }
             0xff01 => self.serial_transfer_data,
             0xff02 => self.serial_transfer_control,
             0xFF04 => self.div,
@@ -125,7 +113,6 @@ impl IORegisters {
     pub fn write(&mut self, location: usize, value: u8) {
         trace!("Writting to I/O Register: {:#x}: {:#b}", location, value);
         match location {
-            0xff00 => self.joypad = value,
             0xff01 => self.serial_transfer_data = value,
             0xff02 => self.serial_transfer_control = value,
             0xFF04 => self.div = value,
@@ -184,7 +171,6 @@ impl IORegisters {
 
     pub fn default() -> IORegisters {
         IORegisters {
-            joypad: 0,
             // scanline: 0,
             interrupt_flag: 0,
             lcd_control: 0x91,

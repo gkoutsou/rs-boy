@@ -1,5 +1,5 @@
 use log::trace;
-use minifb::{Key, Window, WindowOptions};
+use minifb::{Key, KeyRepeat, Window, WindowOptions};
 
 const WIDTH: usize = 160;
 const HEIGHT: usize = 144;
@@ -70,8 +70,8 @@ impl Display {
             });
 
         // Limit to max ~60 fps update rate
-        // window.limit_update_rate(Some(std::time::Duration::from_nanos(119714)));
-        window.limit_update_rate(None);
+        window.limit_update_rate(Some(std::time::Duration::from_micros(16666)));
+        // window.limit_update_rate(None);
 
         Display {
             screen: screen_buffer,
@@ -87,6 +87,10 @@ impl Display {
         } else {
             panic!("window deado")
         }
+    }
+
+    pub fn get_pressed_keys(&self) -> Vec<minifb::Key> {
+        self.window.get_keys_pressed(KeyRepeat::Yes)
     }
 }
 

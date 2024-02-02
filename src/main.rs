@@ -1,19 +1,20 @@
 use std::{thread, time};
 
 mod cartridge;
+mod controls;
 mod cpu_ops;
 mod display;
+mod gpu;
+mod memory;
 mod registers;
-pub use cartridge::Cartridge;
+use cartridge::Cartridge;
+use controls::Joypad;
 use cpu_ops::CpuFlag;
-pub use display::Display;
+use display::Display;
 use env_logger::Env;
 use log::{debug, info, trace};
-pub use registers::Registers;
-mod gpu;
-// pub use gpu::GPU;
-mod memory;
-pub use memory::Memory;
+use memory::Memory;
+use registers::Registers;
 
 use crate::registers::RegisterOperation;
 
@@ -30,6 +31,7 @@ fn u8s_to_u16(ls: u8, hs: u8) -> u16 {
 struct GameBoy {
     cartridge: Cartridge,
     display: Display,
+    joypad: Joypad,
     registers: Registers,
     memory: Memory,
 
@@ -54,6 +56,9 @@ impl GameBoy {
             return;
             // todo should an interrupt still run gpu?
         }
+
+        let keys = self.display.get_pressed_keys();
+        self.joypad.key_pressed(keys);
 
         if !self.halt {
             self.cpu_step();
@@ -179,6 +184,9 @@ impl GameBoy {
                     if self.memory.io_registers.ly == 144 {
                         //todo should this be 143?
                         self.memory.io_registers.enable_video_interrupt();
+
+                        self.display.refresh_buffer();
+
                         self.set_gpu_mode(gpu::Mode::One);
                     } else {
                         self.set_gpu_mode(gpu::Mode::Two);
@@ -198,8 +206,6 @@ impl GameBoy {
                     self.display.wipe_line(line);
                     self.draw_background();
                     // self.draw_sprites(line);
-
-                    self.display.refresh_buffer();
 
                     self.set_gpu_mode(gpu::Mode::Zero);
                     self.cpu_cycles -= 172;
@@ -365,11 +371,23 @@ impl GameBoy {
         }
     }
 
+    pub fn get_ffxx(&self, steps: usize) -> u8 {
+        let location = 0xff00 + steps as usize;
+        self.memory_read(location)
+    }
+
+    pub fn write_ffxx(&mut self, steps: u8, value: u8) {
+        let location = 0xff00 + steps as usize;
+        self.memory_write(location, value);
+    }
+
     pub fn memory_read(&self, location: usize) -> u8 {
         match location {
             0x0000..=0x7FFF => self.cartridge.get(location),
 
             0xA000..=0xBFFF => self.cartridge.get(location),
+
+            controls::REGISTER_LOCATION => self.joypad.get(location),
 
             _ => self.memory.get(location),
         }
@@ -379,6 +397,8 @@ impl GameBoy {
             0x0000..=0x7FFF => self.cartridge.write(location, value),
 
             0xA000..=0xBFFF => self.cartridge.write(location, value),
+
+            controls::REGISTER_LOCATION => self.joypad.write(location, value),
 
             _ => self.memory.write(location, value),
         }
@@ -608,7 +628,7 @@ impl GameBoy {
             0xf0 => {
                 let steps = self.get_u8();
                 trace!("LDH A,(n) --> {}", steps);
-                self.registers.a = self.memory.get_ffxx(steps as usize);
+                self.registers.a = self.get_ffxx(steps as usize);
             }
 
             // LDI (HL), A
@@ -980,13 +1000,13 @@ impl GameBoy {
             // LD A, (C)
             0xf2 => {
                 trace!("LD A, (C)");
-                self.registers.a = self.memory.get_ffxx(self.registers.c as usize);
+                self.registers.a = self.get_ffxx(self.registers.c as usize);
             }
 
             // LD (C), A
             0xe2 => {
                 trace!("LD (C), A");
-                self.memory.write_ffxx(self.registers.c, self.registers.a);
+                self.write_ffxx(self.registers.c, self.registers.a);
             }
 
             // ADD
@@ -2330,6 +2350,7 @@ fn main() {
         cartridge: Cartridge::default(path),
         registers: Registers::default(),
         memory: Memory::default(),
+        joypad: Joypad::default(),
 
         ime: false,
         set_ei: false,
