@@ -57,9 +57,6 @@ impl GameBoy {
             // todo should an interrupt still run gpu?
         }
 
-        let keys = self.display.get_pressed_keys();
-        self.joypad.key_pressed(keys);
-
         if !self.halt {
             self.cpu_step();
         } else {
@@ -187,6 +184,9 @@ impl GameBoy {
 
                         self.display.refresh_buffer();
 
+                        let keys = self.display.get_pressed_keys();
+                        self.joypad.key_pressed(keys);
+
                         self.set_gpu_mode(gpu::Mode::One);
                     } else {
                         self.set_gpu_mode(gpu::Mode::Two);
@@ -205,7 +205,7 @@ impl GameBoy {
                 if self.cpu_cycles >= 172 {
                     self.display.wipe_line(line);
                     self.draw_background();
-                    // self.draw_sprites(line);
+                    self.draw_sprites(line);
 
                     self.set_gpu_mode(gpu::Mode::Zero);
                     self.cpu_cycles -= 172;
@@ -248,7 +248,7 @@ impl GameBoy {
                 self.display
                     .draw_tile(tile.x, line, tile_data, palette, true);
                 if object_counter > 10 {
-                    todo!("too many sprites on the line. Is it a bug?")
+                    info!("too many sprites on the line. Is it a bug?")
                     //     println!("sleeping");
                     //     let ten_millis = time::Duration::from_secs(1);
                     //     thread::sleep(ten_millis);
