@@ -152,14 +152,6 @@ impl Memory {
         let b = self.tile_data[baseline - 0x8000 + id * 16 + row * 2 + 1];
         (a, b)
     }
-    pub fn get_tile_data2(&self, baseline: usize, id: i8, row: usize) -> (u8, u8) {
-        let b = (baseline - 0x8000) as isize;
-        let row = row as isize;
-        let id = id as isize;
-        let a = self.tile_data[(b + id * 16 as isize + row * 2) as usize];
-        let b = self.tile_data[(b + id * 16 as isize + row * 2 + 1) as usize];
-        (a, b)
-    }
 
     pub fn default() -> Memory {
         Memory {

@@ -205,7 +205,7 @@ impl GameBoy {
                 if self.cpu_cycles >= 172 {
                     self.display.wipe_line(line);
                     self.draw_background();
-                    self.draw_sprites(line);
+                    // self.draw_sprites(line);
 
                     self.set_gpu_mode(gpu::Mode::Zero);
                     self.cpu_cycles -= 172;
@@ -271,16 +271,49 @@ impl GameBoy {
             return;
         }
 
-        for x in 0..20u8 {
-            let tile_id = self.get_tile(x, line);
-            let baseline = self.get_tile_data_baseline(tile_id);
-            let row = line as usize % 8;
+        let wx = self.memory.io_registers.wx;
+        let wy = self.memory.io_registers.wy;
+        let in_window = self
+            .memory
+            .io_registers
+            .has_lcd_flag(gpu::LcdStatusFlag::WindowEnabled)
+            && line >= wy;
 
-            let tile_data = self.memory.get_tile_data(baseline, tile_id, row);
+        let y_pos = if !in_window {
+            self.memory.io_registers.scy + line
+        } else {
+            line - wy
+        };
+
+        // which of the 8 vertical pixels of the current
+        // tile is the scanline on?
+        let tile_row = y_pos / 8;
+
+        let tile_map = self.get_tile_map(in_window);
+
+        for x in 0..160u8 {
+            // translate the current x pos to window space if necessary
+            let x_pos = if in_window && x + 7 >= wx {
+                x + 7 - wx
+            } else {
+                x.wrapping_add(self.memory.io_registers.scx)
+            };
+
+            let tile_col = x_pos / 8;
+
+            let tile_id = self
+                .memory
+                .get(tile_map + tile_row as usize * 32 + tile_col as usize);
+
+            let tile_data_baseline = self.get_tile_data_baseline(tile_id);
+
+            let tile_data =
+                self.memory
+                    .get_tile_data(tile_data_baseline, tile_id, y_pos as usize % 8);
             let palette = self.memory.io_registers.bgp;
 
             self.display
-                .draw_tile(x * 8, line, tile_data, palette, false);
+                .draw_bg_tile(x_pos, x, line, tile_data, palette);
         }
     }
 
@@ -302,15 +335,14 @@ impl GameBoy {
                 wy,
                 x,
                 y,
-                wx <= x * 8 + 7 && wy <= y
+                wx <= x + 7 && wy <= y
             );
         }
-        wx <= x * 8 + 7 && wy <= y
+        wx <= x + 7 && wy <= y
     }
 
-    fn get_tile(&self, x: u8, y: u8) -> u8 {
+    fn get_tile_map(&self, in_window: bool) -> usize {
         let mut tilemap = 0x9800;
-        let in_window = self.in_window(x, y);
 
         // When LCDC.3 is enabled and the X coordinate of the current scanline is not inside the window then tilemap $9C00 is used.
         if !in_window
@@ -332,6 +364,8 @@ impl GameBoy {
             tilemap = 0x9c00;
         }
 
+        return tilemap;
+
         // If the current tile is a window tile, the X coordinate for the window tile is used, otherwise the
         // following formula is used to calculate the X coordinate: ((SCX / 8) + fetcher’s X coordinate) & $1F.
         // Because of this formula, fetcherX can be between 0 and 31.
@@ -339,18 +373,18 @@ impl GameBoy {
         // If the current tile is a window tile, the Y coordinate for the window tile is used, otherwise the following
         // formula is used to calculate the Y coordinate: (currentScanline + SCY) & 255. Because of this formula, fetcherY
         //can be between 0 and 255.
-        let (tile_x, tile_y) = if in_window {
-            (x, y)
-        } else {
-            // println!("{} = {}", y, self.memory.io_registers.scy);
-            (
-                ((self.memory.io_registers.scx / 8) + x) & 0x1F,
-                y.wrapping_add(self.memory.io_registers.scy) & 255, // todo is %255 useless?
-            )
-        };
+        // let (tile_x, tile_y) = if in_window {
+        //     (x, y)
+        // } else {
+        //     // println!("{} = {}", y, self.memory.io_registers.scy);
+        //     (
+        //         x.wrapping_add(self.memory.io_registers.scx),
+        //         y.wrapping_add(self.memory.io_registers.scy),
+        //     )
+        // };
 
-        self.memory
-            .get(tilemap + tile_y as usize / 8 * 32 + tile_x as usize)
+        // self.memory
+        //     .get(tilemap + (tile_y >> 3) as usize * 32 + (tile_x >> 3) as usize)
     }
 
     /// For window/background only
