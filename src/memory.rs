@@ -147,9 +147,14 @@ impl Memory {
     }
 
     pub fn get_tile_data(&self, baseline: usize, id: u8, row: usize) -> (u8, u8) {
-        let id = id as usize;
-        let a = self.tile_data[baseline - 0x8000 + id * 16 + row * 2];
-        let b = self.tile_data[baseline - 0x8000 + id * 16 + row * 2 + 1];
+        let baseline = if baseline == 0x8800 {
+            baseline - 0x8000 + (id as i8 as i16 + 128) as usize * 16
+        } else {
+            baseline - 0x8000 + id as usize * 16
+        };
+        // let id = id as usize;
+        let a = self.tile_data[baseline + row * 2];
+        let b = self.tile_data[baseline + row * 2 + 1];
         (a, b)
     }
 

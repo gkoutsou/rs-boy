@@ -169,6 +169,31 @@ impl IORegisters {
         return self.lcd_control & flag as u8 > 0;
     }
 
+    /// For window/background only
+    pub fn get_tile_data_baseline(&self) -> usize {
+        if self.has_lcd_flag(gpu::LcdStatusFlag::TileDataArea) {
+            return 0x8000;
+        } else {
+            return 0x8800;
+        }
+    }
+
+    pub fn get_tile_map(&self, in_window: bool) -> usize {
+        let mut tilemap = 0x9800;
+
+        // When LCDC.3 is enabled and the X coordinate of the current scanline is not inside the window then tilemap $9C00 is used.
+        if !in_window && self.has_lcd_flag(gpu::LcdStatusFlag::BGTileMapArea) {
+            tilemap = 0x9c00;
+        }
+
+        // When LCDC.6 is enabled and the X coordinate of the current scanline is inside the window then tilemap $9C00 is used.
+        if in_window && self.has_lcd_flag(gpu::LcdStatusFlag::WindowTileMapArea) {
+            tilemap = 0x9c00;
+        }
+
+        return tilemap;
+    }
+
     pub fn default() -> IORegisters {
         IORegisters {
             // scanline: 0,
