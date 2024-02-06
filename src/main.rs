@@ -223,10 +223,17 @@ impl GameBoy {
                 .io_registers
                 .has_lcd_flag(gpu::LcdStatusFlag::ObjectSize);
 
-            if tile.object_in_scanline(line) {
+            if tile.object_in_scanline(line, double_size) {
                 object_counter += 1;
                 println!("found object {:?}", tile);
+
+                if tile.x < 8 {
+                    debug!("sprite's x is outside of bounds. ignoring");
+                    continue;
+                }
+
                 let index = if double_size {
+                    todo!("double size not supported yet");
                     if tile.y - line < 8 {
                         tile.tile_index & 0xfe
                     } else {
@@ -245,8 +252,7 @@ impl GameBoy {
 
                 // todo palette
                 let palette = self.memory.io_registers.obp0;
-                self.display
-                    .draw_tile(tile.x, line, tile_data, palette, true);
+                self.display.draw_tile(tile.x - 8, line, tile_data, palette);
                 if object_counter > 10 {
                     info!("too many sprites on the line. Is it a bug?")
                     //     println!("sleeping");

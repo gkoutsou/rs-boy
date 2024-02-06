@@ -48,12 +48,13 @@ pub struct Tile {
 }
 
 impl Tile {
-    pub fn object_in_scanline(&self, scanline: u8) -> bool {
-        let size = 8;
+    pub fn object_in_scanline(&self, scanline: u8, double_size: bool) -> bool {
+        let size = if !double_size { 8 } else { 16 };
+
         let y = self.y as i16;
         let scan = scanline as i16;
-        // todo totally wrong
-        if scan < y - 16 + size && scan >= y - 16 {
+        // todo this probably should return false if double_size but scanline is outside
+        if scan + 16 < y + size && scan + 16 >= y {
             return true;
         }
         false
