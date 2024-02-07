@@ -233,7 +233,7 @@ impl GameBoy {
                 }
 
                 let index = if double_size {
-                    todo!("double size not supported yet");
+                    // todo!("double size not supported yet");
                     if tile.y - line < 8 {
                         tile.tile_index & 0xfe
                     } else {
@@ -2276,8 +2276,8 @@ fn main() {
         .target(env_logger::Target::Stdout)
         .init();
 
-    let path = "PokemonRed.gb";
-    // let path = "Adventure Island II - Aliens in Paradise (USA, Europe).gb";
+    // let path = "PokemonRed.gb";
+    let path = "Adventure Island II - Aliens in Paradise (USA, Europe).gb";
 
     // Testsuites
     // let path = "test/01-special.gb";

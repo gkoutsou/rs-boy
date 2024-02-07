@@ -54,7 +54,7 @@ impl Tile {
         let y = self.y as i16;
         let scan = scanline as i16;
         // todo this probably should return false if double_size but scanline is outside
-        if scan + 16 < y + size && scan + 16 >= y {
+        if scan < y - 16 + size && scan >= y - 16 {
             return true;
         }
         false
@@ -67,5 +67,59 @@ impl Tile {
             tile_index: tile_index,
             flags: flags,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::gpu::Tile;
+
+    #[test]
+    fn object_in_scanline() {
+        assert_eq!(Tile::new(0, 7, 1, 1).object_in_scanline(0, false), false);
+        assert_eq!(Tile::new(2, 7, 1, 1).object_in_scanline(0, false), false);
+
+        let t = Tile::new(16, 7, 1, 1);
+        for i in 0..8 {
+            assert_eq!(t.object_in_scanline(i, false), true, "iteration {}", i);
+        }
+        assert_eq!(t.object_in_scanline(9, false), false);
+
+        let t = Tile::new(144, 7, 1, 1);
+        for i in 0..8 {
+            assert_eq!(
+                t.object_in_scanline(144 - 16 + i, false),
+                true,
+                "iteration {}",
+                144 + i
+            );
+        }
+        assert_eq!(t.object_in_scanline(144 - 16 + 8, false), false);
+    }
+
+    #[test]
+    fn object_in_scanline_double() {
+        assert_eq!(Tile::new(0, 7, 1, 1).object_in_scanline(0, true), false);
+
+        assert_eq!(Tile::new(2, 7, 1, 1).object_in_scanline(0, true), true);
+        assert_eq!(Tile::new(2, 7, 1, 1).object_in_scanline(1, true), true);
+        assert_eq!(Tile::new(2, 7, 1, 1).object_in_scanline(2, true), false);
+
+        let t = Tile::new(16, 7, 1, 1);
+        for i in 0..16 {
+            assert_eq!(t.object_in_scanline(i, true), true, "iteration {}", i);
+        }
+        assert_eq!(t.object_in_scanline(17, true), false);
+
+        let t = Tile::new(144, 7, 1, 1);
+        for i in 0..16 {
+            assert_eq!(
+                t.object_in_scanline(144 - 16 + i, true),
+                true,
+                "iteration {}",
+                144 + i
+            );
+        }
+        assert_eq!(t.object_in_scanline(144 - 16 + 16, false), false);
     }
 }
