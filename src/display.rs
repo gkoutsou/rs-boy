@@ -43,7 +43,14 @@ impl Display {
     pub fn draw_tile(&mut self, tile: Tile, y: u8, tile_data: (u8, u8), palette: u8) {
         let skip = if tile.x < 8 { 8 - tile.x } else { 0 };
 
-        for pixel in (0..8 - skip).rev() {
+        let range: Box<dyn Iterator<Item = u8>> = if tile.is_x_flipped() {
+            // panic!("ASD");
+            Box::new(0..(8 - skip))
+        } else {
+            Box::new((0..(8 - skip)).rev())
+        };
+
+        for pixel in range {
             let x = tile.x + 7 - pixel - 8;
             let lsb = tile_data.0 & (1 << pixel) > 0;
             let msb = tile_data.1 & (1 << pixel) > 0;

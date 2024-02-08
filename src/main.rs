@@ -250,9 +250,6 @@ impl GameBoy {
                     tile.tile_index
                 };
 
-                if tile.is_x_flipped() {
-                    // todo!("x-flipped");
-                }
                 if tile.is_y_flipped() {
                     todo!("y-flipped");
                 }
@@ -2295,8 +2292,8 @@ fn main() {
         .target(env_logger::Target::Stdout)
         .init();
 
-    // let path = "PokemonRed.gb";
-    let path = "Adventure Island II - Aliens in Paradise (USA, Europe).gb";
+    let path = "PokemonRed.gb";
+    // let path = "Adventure Island II - Aliens in Paradise (USA, Europe).gb";
 
     // Testsuites
     // let path = "test/01-special.gb";
