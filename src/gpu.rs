@@ -72,6 +72,10 @@ impl Tile {
         return self.flags & 1 << 6 > 0;
     }
 
+    pub fn has_priority(&self) -> bool {
+        return self.flags & 1 << 7 == 0;
+    }
+
     pub fn new(y: u8, x: u8, tile_index: u8, flags: u8) -> Tile {
         Tile {
             y: y,

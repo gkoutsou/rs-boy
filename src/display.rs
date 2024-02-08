@@ -61,6 +61,11 @@ impl Display {
                 continue;
             }
 
+            // if !tile.has_priority() {
+            //     trace!("skiping not object priority");
+            //     continue;
+            // }
+
             let color_code = use_palette(palette, color_code);
             let color = get_color(color_code);
             // trace!("({}, {}) Color: {:#x} All: {:#x}",x,y,color,y as usize * WIDTH + x as usize);

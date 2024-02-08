@@ -232,7 +232,7 @@ impl GameBoy {
 
             if tile.object_in_scanline(line, double_size) {
                 object_counter += 1;
-                println!("{}: found object {:?}", line, tile);
+                debug!("{}: found object {:?}", line, tile);
 
                 if tile.x == 0 || tile.x >= 168 {
                     debug!("sprite's x is outside of bounds. ignoring");
@@ -263,7 +263,7 @@ impl GameBoy {
                 // todo above is probably useless since the +8 is not affecting due to %8?
                 let y_pos = 16 + line as usize - tile.y as usize;
 
-                println!("line: {} tile.y: {}", line, tile.y);
+                debug!("line: {} tile.y: {}", line, tile.y);
                 let tile_data = self.memory.get_tile_data(0x8000, index, y_pos % 8);
 
                 // todo palette
@@ -288,8 +288,8 @@ impl GameBoy {
             .has_lcd_flag(gpu::LcdStatusFlag::BgWindowEnabled)
         {
             trace!("bg/window is disabled. must draw white :sadge:");
-            // todo is this correct? why would it wipe? at least wipe-row?
-            self.display.wipe_screen();
+            // todo we also wipe_line one up. probably uneccessary
+            self.display.wipe_line(line);
             return;
         }
 

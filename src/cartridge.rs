@@ -4,7 +4,7 @@ use std::{
     str,
 };
 
-use log::{debug, info};
+use log::{debug, info, warn};
 
 pub struct Cartridge {
     rom: Vec<u8>,
@@ -14,6 +14,8 @@ pub struct Cartridge {
     cartridge_memory_enabled: bool,
     pub external_memory: Option<Vec<u8>>,
     pub external_memory_bank: u8,
+
+    rtc_latched: bool,
 }
 
 impl Cartridge {
@@ -54,6 +56,21 @@ impl Cartridge {
                 } else {
                     todo!("support RTC registers");
                 }
+            }
+            0x6000..=0x7fff => {
+                let set_one = value == 1;
+                info!("Latch-change {} => {}", self.rtc_latched, set_one);
+                if !self.rtc_latched && set_one {
+                    // todo here we should actually set some internal variables so that we can read
+                    // todo!("Latching!")
+                } else if self.rtc_latched && set_one {
+                    panic!("from latched to latched!")
+                } else if self.rtc_latched && !set_one {
+                    todo!("latch => 0!")
+                } else if !self.rtc_latched && !set_one {
+                    warn!("from not-latched to not-latched!")
+                }
+                // todo!("Latch RTC")
             }
             0xa000..=0xbfff => {
                 if !self.cartridge_memory_enabled {
@@ -155,6 +172,7 @@ impl Cartridge {
             cartridge_memory_enabled: false,
             external_memory: external_ram,
             external_memory_bank: 0,
+            rtc_latched: false,
         }
     }
 }
