@@ -44,6 +44,10 @@ pub struct Tile {
     pub y: u8,
     pub x: u8,
     pub tile_index: u8,
+    /// 7 - Priority: 0 = No, 1 = BG and Window colors 1–3 are drawn over this OBJ
+    /// 6 - Y flip: 0 = Normal, 1 = Entire OBJ is vertically mirrored
+    /// 5 - X flip: 0 = Normal, 1 = Entire OBJ is horizontally mirrored
+    /// 4- DMG palette [Non CGB Mode only]: 0 = OBP0, 1 = OBP1
     pub flags: u8,
 }
 
@@ -58,6 +62,14 @@ impl Tile {
             return true;
         }
         false
+    }
+
+    pub fn is_x_flipped(&self) -> bool {
+        return self.flags & 1 << 5 > 0;
+    }
+
+    pub fn is_y_flipped(&self) -> bool {
+        return self.flags & 1 << 6 > 0;
     }
 
     pub fn new(y: u8, x: u8, tile_index: u8, flags: u8) -> Tile {

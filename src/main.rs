@@ -215,26 +215,33 @@ impl GameBoy {
     }
 
     fn draw_sprites(&mut self, line: u8) {
+        let double_size = self
+            .memory
+            .io_registers
+            .has_lcd_flag(gpu::LcdStatusFlag::ObjectSize);
+
+        let range = if double_size {
+            (0..40).step_by(2)
+        } else {
+            (0..40).step_by(1)
+        };
+
         let mut object_counter = 0;
-        for i in 0..40 {
+        for i in range {
             let tile = self.memory.get_oam_object(i);
-            let double_size = self
-                .memory
-                .io_registers
-                .has_lcd_flag(gpu::LcdStatusFlag::ObjectSize);
 
             if tile.object_in_scanline(line, double_size) {
                 object_counter += 1;
                 println!("found object {:?}", tile);
 
-                if tile.x < 8 {
+                if tile.x == 0 || tile.x >= 168 {
                     debug!("sprite's x is outside of bounds. ignoring");
                     continue;
                 }
 
                 let index = if double_size {
                     // todo!("double size not supported yet");
-                    if tile.y - line < 8 {
+                    if line + 16 - tile.y < 8 {
                         tile.tile_index & 0xfe
                     } else {
                         tile.tile_index | 0x01
@@ -242,6 +249,14 @@ impl GameBoy {
                 } else {
                     tile.tile_index
                 };
+
+                if tile.is_x_flipped() {
+                    // todo!("x-flipped");
+                }
+                if tile.is_y_flipped() {
+                    todo!("y-flipped");
+                }
+                // todo handle x+1..
 
                 println!("line: {} tile.y: {}", line, tile.y);
                 let tile_data = self.memory.get_tile_data(
@@ -252,7 +267,7 @@ impl GameBoy {
 
                 // todo palette
                 let palette = self.memory.io_registers.obp0;
-                self.display.draw_tile(tile.x - 8, line, tile_data, palette);
+                self.display.draw_tile(tile, line, tile_data, palette);
                 if object_counter > 10 {
                     info!("too many sprites on the line. Is it a bug?")
                     //     println!("sleeping");
@@ -2276,8 +2291,8 @@ fn main() {
         .target(env_logger::Target::Stdout)
         .init();
 
-    // let path = "PokemonRed.gb";
-    let path = "Adventure Island II - Aliens in Paradise (USA, Europe).gb";
+    let path = "PokemonRed.gb";
+    // let path = "Adventure Island II - Aliens in Paradise (USA, Europe).gb";
 
     // Testsuites
     // let path = "test/01-special.gb";
