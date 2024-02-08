@@ -56,13 +56,7 @@ impl Display {
 
             let color_code = use_palette(palette, color_code);
             let color = get_color(color_code);
-            trace!(
-                "({}, {}) Color: {:#x} All: {:#x}",
-                x,
-                y,
-                color,
-                y as usize * WIDTH + x as usize
-            );
+            // trace!("({}, {}) Color: {:#x} All: {:#x}",x,y,color,y as usize * WIDTH + x as usize);
             if y as usize >= HEIGHT || x as usize >= WIDTH {
                 continue;
             }

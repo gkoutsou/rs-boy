@@ -232,7 +232,7 @@ impl GameBoy {
 
             if tile.object_in_scanline(line, double_size) {
                 object_counter += 1;
-                println!("found object {:?}", tile);
+                println!("{}: found object {:?}", line, tile);
 
                 if tile.x == 0 || tile.x >= 168 {
                     debug!("sprite's x is outside of bounds. ignoring");
@@ -256,14 +256,18 @@ impl GameBoy {
                 if tile.is_y_flipped() {
                     todo!("y-flipped");
                 }
-                // todo handle x+1..
+
+                // if not double size or the top tile for double
+                // let y_pos = if !double_size || line + 16 - tile.y < 8 {
+                //     16 + line as usize - tile.y as usize
+                // } else {
+                //     16 + line as usize - (tile.y + 8) as usize
+                // };
+                // todo above is probably useless since the +8 is not affecting due to %8?
+                let y_pos = 16 + line as usize - tile.y as usize;
 
                 println!("line: {} tile.y: {}", line, tile.y);
-                let tile_data = self.memory.get_tile_data(
-                    0x8000,
-                    index,
-                    (16 + line as usize - tile.y as usize) % 8,
-                ); // todo double size
+                let tile_data = self.memory.get_tile_data(0x8000, index, y_pos % 8);
 
                 // todo palette
                 let palette = self.memory.io_registers.obp0;
@@ -2291,8 +2295,8 @@ fn main() {
         .target(env_logger::Target::Stdout)
         .init();
 
-    let path = "PokemonRed.gb";
-    // let path = "Adventure Island II - Aliens in Paradise (USA, Europe).gb";
+    // let path = "PokemonRed.gb";
+    let path = "Adventure Island II - Aliens in Paradise (USA, Europe).gb";
 
     // Testsuites
     // let path = "test/01-special.gb";
