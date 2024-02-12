@@ -1,25 +1,3 @@
-// use crate::Memory;
-
-// pub struct GPU<'a> {
-//     // tile_data: &'a mut Vec<u8>,
-//     // tile_maps: &'a mut Vec<u8>,
-
-//     // oam: &'a mut Vec<u8>,
-//     pub memory: &'a mut Memory,
-// }
-
-// impl<'a> GPU<'a> {
-//     fn step(&mut self) {
-//         self.memory.io_registers.scanline += 1;
-//         if self.memory.io_registers.scanline == 144 {
-//             self.memory.io_registers.enable_video_interrupt();
-//         }
-//         if self.memory.io_registers.scanline > 153 {
-//             self.memory.io_registers.scanline = 0;
-//         }
-//     }
-// }
-
 #[derive(Copy, Clone)]
 pub enum Mode {
     Zero = 0,

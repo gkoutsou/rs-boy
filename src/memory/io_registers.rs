@@ -1,5 +1,3 @@
-use std::{thread, time};
-
 use log::{debug, info, trace};
 
 use crate::gpu;
@@ -15,8 +13,16 @@ pub struct IORegisters {
     /// ff02
     serial_transfer_control: u8,
     /// FF04
+    /// This register is incremented at a rate of 16384Hz (~16779Hz on SGB).
+    /// Writing any value to this register resets it to $00. Additionally,
+    /// this register is reset when executing the stop instruction, and only
+    /// begins ticking again once stop mode ends.
     div: u8,
     /// FF05
+    /// This timer is incremented at the clock frequency specified by the TAC
+    /// register ($FF07). When the value overflows (exceeds $FF) it is reset to
+    /// the value specified in TMA (FF06) and an interrupt is requested, as
+    /// described below.
     tima: u8,
     /// FF06
     tma: u8,
@@ -76,18 +82,33 @@ pub struct IORegisters {
     pub wy: u8,
     /// ff4b
     pub wx: u8,
+
+    // temporary:
+    step_timer: u32,
 }
 
 impl IORegisters {
+    pub fn step_timer(&mut self, ticks: u32) {
+        // a dot is: 4194000 Hz
+        // div step:   16384 Hz
+        // so a div is stepped every 255.981445313 dots
+        self.step_timer += ticks / 4;
+        if self.step_timer >= 256 {
+            self.step_timer -= 256;
+            self.div = self.div.wrapping_add(1);
+            println!("div: {}", self.div)
+        }
+    }
+
     pub fn get(&self, location: usize) -> u8 {
+        println!("Read: {:#x}", location);
         match location {
             0xff01 => self.serial_transfer_data,
             0xff02 => self.serial_transfer_control,
             0xFF04 => self.div,
-            0xFF05 => self.tima,
-            0xFF06 => self.tma,
-            0xFF07 => self.tac,
-
+            // 0xFF05 => self.tima,
+            // 0xFF06 => self.tma,
+            // 0xFF07 => self.tac,
             0xff40 => self.lcd_control,
             0xff41 => self.lcd_status,
             0xff42 => self.scy,
@@ -115,7 +136,7 @@ impl IORegisters {
         match location {
             0xff01 => self.serial_transfer_data = value,
             0xff02 => self.serial_transfer_control = value,
-            0xFF04 => self.div = value,
+            0xFF04 => self.div = 0, // writing any value resets it
             0xFF05 => self.tima = value,
             0xFF06 => self.tma = value,
             0xFF07 => self.tac = value,
@@ -150,9 +171,12 @@ impl IORegisters {
 
             // 0xff0f => self.interrupt_flag,
             _ => {
-                let ten_millis = time::Duration::from_secs(10);
-                thread::sleep(ten_millis);
-                panic!("i/o register location write: {:#x}", location)
+                // let ten_millis = time::Duration::from_secs(10);
+                // thread::sleep(ten_millis);
+                panic!(
+                    "i/o register location write: {:#x} - {:#x}",
+                    location, value
+                )
             }
         }
     }
@@ -216,6 +240,7 @@ impl IORegisters {
             obp0: 0xff,
             obp1: 0xff,
             audio_master: 0xf1, // todo crosscheck
+            step_timer: 0,
         }
     }
 }

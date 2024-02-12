@@ -50,8 +50,9 @@ impl Display {
             Box::new((0..(8 - skip)).rev())
         };
 
-        for pixel in range {
-            let x = tile.x + 7 - pixel - 8;
+        for (i, pixel) in range.enumerate() {
+            // println!("{} + {} - 8 - skip {} - px {}", tile.x, i, skip, pixel);
+            let x = tile.x + (i as u8 + skip) - 8;
             let lsb = tile_data.0 & (1 << pixel) > 0;
             let msb = tile_data.1 & (1 << pixel) > 0;
 

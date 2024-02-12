@@ -36,7 +36,7 @@ impl Memory {
             // trace!("Getting Tile Data: {:#x}", location);
             self.tile_data[location - 0x8000]
         } else if location <= 0x9FFF && location >= 0x9800 {
-            debug!("Reading Tile Map");
+            // debug!("Reading Tile Map");
             self.tile_maps[location - 0x9800]
         } else if location <= 0xff77 && location >= 0xff00 {
             self.io_registers.get(location)

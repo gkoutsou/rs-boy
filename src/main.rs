@@ -35,6 +35,7 @@ struct GameBoy {
     registers: Registers,
     memory: Memory,
 
+    next_timer_step: u32,
     cpu_cycles: u32,
     gpu_mode: gpu::Mode,
 
@@ -51,6 +52,8 @@ struct GameBoy {
 
 impl GameBoy {
     fn step(&mut self) {
+        let current_cpu_cycles = self.cpu_cycles;
+        self.memory.io_registers.step_timer(self.next_timer_step);
         if self.interrupt_step() {
             self.cpu_cycles += 20; // todo 16 or 12?
             return;
@@ -62,6 +65,8 @@ impl GameBoy {
         } else {
             self.cpu_cycles += 4;
         }
+
+        self.next_timer_step = self.cpu_cycles - current_cpu_cycles;
 
         // todo this is not CPU steps but w/e for now
         self.gpu_step();
@@ -139,7 +144,7 @@ impl GameBoy {
         match self.gpu_mode {
             gpu::Mode::Two => {
                 let line = self.memory.io_registers.ly;
-                trace!("OAM Scan: line {} ({})", line, self.cpu_cycles);
+                // trace!("OAM Scan: line {} ({})", line, self.cpu_cycles);
                 // 80 dots
                 if self.cpu_cycles >= 80 {
                     // scan pixels TODO ideally I should follow the ticks, not do it at once
@@ -148,11 +153,11 @@ impl GameBoy {
                 }
             }
             gpu::Mode::One => {
-                trace!(
-                    "VBlank: line {} ({})",
-                    self.memory.io_registers.ly,
-                    self.cpu_cycles
-                );
+                // trace!(
+                //     "VBlank: line {} ({})",
+                //     self.memory.io_registers.ly,
+                //     self.cpu_cycles
+                // );
 
                 if self.cpu_cycles >= 456 {
                     self.memory.io_registers.ly += 1;
@@ -163,20 +168,20 @@ impl GameBoy {
                         self.memory.io_registers.ly = 0;
                         // self.memory.dump_tile_data();
                     }
-                    debug!("line: {}", self.memory.io_registers.ly);
+                    // debug!("line: {}", self.memory.io_registers.ly);
                 }
             }
             gpu::Mode::Zero => {
-                trace!(
-                    "Horrizontal Blank: line {} ({})",
-                    self.memory.io_registers.ly,
-                    self.cpu_cycles
-                );
+                // trace!(
+                //     "Horrizontal Blank: line {} ({})",
+                //     self.memory.io_registers.ly,
+                //     self.cpu_cycles
+                // );
                 if self.cpu_cycles >= 204 {
                     self.cpu_cycles -= 204;
 
                     self.memory.io_registers.ly += 1;
-                    debug!("line: {}", self.memory.io_registers.ly);
+                    // debug!("line: {}", self.memory.io_registers.ly);
 
                     if self.memory.io_registers.ly == 144 {
                         //todo should this be 143?
@@ -195,11 +200,11 @@ impl GameBoy {
             }
             gpu::Mode::Three => {
                 let line = self.memory.io_registers.ly;
-                trace!(
-                    "Drawing Pixels: line {} ({})",
-                    self.memory.io_registers.ly,
-                    self.cpu_cycles
-                );
+                // trace!(
+                //     "Drawing Pixels: line {} ({})",
+                //     self.memory.io_registers.ly,
+                //     self.cpu_cycles
+                // );
                 //todo hack
 
                 if self.cpu_cycles >= 172 {
@@ -302,7 +307,7 @@ impl GameBoy {
             && line >= wy;
 
         let y_pos = if !in_window {
-            self.memory.io_registers.scy + line
+            self.memory.io_registers.scy.wrapping_add(line)
         } else {
             line - wy
         };
@@ -2310,7 +2315,7 @@ fn main() {
 
     // untested
     // let path = "test/instr_timing.gb";
-    // let path = ("test/interrupt_time.gb");
+    // let path = "test/interrupt_time.gb";
     // let path = ("test/mem_timing_1.gb");
     // let path = ("test/mem_timing_2.gb");
     // let path = "test/Acid2 Test for Game Boy.gb";
@@ -2326,6 +2331,7 @@ fn main() {
 
         halt: false,
         cpu_cycles: 0,
+        next_timer_step: 0,
         gpu_mode: gpu::Mode::Two, //todo should this set the ff41?
         display: Display::default(),
         // lcd_prev_state: true,
