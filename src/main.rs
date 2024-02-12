@@ -2298,7 +2298,8 @@ fn main() {
         .init();
 
     let path = "PokemonRed.gb";
-    // let path = "Adventure Island II - Aliens in Paradise (USA, Europe).gb";
+    let path = "Adventure Island II - Aliens in Paradise (USA, Europe).gb";
+    // let path = "Legend of Zelda, The - Link's Awakening (USA, Europe) (Rev 2).gb";
 
     // Testsuites
     // let path = "test/01-special.gb";

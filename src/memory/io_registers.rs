@@ -71,7 +71,7 @@ pub struct IORegisters {
     /// ff44
     pub ly: u8,
     /// ff45
-    lyc: u8,
+    lyc: u8, // TODO enable interrupt
     /// FF47
     pub bgp: u8,
     /// FF48
@@ -114,6 +114,7 @@ impl IORegisters {
             0xff42 => self.scy,
             0xff43 => self.scx,
             0xff44 => self.ly,
+            0xff45 => self.lyc,
             0xff47 => self.bgp,
             0xff48 => self.obp0,
             0xff49 => self.obp1,
@@ -151,6 +152,7 @@ impl IORegisters {
             0xff41 => self.lcd_status = value,
             0xff42 => self.scy = value,
             0xff43 => self.scx = value,
+            0xff45 => self.lyc = value,
             0xff47 => self.bgp = value,
             0xff48 => self.obp0 = value,
             0xff49 => self.obp1 = value,

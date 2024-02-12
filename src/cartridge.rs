@@ -162,6 +162,7 @@ impl Cartridge {
 
         let external_ram = match ram_size {
             0x00 => None,
+            0x02 => Some(vec![0; 8 * 1024]),
             0x03 => Some(vec![0; 32 * 1024]),
             _ => panic!("not handled this ram size: {:#x}", ram_size),
         };
