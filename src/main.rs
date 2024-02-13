@@ -2319,7 +2319,7 @@ fn main() {
     // let path = "test/interrupt_time.gb";
     // let path = ("test/mem_timing_1.gb");
     // let path = ("test/mem_timing_2.gb");
-    // let path = "test/Acid2 Test for Game Boy.gb";
+    let path = "test/Acid2 Test for Game Boy.gb";
 
     let mut cpu = GameBoy {
         cartridge: Cartridge::default(path),

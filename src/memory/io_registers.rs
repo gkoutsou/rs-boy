@@ -110,7 +110,10 @@ impl IORegisters {
             // 0xFF06 => self.tma,
             // 0xFF07 => self.tac,
             0xff40 => self.lcd_control,
-            0xff41 => self.lcd_status,
+            0xff41 => {
+                let compare = (self.ly == self.lyc) as u8;
+                self.lcd_status | (compare << 2)
+            }
             0xff42 => self.scy,
             0xff43 => self.scx,
             0xff44 => self.ly,
@@ -152,7 +155,12 @@ impl IORegisters {
             0xff41 => self.lcd_status = value,
             0xff42 => self.scy = value,
             0xff43 => self.scx = value,
-            0xff45 => self.lyc = value,
+            0xff45 => {
+                if value == self.ly {
+                    todo!("Do I need to trigger STAT interrupt?");
+                }
+                self.lyc = value
+            }
             0xff47 => self.bgp = value,
             0xff48 => self.obp0 = value,
             0xff49 => self.obp1 = value,
