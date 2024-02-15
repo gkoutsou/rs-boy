@@ -276,10 +276,6 @@ impl GameBoy {
                     tile.tile_index
                 };
 
-                if tile.is_y_flipped() {
-                    todo!("y-flipped");
-                }
-
                 // if not double size or the top tile for double
                 // let y_pos = if !double_size || line + 16 - tile.y < 8 {
                 //     16 + line as usize - tile.y as usize
@@ -288,9 +284,14 @@ impl GameBoy {
                 // };
                 // todo above is probably useless since the +8 is not affecting due to %8?
                 let y_pos = 16 + line as usize - tile.y as usize;
+                let final_y_pos = if !tile.is_y_flipped() {
+                    y_pos % 8
+                } else {
+                    8 - (y_pos % 8)
+                };
 
                 debug!("line: {} tile.y: {}", line, tile.y);
-                let tile_data = self.memory.get_tile_data(0x8000, index, y_pos % 8);
+                let tile_data = self.memory.get_tile_data(0x8000, index, final_y_pos);
 
                 // todo palette
                 let palette = self.memory.io_registers.obp0;
@@ -2323,21 +2324,21 @@ fn main() {
         .init();
 
     let path = "PokemonRed.gb";
-    // let path = "Adventure Island II - Aliens in Paradise (USA, Europe).gb";
+    let path = "Adventure Island II - Aliens in Paradise (USA, Europe).gb";
     // let path = "Legend of Zelda, The - Link's Awakening (USA, Europe) (Rev 2).gb";
 
     // Testsuites
     // let path = "test/01-special.gb";
-    let path = "test/02-interrupts.gb"; // fails
-                                        // let path = "test/03-op sp,hl.gb";
-                                        // let path = "test/04-op r,imm.gb";
-                                        // let path = "test/05-op rp.gb";
-                                        // let path = "test/06-ld r,r.gb";
-                                        // let path = "test/07-jr,jp,call,ret,rst.gb";
-                                        // let path = "test/08-misc instrs.gb";
-                                        // let path = "test/09-op r,r.gb";
-                                        // let path = "test/10-bit ops.gb";
-                                        // let path = "test/11-op a,(hl).gb";
+    // let path = "test/02-interrupts.gb"; // fails
+    // let path = "test/03-op sp,hl.gb";
+    // let path = "test/04-op r,imm.gb";
+    // let path = "test/05-op rp.gb";
+    // let path = "test/06-ld r,r.gb";
+    // let path = "test/07-jr,jp,call,ret,rst.gb";
+    // let path = "test/08-misc instrs.gb";
+    // let path = "test/09-op r,r.gb";
+    // let path = "test/10-bit ops.gb";
+    // let path = "test/11-op a,(hl).gb";
 
     // untested
     // let path = "test/instr_timing.gb";

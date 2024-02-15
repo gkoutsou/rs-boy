@@ -110,7 +110,7 @@ impl Display {
     }
 
     pub fn get_pressed_keys(&self) -> Vec<minifb::Key> {
-        self.window.get_keys_pressed(KeyRepeat::Yes)
+        self.window.get_keys()
     }
 }
 
