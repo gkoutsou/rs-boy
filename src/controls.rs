@@ -99,7 +99,7 @@ impl Joypad {
 
     pub fn default() -> Joypad {
         Joypad {
-            joypad: 0x3f,
+            joypad: 0xcf,
             keys: Vec::new(),
         }
     }

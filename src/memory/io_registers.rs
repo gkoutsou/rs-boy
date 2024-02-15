@@ -1,6 +1,6 @@
 use log::{debug, info, trace};
 
-use crate::gpu;
+use crate::{gpu, interrupts};
 
 pub struct IORegisters {
     // ime: bool,
@@ -12,22 +12,6 @@ pub struct IORegisters {
     serial_transfer_data: u8,
     /// ff02
     serial_transfer_control: u8,
-    /// FF04
-    /// This register is incremented at a rate of 16384Hz (~16779Hz on SGB).
-    /// Writing any value to this register resets it to $00. Additionally,
-    /// this register is reset when executing the stop instruction, and only
-    /// begins ticking again once stop mode ends.
-    div: u8,
-    /// FF05
-    /// This timer is incremented at the clock frequency specified by the TAC
-    /// register ($FF07). When the value overflows (exceeds $FF) it is reset to
-    /// the value specified in TMA (FF06) and an interrupt is requested, as
-    /// described below.
-    tima: u8,
-    /// FF06
-    tma: u8,
-    /// FF07
-    tac: u8,
 
     /// FF26
     audio_master: u8,
@@ -88,27 +72,11 @@ pub struct IORegisters {
 }
 
 impl IORegisters {
-    pub fn step_timer(&mut self, ticks: u32) {
-        // a dot is: 4194000 Hz
-        // div step:   16384 Hz
-        // so a div is stepped every 255.981445313 dots
-        self.step_timer += ticks / 4;
-        if self.step_timer >= 256 {
-            self.step_timer -= 256;
-            self.div = self.div.wrapping_add(1);
-            println!("div: {}", self.div)
-        }
-    }
-
     pub fn get(&self, location: usize) -> u8 {
         println!("Read: {:#x}", location);
         match location {
             0xff01 => self.serial_transfer_data,
             0xff02 => self.serial_transfer_control,
-            0xFF04 => self.div,
-            // 0xFF05 => self.tima,
-            // 0xFF06 => self.tma,
-            // 0xFF07 => self.tac,
             0xff40 => self.lcd_control,
             0xff41 => {
                 let compare = (self.ly == self.lyc) as u8;
@@ -140,10 +108,6 @@ impl IORegisters {
         match location {
             0xff01 => self.serial_transfer_data = value,
             0xff02 => self.serial_transfer_control = value,
-            0xFF04 => self.div = 0, // writing any value resets it
-            0xFF05 => self.tima = value,
-            0xFF06 => self.tma = value,
-            0xFF07 => self.tac = value,
             0xff40 => {
                 if value & (1 << 7) == 0 && self.lcd_control & (1 << 7) != 0 {
                     info!("Disabling LCD {:#b}", value)
@@ -192,7 +156,11 @@ impl IORegisters {
     }
 
     pub fn enable_video_interrupt(&mut self) {
-        self.interrupt_flag |= 0x1;
+        self.interrupt_flag |= interrupts::VBLANK;
+    }
+
+    pub fn enable_timer_interrupt(&mut self) {
+        self.interrupt_flag |= interrupts::TIMER;
     }
 
     pub fn lcd_enabled(&self) -> bool {
@@ -231,9 +199,9 @@ impl IORegisters {
     pub fn default() -> IORegisters {
         IORegisters {
             // scanline: 0,
-            interrupt_flag: 0,
+            interrupt_flag: 0xe1,
             lcd_control: 0x91,
-            lcd_status: 0,
+            lcd_status: 0x85,
             scy: 0,
             scx: 0,
             ly: 0,
@@ -242,10 +210,6 @@ impl IORegisters {
             serial_transfer_control: 0,
             wy: 0,
             wx: 0,
-            div: 0,
-            tima: 0,
-            tma: 0,
-            tac: 0,
             bgp: 0xfc,
             obp0: 0xff,
             obp1: 0xff,

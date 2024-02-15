@@ -5,8 +5,11 @@ mod controls;
 mod cpu_ops;
 mod display;
 mod gpu;
+mod interrupts;
 mod memory;
 mod registers;
+mod timer;
+
 use cartridge::Cartridge;
 use controls::Joypad;
 use cpu_ops::CpuFlag;
@@ -15,6 +18,7 @@ use env_logger::Env;
 use log::{debug, info, trace};
 use memory::Memory;
 use registers::Registers;
+use timer::Timer;
 
 use crate::registers::RegisterOperation;
 
@@ -35,7 +39,8 @@ struct GameBoy {
     registers: Registers,
     memory: Memory,
 
-    next_timer_step: u32,
+    timer: Timer,
+
     cpu_cycles: u32,
     gpu_mode: gpu::Mode,
 
@@ -52,24 +57,34 @@ struct GameBoy {
 
 impl GameBoy {
     fn step(&mut self) {
-        let current_cpu_cycles = self.cpu_cycles;
-        self.memory.io_registers.step_timer(self.next_timer_step);
         if self.interrupt_step() {
             self.cpu_cycles += 20; // todo 16 or 12?
             return;
             // todo should an interrupt still run gpu?
         }
 
+        let current_cpu_cycles = self.cpu_cycles;
+        self.cpu_step();
+        let next_timer_step = self.cpu_cycles - current_cpu_cycles;
+
+        self.timer_step(next_timer_step);
+
+        self.gpu_step();
+    }
+
+    fn cpu_step(&mut self) {
         if !self.halt {
-            self.cpu_step();
+            self.run_cpu_instruction();
         } else {
             self.cpu_cycles += 4;
         }
+    }
 
-        self.next_timer_step = self.cpu_cycles - current_cpu_cycles;
-
-        // todo this is not CPU steps but w/e for now
-        self.gpu_step();
+    fn timer_step(&mut self, ticks: u32) {
+        if self.timer.step_timer(ticks) {
+            println!("enabling timer interrupt");
+            self.memory.io_registers.enable_timer_interrupt();
+        }
     }
 
     fn interrupt_step(&mut self) -> bool {
@@ -86,15 +101,21 @@ impl GameBoy {
             return false;
         }
 
-        if interrupts & 0x1 > 0 {
-            // vblank interrupt
-            self.ime = false;
-            self.memory.io_registers.interrupt_flag &= 0b11111110;
-            self.push_stack(self.registers.pc);
+        self.ime = false;
+        self.push_stack(self.registers.pc);
+        self.halt = false;
+
+        if interrupts & interrupts::VBLANK > 0 {
+            self.memory.io_registers.interrupt_flag &= !interrupts::VBLANK;
             debug!("VBlank Interrupt Handler from: {:#x}", self.registers.pc);
             self.registers.set_pc(0x40);
-            self.halt = false;
-            // self.memory.dump_tile_data();
+            return true;
+        }
+
+        if interrupts & interrupts::TIMER > 0 {
+            self.memory.io_registers.interrupt_flag &= !interrupts::TIMER;
+            println!("Timer Interrupt Handler from: {:#x}", self.registers.pc);
+            self.registers.set_pc(0x50);
             return true;
         }
 
@@ -107,7 +128,7 @@ impl GameBoy {
         panic!("found interrupt")
     }
 
-    fn cpu_step(&mut self) {
+    fn run_cpu_instruction(&mut self) {
         let location = self.registers.step_pc();
         trace!("Running location {:#x}", location);
 
@@ -361,6 +382,8 @@ impl GameBoy {
 
             0xA000..=0xBFFF => self.cartridge.get(location),
 
+            0xff04..=0xff07 => self.timer.get(location),
+
             controls::REGISTER_LOCATION => self.joypad.get(location),
 
             _ => self.memory.get(location),
@@ -371,6 +394,8 @@ impl GameBoy {
             0x0000..=0x7FFF => self.cartridge.write(location, value),
 
             0xA000..=0xBFFF => self.cartridge.write(location, value),
+
+            0xff04..=0xff07 => self.timer.write(location, value),
 
             controls::REGISTER_LOCATION => self.joypad.write(location, value),
 
@@ -2298,28 +2323,28 @@ fn main() {
         .init();
 
     let path = "PokemonRed.gb";
-    let path = "Adventure Island II - Aliens in Paradise (USA, Europe).gb";
+    // let path = "Adventure Island II - Aliens in Paradise (USA, Europe).gb";
     // let path = "Legend of Zelda, The - Link's Awakening (USA, Europe) (Rev 2).gb";
 
     // Testsuites
     // let path = "test/01-special.gb";
-    // let path = "test/02-interrupts.gb"; // fails
-    // let path = "test/03-op sp,hl.gb";
-    // let path = "test/04-op r,imm.gb";
-    // let path = "test/05-op rp.gb";
-    // let path = "test/06-ld r,r.gb";
-    // let path = "test/07-jr,jp,call,ret,rst.gb";
-    // let path = "test/08-misc instrs.gb";
-    // let path = "test/09-op r,r.gb";
-    // let path = "test/10-bit ops.gb";
-    // let path = "test/11-op a,(hl).gb";
+    let path = "test/02-interrupts.gb"; // fails
+                                        // let path = "test/03-op sp,hl.gb";
+                                        // let path = "test/04-op r,imm.gb";
+                                        // let path = "test/05-op rp.gb";
+                                        // let path = "test/06-ld r,r.gb";
+                                        // let path = "test/07-jr,jp,call,ret,rst.gb";
+                                        // let path = "test/08-misc instrs.gb";
+                                        // let path = "test/09-op r,r.gb";
+                                        // let path = "test/10-bit ops.gb";
+                                        // let path = "test/11-op a,(hl).gb";
 
     // untested
     // let path = "test/instr_timing.gb";
     // let path = "test/interrupt_time.gb";
     // let path = ("test/mem_timing_1.gb");
     // let path = ("test/mem_timing_2.gb");
-    let path = "test/Acid2 Test for Game Boy.gb";
+    // let path = "test/Acid2 Test for Game Boy.gb";
 
     let mut cpu = GameBoy {
         cartridge: Cartridge::default(path),
@@ -2327,12 +2352,13 @@ fn main() {
         memory: Memory::default(),
         joypad: Joypad::default(),
 
+        timer: Timer::default(),
+
         ime: false,
         set_ei: false,
 
         halt: false,
         cpu_cycles: 0,
-        next_timer_step: 0,
         gpu_mode: gpu::Mode::Two, //todo should this set the ff41?
         display: Display::default(),
         // lcd_prev_state: true,
