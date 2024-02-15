@@ -75,7 +75,7 @@ impl Timer {
     }
 
     pub fn get(&self, location: usize) -> u8 {
-        println!("Read: {:#x}", location);
+        trace!("Read: {:#x}", location);
         match location {
             0xFF04 => self.div,
             0xFF05 => self.tima,

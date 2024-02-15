@@ -1,10 +1,15 @@
 use log::trace;
-use minifb::{Key, KeyRepeat, Window, WindowOptions};
+use minifb::{Key, Window, WindowOptions};
 
 use crate::gpu::Tile;
 
 const WIDTH: usize = 160;
 const HEIGHT: usize = 144;
+
+const WHITE: u32 = 0xffffff;
+const LIGHT_GRAY: u32 = 0xa9a9a9;
+const DARK_GRAY: u32 = 0x545454;
+const BLACK: u32 = 0x000000;
 
 pub struct Display {
     screen: Vec<u32>,
@@ -62,10 +67,11 @@ impl Display {
                 continue;
             }
 
-            // if !tile.has_priority() {
-            //     trace!("skiping not object priority");
-            //     continue;
-            // }
+            let pixel_to_draw = y as usize * WIDTH + x as usize;
+            if !tile.has_priority() && (self.screen[pixel_to_draw] != WHITE) {
+                println!("skiping not object priority");
+                continue;
+            }
 
             let color_code = use_palette(palette, color_code);
             let color = get_color(color_code);
@@ -74,7 +80,7 @@ impl Display {
                 continue;
             }
 
-            self.screen[y as usize * WIDTH + x as usize] = color
+            self.screen[pixel_to_draw] = color
         }
     }
 
@@ -116,13 +122,13 @@ impl Display {
 
 fn get_color(color_code: u8) -> u32 {
     let color = if color_code == 0 {
-        0xffffff // white
+        WHITE // white
     } else if color_code == 1 {
-        0xa9a9a9 // light gray
+        LIGHT_GRAY // light gray
     } else if color_code == 2 {
-        0x545454 // dark gray
+        DARK_GRAY // dark gray
     } else {
-        0x000000 // black
+        BLACK // black
     };
     color
 }

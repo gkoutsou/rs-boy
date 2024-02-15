@@ -73,7 +73,7 @@ pub struct IORegisters {
 
 impl IORegisters {
     pub fn get(&self, location: usize) -> u8 {
-        println!("Read: {:#x}", location);
+        trace!("Read: {:#x}", location);
         match location {
             0xff01 => self.serial_transfer_data,
             0xff02 => self.serial_transfer_control,

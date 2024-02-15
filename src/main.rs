@@ -266,7 +266,6 @@ impl GameBoy {
                 }
 
                 let index = if double_size {
-                    // todo!("double size not supported yet");
                     if line + 16 - tile.y < 8 {
                         tile.tile_index & 0xfe
                     } else {
