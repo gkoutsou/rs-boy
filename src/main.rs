@@ -1,4 +1,7 @@
-use std::{thread, time};
+use std::{
+    thread::{self, panicking},
+    time,
+};
 
 mod cartridge;
 mod controls;
@@ -246,14 +249,8 @@ impl GameBoy {
             .io_registers
             .has_lcd_flag(gpu::LcdStatusFlag::ObjectSize);
 
-        let range = if double_size {
-            (0..40).step_by(2)
-        } else {
-            (0..40).step_by(1)
-        };
-
         let mut object_counter = 0;
-        for i in range {
+        for i in 0..40 {
             let tile = self.memory.get_oam_object(i);
 
             if tile.object_in_scanline(line, double_size) {
@@ -281,11 +278,11 @@ impl GameBoy {
                 // } else {
                 //     16 + line as usize - (tile.y + 8) as usize
                 // };
-                // todo above is probably useless since the +8 is not affecting due to %8?
                 let y_pos = 16 + line as usize - tile.y as usize;
                 let final_y_pos = if !tile.is_y_flipped() {
                     y_pos % 8
                 } else {
+                    // TODO flipped - double is probably broken
                     8 - (y_pos % 8)
                 };
 
@@ -297,9 +294,6 @@ impl GameBoy {
                 self.display.draw_tile(tile, line, tile_data, palette);
                 if object_counter > 10 {
                     info!("too many sprites on the line. Is it a bug?")
-                    //     println!("sleeping");
-                    //     let ten_millis = time::Duration::from_secs(1);
-                    //     thread::sleep(ten_millis);
                 }
                 // todo exit if 8? objects presented
             }
@@ -2322,7 +2316,7 @@ fn main() {
         .target(env_logger::Target::Stdout)
         .init();
 
-    let path = "PokemonRed.gb";
+    // let path = "PokemonRed.gb";
     let path = "Adventure Island II - Aliens in Paradise (USA, Europe).gb";
     // let path = "Legend of Zelda, The - Link's Awakening (USA, Europe) (Rev 2).gb";
 
