@@ -156,13 +156,7 @@ impl GameBoy {
             trace!("LCD disabled!");
             self.cpu_cycles = 0;
             self.memory.io_registers.ly = 0;
-            // self.gpu_mode = gpu::Mode::Two;
-            // self.lcd_prev_state = false;
-            // todo this probably needs to wipe_screen
             return;
-            // } else if !self.lcd_prev_state {
-            // self.cpu_cycles = 4;
-            // self.lcd_prev_state = true;
         }
 
         match self.gpu_mode {
@@ -186,6 +180,10 @@ impl GameBoy {
                 if self.cpu_cycles >= 456 {
                     self.memory.io_registers.ly += 1;
                     self.cpu_cycles -= 456;
+                    if self.memory.io_registers.should_trigger_lyc_stat_interrupt() {
+                        self.memory.io_registers.enable_stat_interrupt();
+                        todo!("check and enable interrupt - lyc");
+                    }
 
                     if self.memory.io_registers.ly > 153 {
                         self.set_gpu_mode(gpu::Mode::Two);
@@ -205,6 +203,10 @@ impl GameBoy {
                     self.cpu_cycles -= 204;
 
                     self.memory.io_registers.ly += 1;
+                    if self.memory.io_registers.should_trigger_lyc_stat_interrupt() {
+                        self.memory.io_registers.enable_stat_interrupt();
+                        todo!("check and enable interrupt - lyc - 2");
+                    }
                     // debug!("line: {}", self.memory.io_registers.ly);
 
                     if self.memory.io_registers.ly == 144 {
@@ -2310,6 +2312,15 @@ impl GameBoy {
         self.gpu_mode = mode;
         self.memory.io_registers.lcd_status &= !3; // wipe 2 first digits
         self.memory.io_registers.lcd_status |= mode as u8;
+
+        if self
+            .memory
+            .io_registers
+            .should_trigger_mode_stat_interrupt(mode)
+        {
+            self.memory.io_registers.enable_stat_interrupt();
+            todo!("check and enable interrupt - mode");
+        }
     }
 }
 

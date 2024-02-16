@@ -52,7 +52,7 @@ pub struct IORegisters {
     /// ff44
     pub ly: u8,
     /// ff45
-    lyc: u8, // TODO enable interrupt
+    pub lyc: u8, // TODO enable interrupt
     /// FF47
     pub bgp: u8,
     /// FF48
@@ -153,6 +153,10 @@ impl IORegisters {
         self.interrupt_flag |= interrupts::VBLANK;
     }
 
+    pub fn enable_stat_interrupt(&mut self) {
+        self.interrupt_flag |= interrupts::STAT;
+    }
+
     pub fn enable_timer_interrupt(&mut self) {
         self.interrupt_flag |= interrupts::TIMER;
     }
@@ -188,6 +192,27 @@ impl IORegisters {
         }
 
         return tilemap;
+    }
+
+    pub fn should_trigger_lyc_stat_interrupt(&self) -> bool {
+        self.lcd_status & (1 << 6) == 1 && self.ly == self.lyc
+    }
+
+    pub fn should_trigger_mode_stat_interrupt(&self, mode: gpu::Mode) -> bool {
+        if self.lcd_status & (1 << 6) == 1 && self.ly == self.lyc {
+            return true;
+        }
+        if self.lcd_status & (1 << 5) == 1 && mode == gpu::Mode::Two {
+            return true;
+        }
+        if self.lcd_status & (1 << 4) == 1 && mode == gpu::Mode::One {
+            return true;
+        }
+        if self.lcd_status & (1 << 3) == 1 && mode == gpu::Mode::Zero {
+            return true;
+        }
+
+        false
     }
 
     pub fn default() -> IORegisters {
