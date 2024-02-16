@@ -56,6 +56,10 @@ impl Memory {
                 self.work_ram[location - 0xc000] = value;
             }
 
+            0xfe00..=0xfe9f => {
+                self.oam[location - 0xfe00] = value;
+            }
+
             0xff46 => {
                 let location = (value as u16) << 8;
                 debug!(

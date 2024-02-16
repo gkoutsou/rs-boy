@@ -30,7 +30,11 @@ impl Cartridge {
     pub fn write(&mut self, location: usize, value: u8) {
         match location {
             0x0000..=0x1fff => {
-                info!("Setting external ram: {}", value & 0x0f == 0x0a);
+                info!(
+                    "Setting external ram: {:#b} => {}",
+                    value,
+                    value & 0x0f == 0x0a
+                );
                 self.cartridge_memory_enabled = value & 0x0f == 0x0a
             }
 

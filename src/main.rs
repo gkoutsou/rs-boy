@@ -96,17 +96,18 @@ impl GameBoy {
             self.set_ei = false;
             return false;
         }
-        if self.ime == false {
-            return false;
-        }
         let interrupts = self.memory.interrupt_enable & self.memory.io_registers.interrupt_flag;
         if interrupts == 0 {
+            return false;
+        }
+        self.halt = false;
+
+        if self.ime == false {
             return false;
         }
 
         self.ime = false;
         self.push_stack(self.registers.pc);
-        self.halt = false;
 
         if interrupts & interrupts::VBLANK > 0 {
             self.memory.io_registers.interrupt_flag &= !interrupts::VBLANK;
@@ -133,10 +134,9 @@ impl GameBoy {
 
     fn run_cpu_instruction(&mut self) {
         let location = self.registers.step_pc();
-        trace!("Running location {:#x}", location);
 
         let op = self.memory_read(location);
-        debug!("operator: {:#x}", op);
+        debug!("operator: {:#x} ({:#x})", op, location);
         match op {
             0xcb => {
                 let cb_op = self.get_u8();
@@ -289,8 +289,11 @@ impl GameBoy {
                 debug!("line: {} tile.y: {}", line, tile.y);
                 let tile_data = self.memory.get_tile_data(0x8000, index, final_y_pos);
 
-                // todo palette
-                let palette = self.memory.io_registers.obp0;
+                let palette = if (tile.flags & (1 << 4)) > 0 {
+                    self.memory.io_registers.obp1
+                } else {
+                    self.memory.io_registers.obp0
+                };
                 self.display.draw_tile(tile, line, tile_data, palette);
                 if object_counter > 10 {
                     info!("too many sprites on the line. Is it a bug?")
@@ -2316,13 +2319,13 @@ fn main() {
         .target(env_logger::Target::Stdout)
         .init();
 
-    // let path = "PokemonRed.gb";
-    let path = "Adventure Island II - Aliens in Paradise (USA, Europe).gb";
+    let path = "PokemonRed.gb";
+    // let path = "Adventure Island II - Aliens in Paradise (USA, Europe).gb";
     // let path = "Legend of Zelda, The - Link's Awakening (USA, Europe) (Rev 2).gb";
 
     // Testsuites
     // let path = "test/01-special.gb";
-    // let path = "test/02-interrupts.gb"; // fails
+    // let path = "test/02-interrupts.gb";
     // let path = "test/03-op sp,hl.gb";
     // let path = "test/04-op r,imm.gb";
     // let path = "test/05-op rp.gb";

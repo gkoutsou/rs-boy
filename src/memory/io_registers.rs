@@ -3,9 +3,6 @@ use log::{debug, info, trace};
 use crate::{gpu, interrupts};
 
 pub struct IORegisters {
-    // ime: bool,
-    // interrupt_enable: u8,
-    // pub scanline: u8,
     pub interrupt_flag: u8,
 
     /// ff01
@@ -61,14 +58,11 @@ pub struct IORegisters {
     /// FF48
     pub obp0: u8,
     /// FF49
-    obp1: u8,
+    pub obp1: u8,
     /// ff4a
     pub wy: u8,
     /// ff4b
     pub wx: u8,
-
-    // temporary:
-    step_timer: u32,
 }
 
 impl IORegisters {
@@ -214,7 +208,6 @@ impl IORegisters {
             obp0: 0xff,
             obp1: 0xff,
             audio_master: 0xf1, // todo crosscheck
-            step_timer: 0,
         }
     }
 }
