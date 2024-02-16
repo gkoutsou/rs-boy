@@ -256,6 +256,10 @@ impl GameBoy {
             if tile.object_in_scanline(line, double_size) {
                 object_counter += 1;
                 debug!("{}: found object {:?}", line, tile);
+                if object_counter > 10 {
+                    info!("too many sprites on the line. Is it a bug?");
+                    break;
+                }
 
                 if tile.x == 0 || tile.x >= 168 {
                     debug!("sprite's x is outside of bounds. ignoring");
@@ -295,10 +299,6 @@ impl GameBoy {
                     self.memory.io_registers.obp0
                 };
                 self.display.draw_tile(tile, line, tile_data, palette);
-                if object_counter > 10 {
-                    info!("too many sprites on the line. Is it a bug?")
-                }
-                // todo exit if 8? objects presented
             }
         }
     }
@@ -2341,7 +2341,7 @@ fn main() {
     // let path = "test/interrupt_time.gb";
     // let path = ("test/mem_timing_1.gb");
     // let path = ("test/mem_timing_2.gb");
-    // let path = "test/Acid2 Test for Game Boy.gb";
+    let path = "test/Acid2 Test for Game Boy.gb";
 
     let mut cpu = GameBoy {
         cartridge: Cartridge::default(path),
