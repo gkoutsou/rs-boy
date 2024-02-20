@@ -69,7 +69,7 @@ impl Display {
 
             let pixel_to_draw = y as usize * WIDTH + x as usize;
             if !tile.has_priority() && (self.screen[pixel_to_draw] != WHITE) {
-                println!("skiping not object priority");
+                trace!("skiping not object priority");
                 continue;
             }
 

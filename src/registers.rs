@@ -324,7 +324,7 @@ impl Registers {
             // Classic
             pc: 0x100,
             sp: 0xFFFE,
-            a: 0x01, // $01-GB/SGB, $FF-GBP, $11-GBC
+            a: 0xff,
             l: 0x4d,
             f: 0xB0,
             b: 0x00,

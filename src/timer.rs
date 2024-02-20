@@ -50,7 +50,7 @@ impl Timer {
         if self.div_counter >= 256 {
             self.div_counter -= 256;
             self.div = self.div.wrapping_add(1);
-            debug!("div: {}", self.div)
+            // debug!("div: {}", self.div)
         }
 
         if !self.tima_enabled() {
@@ -63,7 +63,7 @@ impl Timer {
         if self.tima_counter >= clock {
             self.tima_counter -= clock;
             self.tima = self.tima.wrapping_add(1);
-            debug!("tima: {}", self.tima);
+            // debug!("tima: {}", self.tima);
 
             if self.tima == 0 {
                 self.tima = self.tma;

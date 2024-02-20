@@ -39,6 +39,7 @@ impl Cartridge {
             }
 
             0x2000..=0x3fff => {
+                todo!("is this MBC1 related?");
                 self.rom_bank = value & 0b11111;
                 if self.rom_bank == 0 {
                     // todo 20, 40 etc also step

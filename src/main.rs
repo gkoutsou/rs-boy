@@ -66,21 +66,21 @@ impl GameBoy {
             // todo should an interrupt still run gpu?
         }
 
-        let current_cpu_cycles = self.cpu_cycles;
-        self.cpu_step();
-        let next_timer_step = self.cpu_cycles - current_cpu_cycles;
+        let ticks = self.cpu_step();
 
-        self.timer_step(next_timer_step);
+        self.timer_step(ticks);
 
         self.gpu_step();
     }
 
-    fn cpu_step(&mut self) {
+    fn cpu_step(&mut self) -> u32 {
+        let current_cpu_cycles = self.cpu_cycles;
         if !self.halt {
             self.run_cpu_instruction();
         } else {
             self.cpu_cycles += 4;
         }
+        self.cpu_cycles - current_cpu_cycles
     }
 
     fn timer_step(&mut self, ticks: u32) {
@@ -115,11 +115,24 @@ impl GameBoy {
             self.registers.set_pc(0x40);
             return true;
         }
+        if interrupts & interrupts::STAT > 0 {
+            self.memory.io_registers.interrupt_flag &= !interrupts::STAT;
+            debug!("VBlank Interrupt Handler from: {:#x}", self.registers.pc);
+            self.registers.set_pc(0x48);
+            return true;
+        }
 
         if interrupts & interrupts::TIMER > 0 {
             self.memory.io_registers.interrupt_flag &= !interrupts::TIMER;
             println!("Timer Interrupt Handler from: {:#x}", self.registers.pc);
             self.registers.set_pc(0x50);
+            return true;
+        }
+
+        if interrupts & interrupts::SERIAL > 0 {
+            self.memory.io_registers.interrupt_flag &= !interrupts::SERIAL;
+            println!("Serial Interrupt Handler from: {:#x}", self.registers.pc);
+            self.registers.set_pc(0x58);
             return true;
         }
 
@@ -156,6 +169,8 @@ impl GameBoy {
             trace!("LCD disabled!");
             self.cpu_cycles = 0;
             self.memory.io_registers.ly = 0;
+            self.set_gpu_mode(gpu::Mode::Two);
+            // todo!("should this set mode");
             return;
         }
 
@@ -182,7 +197,10 @@ impl GameBoy {
                     self.cpu_cycles -= 456;
                     if self.memory.io_registers.should_trigger_lyc_stat_interrupt() {
                         self.memory.io_registers.enable_stat_interrupt();
-                        todo!("check and enable interrupt - lyc");
+                        println!(
+                            "todo: check and enable interrupt - lyc - One {}-{}",
+                            self.memory.io_registers.lyc, self.memory.io_registers.ly
+                        )
                     }
 
                     if self.memory.io_registers.ly > 153 {
@@ -205,7 +223,10 @@ impl GameBoy {
                     self.memory.io_registers.ly += 1;
                     if self.memory.io_registers.should_trigger_lyc_stat_interrupt() {
                         self.memory.io_registers.enable_stat_interrupt();
-                        todo!("check and enable interrupt - lyc - 2");
+                        println!(
+                            "todo: check and enable interrupt - lyc - Zero {}-{}",
+                            self.memory.io_registers.lyc, self.memory.io_registers.ly
+                        );
                     }
                     // debug!("line: {}", self.memory.io_registers.ly);
 
@@ -246,6 +267,15 @@ impl GameBoy {
     }
 
     fn draw_sprites(&mut self, line: u8) {
+        if !self
+            .memory
+            .io_registers
+            .has_lcd_flag(gpu::LcdStatusFlag::ObjectEnabled)
+        {
+            trace!("objects are disabled :sadge:");
+            return;
+        }
+
         let double_size = self
             .memory
             .io_registers
@@ -259,7 +289,7 @@ impl GameBoy {
                 object_counter += 1;
                 debug!("{}: found object {:?}", line, tile);
                 if object_counter > 10 {
-                    info!("too many sprites on the line. Is it a bug?");
+                    trace!("too many sprites on the line. Is it a bug?");
                     break;
                 }
 
@@ -289,7 +319,7 @@ impl GameBoy {
                     y_pos % 8
                 } else {
                     // TODO flipped - double is probably broken
-                    8 - (y_pos % 8)
+                    7 - (y_pos % 8)
                 };
 
                 debug!("line: {} tile.y: {}", line, tile.y);
@@ -326,18 +356,19 @@ impl GameBoy {
             .has_lcd_flag(gpu::LcdStatusFlag::WindowEnabled)
             && line >= wy;
 
-        let y_pos = if !in_window {
-            self.memory.io_registers.scy.wrapping_add(line)
-        } else {
-            line - wy
-        };
-
-        // which of the 8 vertical pixels of the current
-        // tile is the scanline on?
-        let tile_row = y_pos / 8;
-
         for x in 0..160u8 {
             let in_window = in_window && x + 7 >= wx;
+
+            let y_pos = if !in_window {
+                self.memory.io_registers.scy.wrapping_add(line)
+            } else {
+                line - wy
+            };
+
+            // which of the 8 vertical pixels of the current
+            // tile is the scanline on?
+            let tile_row = y_pos / 8;
+
             let tile_map = self.memory.io_registers.get_tile_map(in_window);
 
             // translate the current x pos to window space if necessary
@@ -2319,7 +2350,7 @@ impl GameBoy {
             .should_trigger_mode_stat_interrupt(mode)
         {
             self.memory.io_registers.enable_stat_interrupt();
-            todo!("check and enable interrupt - mode");
+            println!("todo: check and enable interrupt - mode");
         }
     }
 }
@@ -2330,9 +2361,9 @@ fn main() {
         .target(env_logger::Target::Stdout)
         .init();
 
-    let path = "PokemonRed.gb";
-    // let path = "Adventure Island II - Aliens in Paradise (USA, Europe).gb";
-    // let path = "Legend of Zelda, The - Link's Awakening (USA, Europe) (Rev 2).gb";
+    // let path = "PokemonRed.gb";
+    let path = "Adventure Island II - Aliens in Paradise (USA, Europe).gb";
+    let path = "Legend of Zelda, The - Link's Awakening (USA, Europe) (Rev 2).gb";
 
     // Testsuites
     // let path = "test/01-special.gb";
@@ -2352,7 +2383,7 @@ fn main() {
     // let path = "test/interrupt_time.gb";
     // let path = ("test/mem_timing_1.gb");
     // let path = ("test/mem_timing_2.gb");
-    let path = "test/Acid2 Test for Game Boy.gb";
+    // let path = "test/Acid2 Test for Game Boy.gb";
 
     let mut cpu = GameBoy {
         cartridge: Cartridge::default(path),
@@ -2367,7 +2398,7 @@ fn main() {
 
         halt: false,
         cpu_cycles: 0,
-        gpu_mode: gpu::Mode::Two, //todo should this set the ff41?
+        gpu_mode: gpu::Mode::Two,
         display: Display::default(),
         // lcd_prev_state: true,
         debug_counter: 0,

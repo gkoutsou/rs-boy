@@ -111,19 +111,32 @@ impl IORegisters {
                 self.lcd_control = value;
             }
             0xff41 => self.lcd_status = value,
-            0xff42 => self.scy = value,
-            0xff43 => self.scx = value,
+            0xff42 => {
+                println!("SCY: {}", value);
+                self.scy = value
+            }
+            0xff43 => {
+                println!("SCX: {}", value);
+                self.scx = value
+            }
             0xff45 => {
                 if value == self.ly {
                     todo!("Do I need to trigger STAT interrupt?");
                 }
+                println!("LYC: {}", value);
                 self.lyc = value
             }
             0xff47 => self.bgp = value,
             0xff48 => self.obp0 = value,
             0xff49 => self.obp1 = value,
-            0xff4a => self.wy = value,
-            0xff4b => self.wx = value,
+            0xff4a => {
+                println!("wy: {}", value);
+                self.wy = value
+            }
+            0xff4b => {
+                println!("wx: {}", value);
+                self.wx = value
+            }
             0xff44 => panic!("writing to scanline"),
             0xff0f => self.interrupt_flag = value,
 
@@ -195,20 +208,17 @@ impl IORegisters {
     }
 
     pub fn should_trigger_lyc_stat_interrupt(&self) -> bool {
-        self.lcd_status & (1 << 6) == 1 && self.ly == self.lyc
+        self.lcd_status & (1 << 6) > 0 && self.ly == self.lyc
     }
 
     pub fn should_trigger_mode_stat_interrupt(&self, mode: gpu::Mode) -> bool {
-        if self.lcd_status & (1 << 6) == 1 && self.ly == self.lyc {
+        if self.lcd_status & (1 << 5) > 0 && mode == gpu::Mode::Two {
             return true;
         }
-        if self.lcd_status & (1 << 5) == 1 && mode == gpu::Mode::Two {
+        if self.lcd_status & (1 << 4) > 0 && mode == gpu::Mode::One {
             return true;
         }
-        if self.lcd_status & (1 << 4) == 1 && mode == gpu::Mode::One {
-            return true;
-        }
-        if self.lcd_status & (1 << 3) == 1 && mode == gpu::Mode::Zero {
+        if self.lcd_status & (1 << 3) > 0 && mode == gpu::Mode::Zero {
             return true;
         }
 
@@ -220,7 +230,7 @@ impl IORegisters {
             // scanline: 0,
             interrupt_flag: 0xe1,
             lcd_control: 0x91,
-            lcd_status: 0x85,
+            lcd_status: 0x86, // I start with mode 2 instead of 1 (since ly = 0)
             scy: 0,
             scx: 0,
             ly: 0,
