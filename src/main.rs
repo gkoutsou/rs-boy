@@ -1,4 +1,5 @@
 use std::{
+    env,
     thread::{self, panicking},
     time,
 };
@@ -282,6 +283,7 @@ impl GameBoy {
             .has_lcd_flag(gpu::LcdStatusFlag::ObjectSize);
 
         let mut object_counter = 0;
+        let mut previous_x_coordinate = 255;
         for i in 0..40 {
             let tile = self.memory.get_oam_object(i);
 
@@ -292,6 +294,13 @@ impl GameBoy {
                     trace!("too many sprites on the line. Is it a bug?");
                     break;
                 }
+
+                // If same X coordinate, the previous has priority
+                if tile.x == previous_x_coordinate {
+                    trace!("same x, previous has priority");
+                    break;
+                }
+                previous_x_coordinate = tile.x;
 
                 if tile.x == 0 || tile.x >= 168 {
                     debug!("sprite's x is outside of bounds. ignoring");
@@ -2361,9 +2370,12 @@ fn main() {
         .target(env_logger::Target::Stdout)
         .init();
 
-    // let path = "PokemonRed.gb";
-    let path = "Adventure Island II - Aliens in Paradise (USA, Europe).gb";
-    let path = "Legend of Zelda, The - Link's Awakening (USA, Europe) (Rev 2).gb";
+    let args: Vec<String> = env::args().collect();
+    if args.len() <= 1 {
+        panic!("Please provide a rom");
+    }
+
+    let path = args[1].as_str();
 
     // Testsuites
     // let path = "test/01-special.gb";
@@ -2383,7 +2395,7 @@ fn main() {
     // let path = "test/interrupt_time.gb";
     // let path = ("test/mem_timing_1.gb");
     // let path = ("test/mem_timing_2.gb");
-    // let path = "test/Acid2 Test for Game Boy.gb";
+    let path = "test/Acid2 Test for Game Boy.gb";
 
     let mut cpu = GameBoy {
         cartridge: Cartridge::default(path),

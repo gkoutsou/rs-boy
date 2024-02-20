@@ -150,6 +150,8 @@ impl IORegisters {
             }
             0xFF30..=0xFF3F => (), // todo
 
+            0xFF56 => (),
+
             // 0xff0f => self.interrupt_flag,
             _ => {
                 // let ten_millis = time::Duration::from_secs(10);

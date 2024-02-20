@@ -2,5 +2,6 @@
 output
 *.gbsave
 *.gb
+*.gbc
 .vscode
 .DS_Store
