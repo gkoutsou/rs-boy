@@ -1,6 +1,6 @@
 use std::{
     env,
-    thread::{self, panicking},
+    thread::{self},
     time,
 };
 
@@ -8,7 +8,7 @@ mod cartridge;
 mod controls;
 mod cpu_ops;
 mod display;
-mod gpu;
+mod graphics;
 mod interrupts;
 mod memory;
 mod registers;
@@ -38,6 +38,7 @@ fn u8s_to_u16(ls: u8, hs: u8) -> u16 {
 
 struct GameBoy {
     cartridge: Cartridge,
+    graphics: graphics::Processor,
     display: Display,
     joypad: Joypad,
     registers: Registers,
@@ -46,7 +47,7 @@ struct GameBoy {
     timer: Timer,
 
     cpu_cycles: u32,
-    gpu_mode: gpu::Mode,
+    gpu_mode: graphics::Mode,
 
     halt: bool,
 
@@ -166,72 +167,72 @@ impl GameBoy {
     }
 
     fn gpu_step(&mut self) {
-        if !self.memory.io_registers.lcd_enabled() {
+        if !self.graphics.lcd_enabled() {
             trace!("LCD disabled!");
             self.cpu_cycles = 0;
-            self.memory.io_registers.ly = 0;
-            self.set_gpu_mode(gpu::Mode::Two);
+            self.graphics.ly = 0;
+            self.set_gpu_mode(graphics::Mode::Two);
             // todo!("should this set mode");
             return;
         }
 
         match self.gpu_mode {
-            gpu::Mode::Two => {
-                let line = self.memory.io_registers.ly;
+            graphics::Mode::Two => {
+                let line = self.graphics.ly;
                 // trace!("OAM Scan: line {} ({})", line, self.cpu_cycles);
                 // 80 dots
                 if self.cpu_cycles >= 80 {
                     // scan pixels TODO ideally I should follow the ticks, not do it at once
                     self.cpu_cycles -= 80;
-                    self.set_gpu_mode(gpu::Mode::Three);
+                    self.set_gpu_mode(graphics::Mode::Three);
                 }
             }
-            gpu::Mode::One => {
+            graphics::Mode::One => {
                 // trace!(
                 //     "VBlank: line {} ({})",
-                //     self.memory.io_registers.ly,
+                //     self.graphics.ly,
                 //     self.cpu_cycles
                 // );
 
                 if self.cpu_cycles >= 456 {
-                    self.memory.io_registers.ly += 1;
+                    self.graphics.ly += 1;
                     self.cpu_cycles -= 456;
-                    if self.memory.io_registers.should_trigger_lyc_stat_interrupt() {
+                    if self.graphics.should_trigger_lyc_stat_interrupt() {
                         self.memory.io_registers.enable_stat_interrupt();
                         println!(
                             "todo: check and enable interrupt - lyc - One {}-{}",
-                            self.memory.io_registers.lyc, self.memory.io_registers.ly
+                            self.graphics.lyc, self.graphics.ly
                         )
                     }
 
-                    if self.memory.io_registers.ly > 153 {
-                        self.set_gpu_mode(gpu::Mode::Two);
-                        self.memory.io_registers.ly = 0;
+                    if self.graphics.ly > 153 {
+                        self.set_gpu_mode(graphics::Mode::Two);
+                        self.graphics.ly = 0;
                         // self.memory.dump_tile_data();
                     }
-                    // debug!("line: {}", self.memory.io_registers.ly);
+                    // debug!("line: {}", self.graphics.ly);
                 }
             }
-            gpu::Mode::Zero => {
+            graphics::Mode::Zero => {
                 // trace!(
                 //     "Horrizontal Blank: line {} ({})",
-                //     self.memory.io_registers.ly,
+                //     self.graphics.ly,
                 //     self.cpu_cycles
                 // );
                 if self.cpu_cycles >= 204 {
                     self.cpu_cycles -= 204;
 
-                    self.memory.io_registers.ly += 1;
-                    if self.memory.io_registers.should_trigger_lyc_stat_interrupt() {
+                    self.graphics.ly += 1;
+                    if self.graphics.should_trigger_lyc_stat_interrupt() {
                         self.memory.io_registers.enable_stat_interrupt();
                         println!(
                             "todo: check and enable interrupt - lyc - Zero {}-{}",
-                            self.memory.io_registers.lyc, self.memory.io_registers.ly
+                            self.graphics.lyc, self.graphics.ly
                         );
                     }
-                    // debug!("line: {}", self.memory.io_registers.ly);
+                    // debug!("line: {}", self.graphics.ly);
 
-                    if self.memory.io_registers.ly == 144 {
+                    if self.graphics.ly == 144 {
                         //todo should this be 143?
                         self.memory.io_registers.enable_video_interrupt();
 
@@ -240,17 +241,17 @@ impl GameBoy {
                         let keys = self.display.get_pressed_keys();
                         self.joypad.key_pressed(keys);
 
-                        self.set_gpu_mode(gpu::Mode::One);
+                        self.set_gpu_mode(graphics::Mode::One);
                     } else {
-                        self.set_gpu_mode(gpu::Mode::Two);
+                        self.set_gpu_mode(graphics::Mode::Two);
                     }
                 }
             }
-            gpu::Mode::Three => {
-                let line = self.memory.io_registers.ly;
+            graphics::Mode::Three => {
+                let line = self.graphics.ly;
                 // trace!(
                 //     "Drawing Pixels: line {} ({})",
-                //     self.memory.io_registers.ly,
+                //     self.graphics.ly,
                 //     self.cpu_cycles
                 // );
                 //todo hack
@@ -260,7 +261,7 @@ impl GameBoy {
                     self.draw_background();
                     self.draw_sprites(line);
 
-                    self.set_gpu_mode(gpu::Mode::Zero);
+                    self.set_gpu_mode(graphics::Mode::Zero);
                     self.cpu_cycles -= 172;
                 }
             }
@@ -268,19 +269,12 @@ impl GameBoy {
     }
 
     fn draw_sprites(&mut self, line: u8) {
-        if !self
-            .memory
-            .io_registers
-            .has_lcd_flag(gpu::LcdStatusFlag::ObjectEnabled)
-        {
+        if !self.graphics.is_object_enabled() {
             trace!("objects are disabled :sadge:");
             return;
         }
 
-        let double_size = self
-            .memory
-            .io_registers
-            .has_lcd_flag(gpu::LcdStatusFlag::ObjectSize);
+        let double_size = self.graphics.is_object_double_size();
 
         let mut object_counter = 0;
         let mut previous_x_coordinate = 255;
@@ -297,8 +291,8 @@ impl GameBoy {
 
                 // If same X coordinate, the previous has priority
                 if tile.x == previous_x_coordinate {
-                    trace!("same x, previous has priority");
-                    break;
+                    info!("same x, previous has priority");
+                    continue;
                 }
                 previous_x_coordinate = tile.x;
 
@@ -335,9 +329,9 @@ impl GameBoy {
                 let tile_data = self.memory.get_tile_data(0x8000, index, final_y_pos);
 
                 let palette = if (tile.flags & (1 << 4)) > 0 {
-                    self.memory.io_registers.obp1
+                    self.graphics.obp1
                 } else {
-                    self.memory.io_registers.obp0
+                    self.graphics.obp0
                 };
                 self.display.draw_tile(tile, line, tile_data, palette);
             }
@@ -345,31 +339,23 @@ impl GameBoy {
     }
 
     fn draw_background(&mut self) {
-        let line = self.memory.io_registers.ly;
-        if !self
-            .memory
-            .io_registers
-            .has_lcd_flag(gpu::LcdStatusFlag::BgWindowEnabled)
-        {
+        let line = self.graphics.ly;
+        if !self.graphics.is_bg_window_enabled() {
             trace!("bg/window is disabled. must draw white :sadge:");
             // todo we also wipe_line one up. probably uneccessary
             self.display.wipe_line(line);
             return;
         }
 
-        let wx = self.memory.io_registers.wx;
-        let wy = self.memory.io_registers.wy;
-        let in_window = self
-            .memory
-            .io_registers
-            .has_lcd_flag(gpu::LcdStatusFlag::WindowEnabled)
-            && line >= wy;
+        let wx = self.graphics.wx;
+        let wy = self.graphics.wy;
+        let in_window = self.graphics.is_window_enabled() && line >= wy;
 
         for x in 0..160u8 {
             let in_window = in_window && x + 7 >= wx;
 
             let y_pos = if !in_window {
-                self.memory.io_registers.scy.wrapping_add(line)
+                self.graphics.scy.wrapping_add(line)
             } else {
                 line - wy
             };
@@ -378,13 +364,13 @@ impl GameBoy {
             // tile is the scanline on?
             let tile_row = y_pos / 8;
 
-            let tile_map = self.memory.io_registers.get_tile_map(in_window);
+            let tile_map = self.graphics.get_tile_map(in_window);
 
             // translate the current x pos to window space if necessary
             let x_pos = if in_window && x + 7 >= wx {
                 x + 7 - wx
             } else {
-                x.wrapping_add(self.memory.io_registers.scx)
+                x.wrapping_add(self.graphics.scx)
             };
 
             let tile_col = x_pos / 8;
@@ -393,13 +379,13 @@ impl GameBoy {
                 .memory
                 .get(tile_map + tile_row as usize * 32 + tile_col as usize);
 
-            let tile_data_baseline = self.memory.io_registers.get_tile_data_baseline();
+            let tile_data_baseline = self.graphics.get_tile_data_baseline();
 
             let tile_data =
                 self.memory
                     .get_tile_data(tile_data_baseline, tile_id, y_pos as usize % 8);
 
-            let palette = self.memory.io_registers.bgp;
+            let palette = self.graphics.bgp;
             self.display
                 .draw_bg_tile(x_pos, x, line, tile_data, palette);
         }
@@ -421,6 +407,9 @@ impl GameBoy {
 
             0xA000..=0xBFFF => self.cartridge.get(location),
 
+            0xff46 => self.memory.get(location),
+            0xff40..=0xff4b => self.graphics.get(location),
+
             0xff04..=0xff07 => self.timer.get(location),
 
             controls::REGISTER_LOCATION => self.joypad.get(location),
@@ -433,6 +422,9 @@ impl GameBoy {
             0x0000..=0x7FFF => self.cartridge.write(location, value),
 
             0xA000..=0xBFFF => self.cartridge.write(location, value),
+
+            0xff46 => self.memory.write(location, value),
+            0xff40..=0xff4b => self.graphics.write(location, value),
 
             0xff04..=0xff07 => self.timer.write(location, value),
 
@@ -676,9 +668,6 @@ impl GameBoy {
                     self.registers.get_hl(),
                     self.registers.a
                 );
-                // if self.registers.get_hl() == 0xc300 {
-                //     panic!("tmp")
-                // }
                 self.memory_write(self.registers.get_hl() as usize, self.registers.a);
                 self.registers.set_hl(self.registers.get_hl() + 1)
             }
@@ -2348,16 +2337,12 @@ impl GameBoy {
         }
     }
 
-    fn set_gpu_mode(&mut self, mode: gpu::Mode) {
+    fn set_gpu_mode(&mut self, mode: graphics::Mode) {
         self.gpu_mode = mode;
-        self.memory.io_registers.lcd_status &= !3; // wipe 2 first digits
-        self.memory.io_registers.lcd_status |= mode as u8;
+        self.graphics.lcd_status &= !3; // wipe 2 first digits
+        self.graphics.lcd_status |= mode as u8;
 
-        if self
-            .memory
-            .io_registers
-            .should_trigger_mode_stat_interrupt(mode)
-        {
+        if self.graphics.should_trigger_mode_stat_interrupt(mode) {
             self.memory.io_registers.enable_stat_interrupt();
             println!("todo: check and enable interrupt - mode");
         }
@@ -2395,10 +2380,11 @@ fn main() {
     // let path = "test/interrupt_time.gb";
     // let path = ("test/mem_timing_1.gb");
     // let path = ("test/mem_timing_2.gb");
-    let path = "test/Acid2 Test for Game Boy.gb";
+    // let path = "test/Acid2 Test for Game Boy.gb";
 
     let mut cpu = GameBoy {
         cartridge: Cartridge::default(path),
+        graphics: graphics::Processor::default(),
         registers: Registers::default(),
         memory: Memory::default(),
         joypad: Joypad::default(),
@@ -2410,15 +2396,13 @@ fn main() {
 
         halt: false,
         cpu_cycles: 0,
-        gpu_mode: gpu::Mode::Two,
+        gpu_mode: graphics::Mode::Two,
         display: Display::default(),
         // lcd_prev_state: true,
         debug_counter: 0,
     };
 
     loop {
-        // println!("Iteration {}", _i);
         cpu.step();
     }
-    cpu.memory.dump_tile_data();
 }

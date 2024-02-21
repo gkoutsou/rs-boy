@@ -3,7 +3,7 @@ mod io_registers;
 pub use io_registers::IORegisters;
 use log::{debug, info, trace};
 
-use crate::gpu;
+use crate::graphics;
 
 pub struct Memory {
     high_ram: Vec<u8>,
@@ -142,12 +142,12 @@ impl Memory {
         // println!("DUMPING OAM DATA COMPLETED");
     }
 
-    pub fn get_oam_object(&self, object: usize) -> gpu::Tile {
+    pub fn get_oam_object(&self, object: usize) -> graphics::Tile {
         let y = self.oam[object * 4];
         let x = self.oam[object * 4 + 1];
         let tile_index = self.oam[object * 4 + 2];
         let flags = self.oam[object * 4 + 3];
-        gpu::Tile::new(y, x, tile_index, flags)
+        graphics::Tile::new(y, x, tile_index, flags)
     }
 
     pub fn get_tile_data(&self, baseline: usize, id: u8, row: usize) -> (u8, u8) {

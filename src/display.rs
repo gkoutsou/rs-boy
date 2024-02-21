@@ -1,7 +1,7 @@
 use log::trace;
 use minifb::{Key, Window, WindowOptions};
 
-use crate::gpu::Tile;
+use crate::graphics;
 
 const WIDTH: usize = 160;
 const HEIGHT: usize = 144;
@@ -45,7 +45,7 @@ impl Display {
         self.screen[y as usize * WIDTH + x as usize] = color
     }
 
-    pub fn draw_tile(&mut self, tile: Tile, y: u8, tile_data: (u8, u8), palette: u8) {
+    pub fn draw_tile(&mut self, tile: graphics::Tile, y: u8, tile_data: (u8, u8), palette: u8) {
         let skip = if tile.x < 8 { 8 - tile.x } else { 0 };
 
         let range: Box<dyn Iterator<Item = u8>> = if tile.is_x_flipped() {

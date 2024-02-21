@@ -1,22 +1,3 @@
-#[derive(Copy, Clone, PartialEq, Eq)]
-pub enum Mode {
-    Zero = 0,
-    One = 1,
-    Two = 2,
-    Three = 3,
-}
-
-pub enum LcdStatusFlag {
-    LcdEnabled = 1 << 7,
-    WindowTileMapArea = 1 << 6,
-    WindowEnabled = 1 << 5,
-    TileDataArea = 1 << 4,
-    BGTileMapArea = 1 << 3,
-    ObjectSize = 1 << 2,
-    ObjectEnabled = 1 << 1,
-    BgWindowEnabled = 1 << 0,
-}
-
 #[derive(Debug)]
 pub struct Tile {
     pub y: u8,
@@ -66,7 +47,7 @@ impl Tile {
 
 #[cfg(test)]
 mod tests {
-    use crate::gpu::Tile;
+    use crate::graphics::tile::Tile;
 
     #[test]
     fn object_in_scanline() {
