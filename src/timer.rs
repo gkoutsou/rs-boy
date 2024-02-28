@@ -1,4 +1,4 @@
-use log::{debug, info, trace};
+use log::{info, trace};
 
 pub struct Timer {
     /// FF04
@@ -26,7 +26,7 @@ pub struct Timer {
 
 impl Timer {
     fn tima_enabled(&self) -> bool {
-        (self.tac & (1 << 2)) as u8 > 0
+        (self.tac & (1 << 2)) > 0
     }
 
     fn clock(&self) -> u32 {
@@ -71,11 +71,11 @@ impl Timer {
                 // todo!("trigger timer interrupt");
             }
         }
-        return false;
+        false
     }
 
     pub fn get(&self, location: usize) -> u8 {
-        trace!("Read: {:#x}", location);
+        info!("Read Timer: {:#x}", location);
         match location {
             0xFF04 => self.div,
             0xFF05 => self.tima,

@@ -24,23 +24,23 @@ impl Tile {
     }
 
     pub fn is_x_flipped(&self) -> bool {
-        return self.flags & 1 << 5 > 0;
+        self.flags & 1 << 5 > 0
     }
 
     pub fn is_y_flipped(&self) -> bool {
-        return self.flags & 1 << 6 > 0;
+        self.flags & 1 << 6 > 0
     }
 
     pub fn has_priority(&self) -> bool {
-        return self.flags & 1 << 7 == 0;
+        self.flags & 1 << 7 == 0
     }
 
     pub fn new(y: u8, x: u8, tile_index: u8, flags: u8) -> Tile {
         Tile {
-            y: y,
-            x: x,
-            tile_index: tile_index,
-            flags: flags,
+            y,
+            x,
+            tile_index,
+            flags,
         }
     }
 }
@@ -51,50 +51,48 @@ mod tests {
 
     #[test]
     fn object_in_scanline() {
-        assert_eq!(Tile::new(0, 7, 1, 1).object_in_scanline(0, false), false);
-        assert_eq!(Tile::new(2, 7, 1, 1).object_in_scanline(0, false), false);
+        assert!(!Tile::new(0, 7, 1, 1).object_in_scanline(0, false));
+        assert!(!Tile::new(2, 7, 1, 1).object_in_scanline(0, false));
 
         let t = Tile::new(16, 7, 1, 1);
         for i in 0..8 {
-            assert_eq!(t.object_in_scanline(i, false), true, "iteration {}", i);
+            assert!(t.object_in_scanline(i, false), "iteration {}", i);
         }
-        assert_eq!(t.object_in_scanline(9, false), false);
+        assert!(!t.object_in_scanline(9, false));
 
         let t = Tile::new(144, 7, 1, 1);
         for i in 0..8 {
-            assert_eq!(
+            assert!(
                 t.object_in_scanline(144 - 16 + i, false),
-                true,
                 "iteration {}",
                 144 + i
             );
         }
-        assert_eq!(t.object_in_scanline(144 - 16 + 8, false), false);
+        assert!(!t.object_in_scanline(144 - 16 + 8, false));
     }
 
     #[test]
     fn object_in_scanline_double() {
-        assert_eq!(Tile::new(0, 7, 1, 1).object_in_scanline(0, true), false);
+        assert!(!Tile::new(0, 7, 1, 1).object_in_scanline(0, true));
 
-        assert_eq!(Tile::new(2, 7, 1, 1).object_in_scanline(0, true), true);
-        assert_eq!(Tile::new(2, 7, 1, 1).object_in_scanline(1, true), true);
-        assert_eq!(Tile::new(2, 7, 1, 1).object_in_scanline(2, true), false);
+        assert!(Tile::new(2, 7, 1, 1).object_in_scanline(0, true));
+        assert!(Tile::new(2, 7, 1, 1).object_in_scanline(1, true));
+        assert!(!Tile::new(2, 7, 1, 1).object_in_scanline(2, true));
 
         let t = Tile::new(16, 7, 1, 1);
         for i in 0..16 {
-            assert_eq!(t.object_in_scanline(i, true), true, "iteration {}", i);
+            assert!(t.object_in_scanline(i, true), "iteration {}", i);
         }
-        assert_eq!(t.object_in_scanline(17, true), false);
+        assert!(!t.object_in_scanline(17, true));
 
         let t = Tile::new(144, 7, 1, 1);
         for i in 0..16 {
-            assert_eq!(
+            assert!(
                 t.object_in_scanline(144 - 16 + i, true),
-                true,
                 "iteration {}",
                 144 + i
             );
         }
-        assert_eq!(t.object_in_scanline(144 - 16 + 16, false), false);
+        assert!(!t.object_in_scanline(144 - 16 + 16, false));
     }
 }

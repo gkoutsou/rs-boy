@@ -104,7 +104,7 @@ impl GameBoy {
         }
         self.halt = false;
 
-        if self.ime == false {
+        if !self.ime {
             return false;
         }
 
@@ -172,13 +172,12 @@ impl GameBoy {
             self.cpu_cycles = 0;
             self.graphics.ly = 0;
             self.set_gpu_mode(graphics::Mode::Two);
-            // todo!("should this set mode");
             return;
         }
 
         match self.gpu_mode {
             graphics::Mode::Two => {
-                let line = self.graphics.ly;
+                let _line = self.graphics.ly;
                 // trace!("OAM Scan: line {} ({})", line, self.cpu_cycles);
                 // 80 dots
                 if self.cpu_cycles >= 80 {
@@ -206,8 +205,8 @@ impl GameBoy {
                     }
 
                     if self.graphics.ly > 153 {
-                        self.set_gpu_mode(graphics::Mode::Two);
                         self.graphics.ly = 0;
+                        self.set_gpu_mode(graphics::Mode::Two);
                         // self.memory.dump_tile_data();
                     }
                     // debug!("line: {}", self.graphics.ly);
@@ -230,10 +229,8 @@ impl GameBoy {
                             self.graphics.lyc, self.graphics.ly
                         );
                     }
-                    // debug!("line: {}", self.graphics.ly);
 
                     if self.graphics.ly == 144 {
-                        //todo should this be 143?
                         self.memory.io_registers.enable_video_interrupt();
 
                         self.display.refresh_buffer();
@@ -292,7 +289,8 @@ impl GameBoy {
                 // If same X coordinate, the previous has priority
                 if tile.x == previous_x_coordinate {
                     info!("same x, previous has priority");
-                    continue;
+                    // todo!("this is wrong.. only if opaque!")
+                    // continue;
                 }
                 previous_x_coordinate = tile.x;
 
@@ -349,15 +347,16 @@ impl GameBoy {
 
         let wx = self.graphics.wx;
         let wy = self.graphics.wy;
-        let in_window = self.graphics.is_window_enabled() && line >= wy;
+        let in_window =
+            self.graphics.is_window_enabled() && line >= wy && wx <= (display::WIDTH + 7) as u8;
 
         for x in 0..160u8 {
             let in_window = in_window && x + 7 >= wx;
 
-            let y_pos = if !in_window {
-                self.graphics.scy.wrapping_add(line)
+            let y_pos = if in_window {
+                self.graphics.win_y_counter
             } else {
-                line - wy
+                self.graphics.scy.wrapping_add(line)
             };
 
             // which of the 8 vertical pixels of the current
@@ -367,13 +366,28 @@ impl GameBoy {
             let tile_map = self.graphics.get_tile_map(in_window);
 
             // translate the current x pos to window space if necessary
-            let x_pos = if in_window && x + 7 >= wx {
+            let x_pos = if in_window {
                 x + 7 - wx
             } else {
                 x.wrapping_add(self.graphics.scx)
             };
 
             let tile_col = x_pos / 8;
+
+            // if in_window {
+            //     println!(
+            //         "tilemap: {:#x} -> {:#x} (tile_row/col {}-{}) - (xpos/ypos {}-{}) - line/counter/wy {}-{}-{}",
+            //         tile_map,
+            //         tile_map + tile_row as usize * 32 + tile_col as usize,
+            //         tile_row,
+            //         tile_col,
+            //         x_pos,
+            //         y_pos,
+            //         line,
+            //         self.graphics.win_y_counter,
+            //         wy
+            //     );
+            // }
 
             let tile_id = self
                 .memory
@@ -389,10 +403,17 @@ impl GameBoy {
             self.display
                 .draw_bg_tile(x_pos, x, line, tile_data, palette);
         }
+        if in_window {
+            println!(
+                "GKO: c:{} - ly:{} - wy:{}",
+                self.graphics.win_y_counter, line, wy
+            );
+            self.graphics.win_y_counter += 1;
+        }
     }
 
     pub fn get_ffxx(&self, steps: usize) -> u8 {
-        let location = 0xff00 + steps as usize;
+        let location = 0xff00 + steps;
         self.memory_read(location)
     }
 
@@ -439,7 +460,7 @@ impl GameBoy {
         self.registers.sp += 1;
         let hs = self.memory_read(self.registers.sp as usize);
         self.registers.sp += 1;
-        return u8s_to_u16(ls, hs);
+        u8s_to_u16(ls, hs)
     }
 
     fn push_stack(&mut self, value: u16) {
@@ -533,7 +554,7 @@ impl GameBoy {
                 trace!("############");
                 if !self.registers.f.has_flag(registers::Flag::Z) {
                     let new_location = (self.registers.pc as i32 + steps) as u16;
-                    debug!(
+                    info!(
                         "JUMP - Current location: {:#x}, next: {:#x}",
                         self.registers.pc, new_location
                     );
@@ -2345,6 +2366,11 @@ impl GameBoy {
         if self.graphics.should_trigger_mode_stat_interrupt(mode) {
             self.memory.io_registers.enable_stat_interrupt();
             println!("todo: check and enable interrupt - mode");
+        }
+
+        if mode == graphics::Mode::Two && self.graphics.wy == self.graphics.ly {
+            // reset window counter
+            self.graphics.win_y_counter = 0
         }
     }
 }

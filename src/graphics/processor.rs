@@ -70,6 +70,9 @@ pub struct Processor {
     pub wy: u8,
     /// ff4b
     pub wx: u8,
+
+    //Helpers
+    pub win_y_counter: u8,
 }
 
 impl Processor {
@@ -119,18 +122,18 @@ impl Processor {
                 if value == self.ly {
                     todo!("Do I need to trigger STAT interrupt?");
                 }
-                println!("LYC: {}", value);
+                trace!("LYC: {}", value);
                 self.lyc = value
             }
             0xff47 => self.bgp = value,
             0xff48 => self.obp0 = value,
             0xff49 => self.obp1 = value,
             0xff4a => {
-                println!("wy: {}", value);
+                info!("wy: {}", value);
                 self.wy = value
             }
             0xff4b => {
-                println!("wx: {}", value);
+                info!("wx: {}", value);
                 self.wx = value
             }
             0xff44 => panic!("writing to scanline"),
@@ -163,19 +166,19 @@ impl Processor {
     }
 
     pub fn lcd_enabled(&self) -> bool {
-        return self.lcd_control & LcdStatusFlag::LcdEnabled as u8 > 0;
+        self.lcd_control & LcdStatusFlag::LcdEnabled as u8 > 0
     }
 
     fn has_lcd_flag(&self, flag: LcdStatusFlag) -> bool {
-        return self.lcd_control & flag as u8 > 0;
+        self.lcd_control & flag as u8 > 0
     }
 
     /// For window/background only
     pub fn get_tile_data_baseline(&self) -> usize {
         if self.has_lcd_flag(LcdStatusFlag::TileDataArea) {
-            return 0x8000;
+            0x8000
         } else {
-            return 0x8800;
+            0x8800
         }
     }
 
@@ -192,7 +195,7 @@ impl Processor {
             tilemap = 0x9c00;
         }
 
-        return tilemap;
+        tilemap
     }
 
     pub fn should_trigger_lyc_stat_interrupt(&self) -> bool {
@@ -227,6 +230,8 @@ impl Processor {
             bgp: 0xfc,
             obp0: 0xff,
             obp1: 0xff,
+
+            win_y_counter: 0,
         }
     }
 }

@@ -28,7 +28,7 @@ impl Joypad {
             REGISTER_LOCATION => {
                 // If neither buttons nor d-pad is selected ($30 was written), then the low nibble
                 // reads $F (all buttons released).
-                if self.joypad & 0x30 == 0x30 || self.keys.len() == 0 {
+                if self.joypad & 0x30 == 0x30 || self.keys.is_empty() {
                     return self.joypad | 0xf;
                 }
 
@@ -82,13 +82,13 @@ impl Joypad {
     }
 
     fn buttons_selected(&self) -> bool {
-        let val = (self.joypad & (1 << 5)) == 0; // flipped semantics
+         // flipped semantics
                                                  // println!("== {}", val);
-        val
+        (self.joypad & (1 << 5)) == 0
     }
     fn dpad_selected(&self) -> bool {
         // println!("joy: {:#b}\nmask: {:#b}", self.joypad, (1 << 4));
-        let val = (self.joypad & (1 << 4)); // flipped semantics
+        let val = self.joypad & (1 << 4); // flipped semantics
                                             // println!("==> {}", val);
         val == 0
     }

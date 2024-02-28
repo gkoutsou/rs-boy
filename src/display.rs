@@ -3,7 +3,7 @@ use minifb::{Key, Window, WindowOptions};
 
 use crate::graphics;
 
-const WIDTH: usize = 160;
+pub const WIDTH: usize = 160;
 const HEIGHT: usize = 144;
 
 const WHITE: u32 = 0xffffff;
@@ -101,7 +101,7 @@ impl Display {
 
         Display {
             screen: screen_buffer,
-            window: window,
+            window,
         }
     }
 
@@ -121,7 +121,7 @@ impl Display {
 }
 
 fn get_color(color_code: u8) -> u32 {
-    let color = if color_code == 0 {
+    if color_code == 0 {
         WHITE // white
     } else if color_code == 1 {
         LIGHT_GRAY // light gray
@@ -129,15 +129,13 @@ fn get_color(color_code: u8) -> u32 {
         DARK_GRAY // dark gray
     } else {
         BLACK // black
-    };
-    color
+    }
 }
 
 pub fn use_palette(palette: u8, id: u8) -> u8 {
     let bit = 1 << (id * 2);
     let l = ((palette & bit) != 0) as u8;
     let m = ((palette & (bit << 1)) != 0) as u8;
-    let color_id = m << 1 | l;
 
-    return color_id;
+    m << 1 | l
 }

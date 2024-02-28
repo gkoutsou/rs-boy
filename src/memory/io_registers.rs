@@ -1,4 +1,4 @@
-use log::{debug, info, trace};
+use log::{info, trace};
 
 use crate::interrupts;
 
@@ -16,7 +16,7 @@ pub struct IORegisters {
 
 impl IORegisters {
     pub fn get(&self, location: usize) -> u8 {
-        trace!("Read: {:#x}", location);
+        info!("Read io/memory: {:#x}", location);
         match location {
             0xff01 => self.serial_transfer_data,
             0xff02 => self.serial_transfer_control,

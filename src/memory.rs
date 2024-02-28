@@ -26,19 +26,19 @@ pub struct Memory {
 
 impl Memory {
     pub fn get(&self, location: usize) -> u8 {
-        if location <= 0xfffe && location >= 0xff80 {
+        if (0xff80..=0xfffe).contains(&location) {
             trace!("HRAM Read: {:#x}", location);
             self.high_ram[location - 0xff80]
-        } else if location <= 0xdfff && location >= 0xc000 {
+        } else if (0xc000..=0xdfff).contains(&location) {
             trace!("WRAM Read: {:#x}", location);
             self.work_ram[location - 0xc000]
-        } else if location <= 0x97FF && location >= 0x8000 {
+        } else if (0x8000..=0x97FF).contains(&location) {
             // trace!("Getting Tile Data: {:#x}", location);
             self.tile_data[location - 0x8000]
-        } else if location <= 0x9FFF && location >= 0x9800 {
+        } else if (0x9800..=0x9FFF).contains(&location) {
             // debug!("Reading Tile Map");
             self.tile_maps[location - 0x9800]
-        } else if location <= 0xff77 && location >= 0xff00 {
+        } else if (0xff00..=0xff77).contains(&location) {
             self.io_registers.get(location)
         } else if location == 0xffff {
             trace!("IME");
@@ -124,7 +124,7 @@ impl Memory {
         // println!("DUMPING TILE DATA COMPLETED");
     }
 
-    pub fn dump_tile(&self, tile_id: u8) {
+    pub fn dump_tile(&self, _tile_id: u8) {
         // println!("DUMPING TILE DATA");
         // for i in 0..16 {
         //     print!("{:#04x} ", self.tile_data[tile_id as usize * 16 + i]);

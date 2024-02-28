@@ -99,8 +99,8 @@ impl Cartridge {
 
     pub fn get_rom(&self, location: usize) -> u8 {
         if location <= 0x3fff {
-            self.rom[location as usize]
-        } else if location <= 0x7fff && location >= 0x4000 {
+            self.rom[location]
+        } else if (0x4000..=0x7fff).contains(&location) {
             let relative_loc = location - 0x4000;
             let actual_loc = relative_loc + (self.rom_bank as usize) * 0x4000;
             self.rom[actual_loc]
@@ -131,7 +131,7 @@ impl Cartridge {
             panic!("Rom size to small");
         }
 
-        let title = str::from_utf8(&buffer[0x134..0x142]).unwrap();
+        let _title = str::from_utf8(&buffer[0x134..0x142]).unwrap();
 
         // println!("Title = {}", title);
 

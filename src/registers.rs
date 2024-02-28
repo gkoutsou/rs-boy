@@ -43,8 +43,8 @@ pub trait RegisterOperation {
 impl RegisterOperation for u8 {
     fn or(&mut self, b: u8) -> u8 {
         *self |= b;
-        let f = set_flag(0x0, Flag::Z, *self == 0);
-        f
+        
+        set_flag(0x0, Flag::Z, *self == 0)
     }
 
     fn and(&mut self, b: u8) -> u8 {
@@ -56,8 +56,8 @@ impl RegisterOperation for u8 {
 
     fn xor(&mut self, b: u8) -> u8 {
         *self ^= b;
-        let f = set_flag(0x0, Flag::Z, *self == 0);
-        f
+        
+        set_flag(0x0, Flag::Z, *self == 0)
     }
 
     fn inc(&mut self, f: u8) -> u8 {
@@ -141,9 +141,9 @@ impl RegisterOperation for u8 {
 
     fn set_bit(&mut self, bit: u8, value: bool) {
         if value {
-            *self |= 1 << bit as u8
+            *self |= 1 << bit
         } else {
-            *self &= !(1 << bit as u8)
+            *self &= !(1 << bit)
         }
     }
 
@@ -182,7 +182,7 @@ impl RegisterOperation for u8 {
     fn sla(&mut self) -> u8 {
         let mut a = *self;
         let c = a & (1 << 7) > 0;
-        a = a << 1;
+        a <<= 1;
         let mut f = set_flag(0, Flag::Z, a == 0);
         f = set_flag(f, Flag::C, c);
         *self = a;
@@ -211,7 +211,7 @@ impl RegisterOperation for u8 {
     fn srl(&mut self) -> u8 {
         let mut a = *self;
         let c = a & 0x01;
-        a = a >> 1;
+        a >>= 1;
         let f = set_flag(0x0, Flag::C, c == 1);
         let f = set_flag(f, Flag::Z, a == 0);
         *self = a;
