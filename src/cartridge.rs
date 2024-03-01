@@ -6,9 +6,16 @@ use std::{
 
 use log::{debug, info, warn};
 
+#[derive(PartialEq, Eq)]
+enum Type {
+    MBC1,
+    MBC3,
+}
+
 pub struct Cartridge {
     rom: Vec<u8>,
     rom_bank: u8,
+    mbc_type: Type,
 
     // RAM
     cartridge_memory_enabled: bool,
@@ -39,14 +46,14 @@ impl Cartridge {
             }
 
             0x2000..=0x3fff => {
-                // todo!("is this MBC1 related?");
-                self.rom_bank = value & 0b11111;
+                match self.mbc_type {
+                    Type::MBC1 => self.rom_bank = value & 0b11111,
+                    Type::MBC3 => self.rom_bank = value,
+                };
+
                 if self.rom_bank == 0 {
-                    // todo 20, 40 etc also step
+                    // todo MBC1 has issue with 20, 40 etc
                     self.rom_bank = 1;
-                }
-                if self.rom_bank == 20 || self.rom_bank == 40 {
-                    todo!("handle rom_banks")
                 }
                 debug!(
                     "Changing to bank: {} (value: {})",
@@ -148,10 +155,20 @@ impl Cartridge {
         // panic!("Usupported Cartridge Type: {:#x}", cartridge_type);
         // }
 
+        let mbc_type = match cartridge_type {
+            0x1..=0x3 => Type::MBC1,
+            0x0f..=0x13 => Type::MBC3,
+
+            _t => todo!("unsupported mbc_type {:#x}", _t),
+        };
         // std::panic::set_hook(Box::new(|panic_info| {
         //     let backtrace = std::backtrace::Backtrace::capture();
         //     eprintln!("My backtrace: {:#?}", backtrace);
         // }));
+
+        if rom_size >= 5 && mbc_type == Type::MBC1 {
+            todo!("handle large MBC1 cartridges.")
+        }
 
         let expected_rom_size = 32 * (2u32.pow(rom_size as u32)) * 1024u32;
 
@@ -175,6 +192,7 @@ impl Cartridge {
         Cartridge {
             rom: buffer,
             rom_bank: 1,
+            mbc_type: mbc_type,
             cartridge_memory_enabled: false,
             external_memory: external_ram,
             external_memory_bank: 0,
