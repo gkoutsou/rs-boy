@@ -1,6 +1,7 @@
 use std::{
     fs::File,
-    io::{self, Read},
+    io::{self, Read, Write},
+    path::{self, Path},
     str,
 };
 
@@ -13,15 +14,17 @@ enum Type {
 }
 
 pub struct Cartridge {
-    rom: Vec<u8>,
-    rom_bank: u8,
     mbc_type: Type,
 
-    // RAM
-    cartridge_memory_enabled: bool,
-    pub external_memory: Option<Vec<u8>>,
-    pub external_memory_bank: u8,
+    rom: Vec<u8>,
+    rom_bank: u8,
 
+    // RAM
+    ram_enabled: bool,
+    ram: Option<Vec<u8>>,
+    ram_bank: u8,
+
+    save_file: Option<path::PathBuf>,
     rtc_latched: bool,
 }
 
@@ -42,7 +45,7 @@ impl Cartridge {
                     value,
                     value & 0x0f == 0x0a
                 );
-                self.cartridge_memory_enabled = value & 0x0f == 0x0a
+                self.ram_enabled = value & 0x0f == 0x0a
             }
 
             0x2000..=0x3fff => {
@@ -63,8 +66,8 @@ impl Cartridge {
             }
             0x4000..=0x5fff => {
                 if value <= 0x3 {
-                    info!("Changing to memory bank: {}", self.external_memory_bank);
-                    self.external_memory_bank = value
+                    info!("Changing to memory bank: {}", self.ram_bank);
+                    self.ram_bank = value
                 } else {
                     todo!("support RTC registers");
                 }
@@ -85,17 +88,17 @@ impl Cartridge {
                 // todo!("Latch RTC")
             }
             0xa000..=0xbfff => {
-                if !self.cartridge_memory_enabled {
+                if !self.ram_enabled {
                     panic!("writing on cartridge when ram is disabled");
                 }
-                if self.external_memory.is_none() {
+                if self.ram.is_none() {
                     panic!("no external memory defined");
                 }
                 let relative_loc = location - 0xa000;
-                let actual_loc = relative_loc + (self.external_memory_bank as usize) * 0x2000;
-                self.external_memory
+                let actual_loc = relative_loc + (self.ram_bank as usize) * 0x2000;
+                self.ram
                     .as_mut()
-                    .expect("there should be some cartridge memory now..")[actual_loc];
+                    .expect("there should be some cartridge memory now..")[actual_loc] = value;
             }
 
             _ => {
@@ -118,11 +121,11 @@ impl Cartridge {
 
     fn get_external_ram(&self, location: usize) -> u8 {
         let relative_loc = location - 0xA000;
-        let actual_loc = relative_loc + (self.external_memory_bank as usize) * 0x2000;
-        self.rom[actual_loc]
+        let actual_loc = relative_loc + (self.ram_bank as usize) * 0x2000;
+        self.ram.as_ref().unwrap()[actual_loc]
     }
 
-    fn load_rom(file_path: &str) -> io::Result<Vec<u8>> {
+    fn load_file(file_path: &path::Path) -> io::Result<Vec<u8>> {
         let mut f = File::open(file_path)?;
         let mut buffer = Vec::new();
 
@@ -130,17 +133,18 @@ impl Cartridge {
         Ok(buffer)
     }
 
-    pub fn default(file_path: &str) -> Cartridge {
-        let result = Self::load_rom(file_path);
+    pub fn default(file_path: path::PathBuf) -> Cartridge {
+        let result = Self::load_file(file_path.as_path());
 
         let buffer = result.unwrap();
         if buffer.len() < 0x150 {
             panic!("Rom size to small");
         }
 
-        let _title = str::from_utf8(&buffer[0x134..0x142]).unwrap();
+        let title = str::from_utf8(&buffer[0x134..0x142]).unwrap();
+        let title = title.trim_end_matches(0x0 as char);
 
-        // println!("Title = {}", title);
+        info!("Title = {}", title);
 
         info!("Type = {:#x}", buffer[0x143]);
         info!("GB/SGB Indicator = {:#x}", buffer[0x146]);
@@ -178,21 +182,48 @@ impl Cartridge {
             println!("ROM size Bytes = {}", expected_rom_size);
         }
 
-        let external_ram = match ram_size {
+        let external_ram_size = match ram_size {
             0x00 => None,
-            0x02 => Some(vec![0; 8 * 1024]),
-            0x03 => Some(vec![0; 32 * 1024]),
+            0x02 => Some(8 * 1024),
+            0x03 => Some(32 * 1024),
             _ => panic!("not handled this ram size: {:#x}", ram_size),
         };
 
+        let save_file = if external_ram_size.is_some() {
+            Some(path::PathBuf::from(title).with_extension("gbsave"))
+        } else {
+            None
+        };
+
+        let external_ram = if save_file.is_none() {
+            None
+        } else if !save_file.as_ref().unwrap().exists() {
+            Some(vec![0; external_ram_size.unwrap()])
+        } else {
+            Some(Self::load_file(save_file.as_ref().unwrap().as_path()).unwrap())
+        };
+
         Cartridge {
+            mbc_type,
             rom: buffer,
             rom_bank: 1,
-            mbc_type: mbc_type,
-            cartridge_memory_enabled: false,
-            external_memory: external_ram,
-            external_memory_bank: 0,
+            ram: external_ram,
+            ram_enabled: false,
+            ram_bank: 0,
+            save_file,
             rtc_latched: false,
+        }
+    }
+}
+
+impl Drop for Cartridge {
+    fn drop(&mut self) {
+        if let Some(filepath) = &self.save_file {
+            let mut file = File::create(filepath).unwrap();
+            let res = file.write_all(&self.ram.as_ref().unwrap());
+            if res.is_err() {
+                panic!("{:?}", res);
+            }
         }
     }
 }

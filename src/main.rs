@@ -1,8 +1,4 @@
-use std::{
-    env,
-    thread::{self},
-    time,
-};
+use std::{env, path, thread, time};
 
 mod cartridge;
 mod controls;
@@ -2397,7 +2393,7 @@ fn main() {
     // let path = "test/Acid2 Test for Game Boy.gb";
 
     let mut cpu = GameBoy {
-        cartridge: Cartridge::default(path),
+        cartridge: Cartridge::default(path::PathBuf::from(path)),
         graphics: graphics::Processor::default(),
         registers: Registers::default(),
         memory: Memory::default(),
