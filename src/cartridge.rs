@@ -6,7 +6,7 @@ use std::{
 
 use log::{debug, info, warn};
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Debug)]
 enum Type {
     MBC1,
     MBC3,
@@ -144,23 +144,19 @@ impl Cartridge {
 
         info!("Type = {:#x}", buffer[0x143]);
         info!("GB/SGB Indicator = {:#x}", buffer[0x146]);
-        let cartridge_type = buffer[0x147];
-        info!("Cartridge type = {:#x}", cartridge_type);
         let rom_size = buffer[0x148];
         info!("ROM size = {:#x}", rom_size);
         let ram_size = buffer[0x149];
         info!("RAM size = {:#x}", ram_size);
 
-        // if cartridge_type != 0x13 {
-        // panic!("Usupported Cartridge Type: {:#x}", cartridge_type);
-        // }
-
+        let cartridge_type = buffer[0x147];
         let mbc_type = match cartridge_type {
             0x1..=0x3 => Type::MBC1,
             0x0f..=0x13 => Type::MBC3,
 
             _t => todo!("unsupported mbc_type {:#x}", _t),
         };
+        info!("Cartridge type: {:?} ({:#x})", mbc_type, cartridge_type);
         // std::panic::set_hook(Box::new(|panic_info| {
         //     let backtrace = std::backtrace::Backtrace::capture();
         //     eprintln!("My backtrace: {:#?}", backtrace);

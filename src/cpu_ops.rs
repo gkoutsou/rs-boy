@@ -404,9 +404,5 @@ pub fn get_cb_ticks(cb_instruction: u8) -> u32 {
         0x46 | 0x56 | 0x66 | 0x76 => 12,
         0x4e | 0x5e | 0x6e | 0x7e => 12,
         0x40..=0x7f => 8,
-
-        _ => {
-            panic!("missing cb operator CPU cycles{:#x}", cb_instruction);
-        }
     }
 }

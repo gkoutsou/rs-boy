@@ -55,9 +55,6 @@ struct GameBoy {
     /// Interrupt Master Enable
     ime: bool,
     set_ei: bool,
-
-    // debug stuff
-    debug_counter: i32,
 }
 
 impl GameBoy {
@@ -2346,15 +2343,6 @@ impl GameBoy {
                 self.registers.f = value.bit(7, self.registers.f);
                 self.memory_write(self.registers.get_hl() as usize, value);
             }
-
-            _ => {
-                debug!("Info for debugging");
-                self.memory.dump_tile_data();
-
-                let ten_millis = time::Duration::from_secs(10);
-                thread::sleep(ten_millis);
-                panic!("Missing cb {:#x}", cb_instruction)
-            }
         }
     }
 
@@ -2425,7 +2413,6 @@ fn main() {
         gpu_mode: graphics::Mode::Two,
         display: Display::default(),
         // lcd_prev_state: true,
-        debug_counter: 0,
     };
 
     loop {

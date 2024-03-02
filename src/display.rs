@@ -22,7 +22,7 @@ impl Display {
         }
     }
 
-    pub fn wipe_screen(&mut self) {
+    pub fn _wipe_screen(&mut self) {
         for elem in self.screen.iter_mut() {
             *elem = 0xffffff;
         }

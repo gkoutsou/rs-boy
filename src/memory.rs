@@ -19,9 +19,6 @@ pub struct Memory {
     pub io_registers: IORegisters,
 
     pub interrupt_enable: u8,
-
-    // Cartridge
-    debug_counter: u8,
 }
 
 impl Memory {
@@ -124,7 +121,7 @@ impl Memory {
         // println!("DUMPING TILE DATA COMPLETED");
     }
 
-    pub fn dump_tile(&self, _tile_id: u8) {
+    pub fn _dump_tile(&self, _tile_id: u8) {
         // println!("DUMPING TILE DATA");
         // for i in 0..16 {
         //     print!("{:#04x} ", self.tile_data[tile_id as usize * 16 + i]);
@@ -174,8 +171,6 @@ impl Memory {
             tile_data: vec![0; 0x97FF - 0x8000 + 1],
             tile_maps: vec![0; 0x9FFF - 0x9800 + 1],
             oam: vec![0; 0xFE9F - 0xFE00 + 1],
-
-            debug_counter: 0,
         }
     }
 }
