@@ -1,6 +1,6 @@
 use log::{info, trace};
 
-use crate::interrupts;
+use crate::gameboy::interrupts;
 
 pub struct IORegisters {
     pub interrupt_flag: u8,

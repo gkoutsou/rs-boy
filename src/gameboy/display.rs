@@ -1,7 +1,7 @@
 use log::trace;
 use minifb::{Key, Window, WindowOptions};
 
-use crate::graphics;
+use super::graphics;
 
 pub const WIDTH: usize = 160;
 const HEIGHT: usize = 144;

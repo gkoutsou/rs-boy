@@ -3,7 +3,7 @@ mod io_registers;
 pub use io_registers::IORegisters;
 use log::{debug, info, trace};
 
-use crate::graphics;
+use super::graphics;
 
 pub struct Memory {
     high_ram: Vec<u8>,
@@ -57,6 +57,7 @@ impl Memory {
                 self.oam[location - 0xfe00] = value;
             }
 
+            // TODO move one level up? What if it copies from other memory? cartridge etc? cross-check this..
             0xff46 => {
                 let location = (value as u16) << 8;
                 debug!(

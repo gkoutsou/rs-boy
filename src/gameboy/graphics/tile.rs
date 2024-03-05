@@ -47,7 +47,7 @@ impl Tile {
 
 #[cfg(test)]
 mod tests {
-    use crate::graphics::tile::Tile;
+    use super::Tile;
 
     #[test]
     fn object_in_scanline() {
