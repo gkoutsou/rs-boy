@@ -18,7 +18,7 @@ use memory::Memory;
 use registers::Registers;
 use timer::Timer;
 
-use registers::RegisterOperation;
+use registers::operations::Operations;
 
 fn u16_to_u8s(input: u16) -> (u8, u8) {
     let hs = (input >> 8) as u8;
@@ -1366,76 +1366,75 @@ impl GameBoy {
             // INC n
             0x3c => {
                 trace!("INC A");
-                self.registers.f = self.registers.a.inc(self.registers.f);
+                self.registers.a.inc(&mut self.registers.f);
             }
             0x04 => {
                 trace!("INC B");
-                self.registers.f = self.registers.b.inc(self.registers.f);
+                self.registers.b.inc(&mut self.registers.f);
             }
             0x0c => {
                 trace!("INC C");
-                self.registers.f = self.registers.c.inc(self.registers.f);
+                self.registers.c.inc(&mut self.registers.f);
             }
             0x14 => {
                 trace!("INC D");
-                self.registers.f = self.registers.d.inc(self.registers.f);
+                self.registers.d.inc(&mut self.registers.f);
             }
             0x1c => {
                 trace!("INC E");
-                self.registers.f = self.registers.e.inc(self.registers.f);
+                self.registers.e.inc(&mut self.registers.f);
             }
             0x24 => {
                 trace!("INC H");
-                self.registers.f = self.registers.h.inc(self.registers.f);
+                self.registers.h.inc(&mut self.registers.f);
             }
             0x2c => {
                 trace!("INC L");
-                self.registers.f = self.registers.l.inc(self.registers.f);
+                self.registers.l.inc(&mut self.registers.f);
             }
             0x34 => {
                 trace!("INC (HL)");
                 let location = self.registers.get_hl() as usize;
                 let mut value = self.memory_read(location);
-                let f = value.inc(self.registers.f);
-                self.registers.f = f;
+                value.inc(&mut self.registers.f);
                 self.memory_write(location, value);
             }
 
             // DEC
             0x3d => {
                 trace!("DEC A");
-                self.registers.f = self.registers.a.dec(self.registers.f);
+                self.registers.a.dec(&mut self.registers.f);
             }
             0x05 => {
                 trace!("DEC B");
-                self.registers.f = self.registers.b.dec(self.registers.f);
+                self.registers.b.dec(&mut self.registers.f);
             }
             0x0d => {
                 trace!("DEC C");
-                self.registers.f = self.registers.c.dec(self.registers.f);
+                self.registers.c.dec(&mut self.registers.f);
             }
             0x15 => {
                 trace!("DEC D");
-                self.registers.f = self.registers.d.dec(self.registers.f);
+                self.registers.d.dec(&mut self.registers.f);
             }
             0x1d => {
                 trace!("DEC E");
-                self.registers.f = self.registers.e.dec(self.registers.f);
+                self.registers.e.dec(&mut self.registers.f);
             }
             0x25 => {
                 trace!("DEC H");
-                self.registers.f = self.registers.h.dec(self.registers.f);
+                self.registers.h.dec(&mut self.registers.f);
             }
             0x2d => {
                 trace!("DEC L");
-                self.registers.f = self.registers.l.dec(self.registers.f);
+                self.registers.l.dec(&mut self.registers.f);
             }
 
             0x35 => {
                 trace!("DEC (HL)");
                 let location = self.registers.get_hl() as usize;
                 let mut value = self.memory_read(location);
-                self.registers.f = value.dec(self.registers.f);
+                value.dec(&mut self.registers.f);
                 self.memory_write(location, value);
             }
 
@@ -1936,32 +1935,32 @@ impl GameBoy {
             0x0f => self.registers.f = self.registers.a.rrc(),
 
             // RR
-            0x18 => Registers::rr(&mut self.registers.b, &mut self.registers.f),
-            0x19 => Registers::rr(&mut self.registers.c, &mut self.registers.f),
-            0x1a => Registers::rr(&mut self.registers.d, &mut self.registers.f),
-            0x1b => Registers::rr(&mut self.registers.e, &mut self.registers.f),
-            0x1c => Registers::rr(&mut self.registers.h, &mut self.registers.f),
-            0x1d => Registers::rr(&mut self.registers.l, &mut self.registers.f),
+            0x1f => self.registers.a.rr(&mut self.registers.f),
+            0x18 => self.registers.b.rr(&mut self.registers.f),
+            0x19 => self.registers.c.rr(&mut self.registers.f),
+            0x1a => self.registers.d.rr(&mut self.registers.f),
+            0x1b => self.registers.e.rr(&mut self.registers.f),
+            0x1c => self.registers.h.rr(&mut self.registers.f),
+            0x1d => self.registers.l.rr(&mut self.registers.f),
             0x1e => {
                 let mut value = self.memory_read(self.registers.get_hl() as usize);
-                Registers::rr(&mut value, &mut self.registers.f);
+                value.rr(&mut self.registers.f);
                 self.memory_write(self.registers.get_hl() as usize, value);
             }
-            0x1f => Registers::rr(&mut self.registers.a, &mut self.registers.f),
 
             // RL
-            0x10 => Registers::rl(&mut self.registers.b, &mut self.registers.f),
-            0x11 => Registers::rl(&mut self.registers.c, &mut self.registers.f),
-            0x12 => Registers::rl(&mut self.registers.d, &mut self.registers.f),
-            0x13 => Registers::rl(&mut self.registers.e, &mut self.registers.f),
-            0x14 => Registers::rl(&mut self.registers.h, &mut self.registers.f),
-            0x15 => Registers::rl(&mut self.registers.l, &mut self.registers.f),
+            0x17 => self.registers.a.rl(&mut self.registers.f),
+            0x10 => self.registers.b.rl(&mut self.registers.f),
+            0x11 => self.registers.c.rl(&mut self.registers.f),
+            0x12 => self.registers.d.rl(&mut self.registers.f),
+            0x13 => self.registers.e.rl(&mut self.registers.f),
+            0x14 => self.registers.h.rl(&mut self.registers.f),
+            0x15 => self.registers.l.rl(&mut self.registers.f),
             0x16 => {
                 let mut value = self.memory_read(self.registers.get_hl() as usize);
-                Registers::rl(&mut value, &mut self.registers.f);
+                value.rl(&mut self.registers.f);
                 self.memory_write(self.registers.get_hl() as usize, value);
             }
-            0x17 => Registers::rl(&mut self.registers.a, &mut self.registers.f),
 
             // SWAP
             0x30 => self.registers.f = self.registers.b.swap(),
