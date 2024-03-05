@@ -1,15 +1,4 @@
-// type Register = u8;
-#[derive(Copy, Clone)]
-pub enum Flag {
-    /// carry
-    C = 0b00010000,
-    /// half-carry
-    H = 0b00100000,
-    /// substraction
-    N = 0b01000000,
-    /// zero - indicates that result was zero
-    Z = 0b10000000,
-}
+use super::cpu::Flag;
 
 pub trait RegisterOperation {
     fn xor(&mut self, b: u8) -> u8;
@@ -43,7 +32,7 @@ pub trait RegisterOperation {
 impl RegisterOperation for u8 {
     fn or(&mut self, b: u8) -> u8 {
         *self |= b;
-        
+
         set_flag(0x0, Flag::Z, *self == 0)
     }
 
@@ -56,7 +45,7 @@ impl RegisterOperation for u8 {
 
     fn xor(&mut self, b: u8) -> u8 {
         *self ^= b;
-        
+
         set_flag(0x0, Flag::Z, *self == 0)
     }
 

@@ -1,5 +1,5 @@
 #[derive(Copy, Clone)]
-pub enum CpuFlag {
+pub enum Flag {
     /// carry
     C = 0b00010000,
     /// half-carry
@@ -8,15 +8,6 @@ pub enum CpuFlag {
     N = 0b01000000,
     /// zero - indicates that result was zero
     Z = 0b10000000,
-}
-
-// TODO remove file
-pub fn set_flag(f: u8, flag: CpuFlag, value: bool) -> u8 {
-    if value {
-        f | flag as u8
-    } else {
-        f & !(flag as u8)
-    }
 }
 
 pub fn get_ticks(instruction: u8) -> u32 {

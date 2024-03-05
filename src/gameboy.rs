@@ -2,7 +2,7 @@ use std::{path, thread, time};
 
 mod cartridge;
 mod controls;
-mod cpu_ops;
+mod cpu;
 mod display;
 mod graphics;
 mod interrupts;
@@ -12,7 +12,6 @@ mod timer;
 
 use cartridge::Cartridge;
 use controls::Joypad;
-use cpu_ops::CpuFlag;
 use display::Display;
 use log::{debug, info, trace};
 use memory::Memory;
@@ -148,12 +147,12 @@ impl GameBoy {
             0xcb => {
                 let cb_op = self.get_u8();
                 self.do_cb(cb_op);
-                self.cpu_cycles += cpu_ops::get_cb_ticks(cb_op);
+                self.cpu_cycles += cpu::get_cb_ticks(cb_op);
             }
 
             _ => {
                 self.run_instruction(op);
-                self.cpu_cycles += cpu_ops::get_ticks(op);
+                self.cpu_cycles += cpu::get_ticks(op);
             }
         }
     }
@@ -498,7 +497,7 @@ impl GameBoy {
             0xc2 => {
                 let new_loc = self.get_u16();
                 trace!("JP NZ,nn --> {:#x}", new_loc);
-                if !self.registers.f.has_flag(registers::Flag::Z) {
+                if !self.registers.f.has_flag(cpu::Flag::Z) {
                     trace!("Making the jump!");
                     self.cpu_cycles += 4;
                     self.registers.set_pc(new_loc);
@@ -508,7 +507,7 @@ impl GameBoy {
             0xca => {
                 let new_loc = self.get_u16();
                 trace!("JP Z,nn --> {:#x}", new_loc);
-                if self.registers.f.has_flag(registers::Flag::Z) {
+                if self.registers.f.has_flag(cpu::Flag::Z) {
                     trace!("Making the jump!");
                     self.cpu_cycles += 4;
                     self.registers.set_pc(new_loc);
@@ -518,7 +517,7 @@ impl GameBoy {
             0xd2 => {
                 let new_loc = self.get_u16();
                 trace!("JP NC,nn --> {:#x}", new_loc);
-                if !self.registers.f.has_flag(registers::Flag::C) {
+                if !self.registers.f.has_flag(cpu::Flag::C) {
                     trace!("Making the jump!");
                     self.cpu_cycles += 4;
                     self.registers.set_pc(new_loc);
@@ -528,7 +527,7 @@ impl GameBoy {
             0xda => {
                 let new_loc = self.get_u16();
                 trace!("JP C,nn --> {:#x}", new_loc);
-                if self.registers.f.has_flag(registers::Flag::C) {
+                if self.registers.f.has_flag(cpu::Flag::C) {
                     trace!("Making the jump!");
                     self.cpu_cycles += 4;
                     self.registers.set_pc(new_loc);
@@ -544,7 +543,7 @@ impl GameBoy {
                     self.registers.pc as i32 + steps
                 );
                 trace!("############");
-                if !self.registers.f.has_flag(registers::Flag::Z) {
+                if !self.registers.f.has_flag(cpu::Flag::Z) {
                     let new_location = (self.registers.pc as i32 + steps) as u16;
                     info!(
                         "JUMP - Current location: {:#x}, next: {:#x}",
@@ -559,7 +558,7 @@ impl GameBoy {
                 trace!("JR Z,n");
                 let steps = self.get_u8() as i8 as i32;
                 trace!("{:#b}", self.registers.f);
-                if self.registers.f.has_flag(registers::Flag::Z) {
+                if self.registers.f.has_flag(cpu::Flag::Z) {
                     let new_location = (self.registers.pc as i32 + steps) as u16;
                     trace!(
                         "Current location: {}, next: {}",
@@ -573,7 +572,7 @@ impl GameBoy {
             0x30 => {
                 trace!("JR NC,n");
                 let steps = self.get_u8() as i8 as i32;
-                if !self.registers.f.has_flag(registers::Flag::C) {
+                if !self.registers.f.has_flag(cpu::Flag::C) {
                     let new_location = (self.registers.pc as i32 + steps) as u16;
                     trace!(
                         "Current location: {:#x}, next: {:#x}",
@@ -589,7 +588,7 @@ impl GameBoy {
             0x38 => {
                 trace!("JR C,n");
                 let steps = self.get_u8() as i8 as i32;
-                if self.registers.f.has_flag(registers::Flag::C) {
+                if self.registers.f.has_flag(cpu::Flag::C) {
                     let new_location = (self.registers.pc as i32 + steps) as u16;
                     trace!(
                         "Current location: {:#x}, next: {:#x}",
@@ -715,14 +714,14 @@ impl GameBoy {
                 let new_val = old_val.wrapping_add_signed(steps);
                 let steps = steps as u16;
 
-                let mut f = cpu_ops::set_flag(
+                let mut f = registers::set_flag(
                     0,
-                    CpuFlag::H,
+                    cpu::Flag::H,
                     (old_val & 0x000F) + (steps & 0x000F) > 0x000F,
                 );
-                f = cpu_ops::set_flag(
+                f = registers::set_flag(
                     f,
-                    CpuFlag::C,
+                    cpu::Flag::C,
                     (old_val & 0x00FF) + (steps & 0x00FF) > 0x00FF,
                 );
 
@@ -1136,14 +1135,14 @@ impl GameBoy {
 
                 let steps = n as u16;
 
-                let f = cpu_ops::set_flag(
+                let f = registers::set_flag(
                     0,
-                    CpuFlag::H,
+                    cpu::Flag::H,
                     (old_val & 0x000F) + (steps & 0x000F) > 0x000F,
                 );
-                self.registers.f = cpu_ops::set_flag(
+                self.registers.f = registers::set_flag(
                     f,
-                    CpuFlag::C,
+                    cpu::Flag::C,
                     (old_val & 0x00FF) + (steps & 0x00FF) > 0x00FF,
                 );
             }
@@ -1151,52 +1150,52 @@ impl GameBoy {
             // ADC
             0x8f => {
                 trace!("ADC A, A");
-                self.registers.f = self.registers.a.adc(
-                    self.registers.a,
-                    self.registers.f.has_flag(registers::Flag::C),
-                );
+                self.registers.f = self
+                    .registers
+                    .a
+                    .adc(self.registers.a, self.registers.f.has_flag(cpu::Flag::C));
             }
             0x88 => {
                 trace!("ADC A, B");
-                self.registers.f = self.registers.a.adc(
-                    self.registers.b,
-                    self.registers.f.has_flag(registers::Flag::C),
-                );
+                self.registers.f = self
+                    .registers
+                    .a
+                    .adc(self.registers.b, self.registers.f.has_flag(cpu::Flag::C));
             }
             0x89 => {
                 trace!("ADC A, C");
-                self.registers.f = self.registers.a.adc(
-                    self.registers.c,
-                    self.registers.f.has_flag(registers::Flag::C),
-                );
+                self.registers.f = self
+                    .registers
+                    .a
+                    .adc(self.registers.c, self.registers.f.has_flag(cpu::Flag::C));
             }
             0x8a => {
                 trace!("ADC A, D");
-                self.registers.f = self.registers.a.adc(
-                    self.registers.d,
-                    self.registers.f.has_flag(registers::Flag::C),
-                );
+                self.registers.f = self
+                    .registers
+                    .a
+                    .adc(self.registers.d, self.registers.f.has_flag(cpu::Flag::C));
             }
             0x8b => {
                 trace!("ADC A, E");
-                self.registers.f = self.registers.a.adc(
-                    self.registers.e,
-                    self.registers.f.has_flag(registers::Flag::C),
-                );
+                self.registers.f = self
+                    .registers
+                    .a
+                    .adc(self.registers.e, self.registers.f.has_flag(cpu::Flag::C));
             }
             0x8c => {
                 trace!("ADC A, H");
-                self.registers.f = self.registers.a.adc(
-                    self.registers.h,
-                    self.registers.f.has_flag(registers::Flag::C),
-                );
+                self.registers.f = self
+                    .registers
+                    .a
+                    .adc(self.registers.h, self.registers.f.has_flag(cpu::Flag::C));
             }
             0x8d => {
                 trace!("ADC A, L");
-                self.registers.f = self.registers.a.adc(
-                    self.registers.l,
-                    self.registers.f.has_flag(registers::Flag::C),
-                );
+                self.registers.f = self
+                    .registers
+                    .a
+                    .adc(self.registers.l, self.registers.f.has_flag(cpu::Flag::C));
             }
             0x8e => {
                 trace!("ADC A, (HL)");
@@ -1204,7 +1203,7 @@ impl GameBoy {
                 self.registers.f = self
                     .registers
                     .a
-                    .adc(v, self.registers.f.has_flag(registers::Flag::C));
+                    .adc(v, self.registers.f.has_flag(cpu::Flag::C));
             }
             0xce => {
                 trace!("ADC A, #");
@@ -1212,7 +1211,7 @@ impl GameBoy {
                 self.registers.f = self
                     .registers
                     .a
-                    .adc(v, self.registers.f.has_flag(registers::Flag::C));
+                    .adc(v, self.registers.f.has_flag(cpu::Flag::C));
             }
 
             // SUB n
@@ -1259,52 +1258,52 @@ impl GameBoy {
             // SBC
             0x9f => {
                 trace!("SBC A, A");
-                self.registers.f = self.registers.a.sbc(
-                    self.registers.a,
-                    self.registers.f.has_flag(registers::Flag::C),
-                );
+                self.registers.f = self
+                    .registers
+                    .a
+                    .sbc(self.registers.a, self.registers.f.has_flag(cpu::Flag::C));
             }
             0x98 => {
                 trace!("SBC A, B");
-                self.registers.f = self.registers.a.sbc(
-                    self.registers.b,
-                    self.registers.f.has_flag(registers::Flag::C),
-                );
+                self.registers.f = self
+                    .registers
+                    .a
+                    .sbc(self.registers.b, self.registers.f.has_flag(cpu::Flag::C));
             }
             0x99 => {
                 trace!("SBC A, C");
-                self.registers.f = self.registers.a.sbc(
-                    self.registers.c,
-                    self.registers.f.has_flag(registers::Flag::C),
-                );
+                self.registers.f = self
+                    .registers
+                    .a
+                    .sbc(self.registers.c, self.registers.f.has_flag(cpu::Flag::C));
             }
             0x9a => {
                 trace!("SBC A, D");
-                self.registers.f = self.registers.a.sbc(
-                    self.registers.d,
-                    self.registers.f.has_flag(registers::Flag::C),
-                );
+                self.registers.f = self
+                    .registers
+                    .a
+                    .sbc(self.registers.d, self.registers.f.has_flag(cpu::Flag::C));
             }
             0x9b => {
                 trace!("SBC A, E");
-                self.registers.f = self.registers.a.sbc(
-                    self.registers.e,
-                    self.registers.f.has_flag(registers::Flag::C),
-                );
+                self.registers.f = self
+                    .registers
+                    .a
+                    .sbc(self.registers.e, self.registers.f.has_flag(cpu::Flag::C));
             }
             0x9c => {
                 trace!("SBC A, H");
-                self.registers.f = self.registers.a.sbc(
-                    self.registers.h,
-                    self.registers.f.has_flag(registers::Flag::C),
-                );
+                self.registers.f = self
+                    .registers
+                    .a
+                    .sbc(self.registers.h, self.registers.f.has_flag(cpu::Flag::C));
             }
             0x9d => {
                 trace!("SBC A, L");
-                self.registers.f = self.registers.a.sbc(
-                    self.registers.l,
-                    self.registers.f.has_flag(registers::Flag::C),
-                );
+                self.registers.f = self
+                    .registers
+                    .a
+                    .sbc(self.registers.l, self.registers.f.has_flag(cpu::Flag::C));
             }
             0x9e => {
                 trace!("SBC A, (HL)");
@@ -1312,7 +1311,7 @@ impl GameBoy {
                 self.registers.f = self
                     .registers
                     .a
-                    .sbc(v, self.registers.f.has_flag(registers::Flag::C));
+                    .sbc(v, self.registers.f.has_flag(cpu::Flag::C));
             }
 
             0xde => {
@@ -1321,7 +1320,7 @@ impl GameBoy {
                 self.registers.f = self
                     .registers
                     .a
-                    .sbc(v, self.registers.f.has_flag(registers::Flag::C));
+                    .sbc(v, self.registers.f.has_flag(cpu::Flag::C));
             }
 
             // INC nn
@@ -1634,7 +1633,7 @@ impl GameBoy {
             0xc4 => {
                 let new_location = self.get_u16();
                 debug!("CALL NZ,nn --> {:#x}", new_location);
-                if !self.registers.f.has_flag(registers::Flag::Z) {
+                if !self.registers.f.has_flag(cpu::Flag::Z) {
                     debug!("Making the jump!");
                     self.cpu_cycles += 12;
                     self.push_stack(self.registers.pc);
@@ -1644,7 +1643,7 @@ impl GameBoy {
             0xcc => {
                 let new_location = self.get_u16();
                 debug!("CALL Z,nn --> {:#x}", new_location);
-                if self.registers.f.has_flag(registers::Flag::Z) {
+                if self.registers.f.has_flag(cpu::Flag::Z) {
                     debug!("Making the jump!");
                     self.cpu_cycles += 12;
                     self.push_stack(self.registers.pc);
@@ -1654,7 +1653,7 @@ impl GameBoy {
             0xd4 => {
                 let new_location = self.get_u16();
                 debug!("CALL NC,nn --> {:#x}", new_location);
-                if !self.registers.f.has_flag(registers::Flag::C) {
+                if !self.registers.f.has_flag(cpu::Flag::C) {
                     debug!("Making the jump!");
                     self.cpu_cycles += 12;
                     self.push_stack(self.registers.pc);
@@ -1664,7 +1663,7 @@ impl GameBoy {
             0xdc => {
                 let new_location = self.get_u16();
                 debug!("CALL C,nn --> {:#x}", new_location);
-                if self.registers.f.has_flag(registers::Flag::C) {
+                if self.registers.f.has_flag(cpu::Flag::C) {
                     debug!("Making the jump!");
                     self.cpu_cycles += 12;
                     self.push_stack(self.registers.pc);
@@ -1681,7 +1680,7 @@ impl GameBoy {
 
             0xc0 => {
                 debug!("RET NZ");
-                if !self.registers.f.has_flag(registers::Flag::Z) {
+                if !self.registers.f.has_flag(cpu::Flag::Z) {
                     let new_loc = self.pop_stack();
                     debug!("Made the jump");
                     self.cpu_cycles += 12;
@@ -1690,7 +1689,7 @@ impl GameBoy {
             }
             0xc8 => {
                 debug!("RET Z");
-                if self.registers.f.has_flag(registers::Flag::Z) {
+                if self.registers.f.has_flag(cpu::Flag::Z) {
                     let new_loc = self.pop_stack();
                     debug!("Made the jump");
                     self.cpu_cycles += 12;
@@ -1699,7 +1698,7 @@ impl GameBoy {
             }
             0xd0 => {
                 debug!("RET NC");
-                if !self.registers.f.has_flag(registers::Flag::C) {
+                if !self.registers.f.has_flag(cpu::Flag::C) {
                     let new_loc = self.pop_stack();
                     debug!("Made the jump");
                     self.cpu_cycles += 12;
@@ -1708,7 +1707,7 @@ impl GameBoy {
             }
             0xd8 => {
                 debug!("RET C");
-                if self.registers.f.has_flag(registers::Flag::C) {
+                if self.registers.f.has_flag(cpu::Flag::C) {
                     let new_loc = self.pop_stack();
                     debug!("Made the jump");
                     self.cpu_cycles += 12;
@@ -1808,20 +1807,20 @@ impl GameBoy {
             // SCF
             0x37 => {
                 trace!("SCF");
-                let mut f = cpu_ops::set_flag(self.registers.f, CpuFlag::C, true);
-                f = cpu_ops::set_flag(f, CpuFlag::H, false);
-                f = cpu_ops::set_flag(f, CpuFlag::N, false);
+                let mut f = registers::set_flag(self.registers.f, cpu::Flag::C, true);
+                f = registers::set_flag(f, cpu::Flag::H, false);
+                f = registers::set_flag(f, cpu::Flag::N, false);
                 self.registers.f = f;
             }
 
             // MISC
             0x27 => {
                 let mut a = self.registers.a;
-                let mut adjust = 0x60 * self.registers.f.has_flag(registers::Flag::C) as u8;
-                if self.registers.f.has_flag(registers::Flag::H) {
+                let mut adjust = 0x60 * self.registers.f.has_flag(cpu::Flag::C) as u8;
+                if self.registers.f.has_flag(cpu::Flag::H) {
                     adjust |= 0x06;
                 };
-                if !self.registers.f.has_flag(registers::Flag::N) {
+                if !self.registers.f.has_flag(cpu::Flag::N) {
                     if a & 0x0F > 0x09 {
                         adjust |= 0x06;
                     };
@@ -1834,10 +1833,9 @@ impl GameBoy {
                 }
 
                 self.registers.f =
-                    registers::set_flag(self.registers.f, registers::Flag::C, adjust >= 0x60);
-                self.registers.f = registers::set_flag(self.registers.f, registers::Flag::H, false);
-                self.registers.f =
-                    registers::set_flag(self.registers.f, registers::Flag::Z, a == 0);
+                    registers::set_flag(self.registers.f, cpu::Flag::C, adjust >= 0x60);
+                self.registers.f = registers::set_flag(self.registers.f, cpu::Flag::H, false);
+                self.registers.f = registers::set_flag(self.registers.f, cpu::Flag::Z, a == 0);
                 self.registers.a = a;
             }
             0x76 => {
@@ -1857,38 +1855,38 @@ impl GameBoy {
                 trace!("RLCA");
                 let new_c = self.registers.a & (1 << 7) > 0;
                 self.registers.a = self.registers.a << 1 | (new_c as u8);
-                self.registers.f = cpu_ops::set_flag(0, CpuFlag::C, new_c);
+                self.registers.f = registers::set_flag(0, cpu::Flag::C, new_c);
             }
 
             0x0f => {
                 trace!("RRCA");
                 let new_c = self.registers.a & 1 > 0;
                 self.registers.a = self.registers.a >> 1 | ((new_c as u8) << 7);
-                self.registers.f = cpu_ops::set_flag(0, CpuFlag::C, new_c);
+                self.registers.f = registers::set_flag(0, cpu::Flag::C, new_c);
             }
 
             0x17 => {
                 trace!("RLA");
                 let new_c = self.registers.a & (1 << 7) > 0;
-                let old_c = self.registers.f.has_flag(registers::Flag::C);
+                let old_c = self.registers.f.has_flag(cpu::Flag::C);
                 self.registers.a = self.registers.a << 1 | old_c as u8;
-                self.registers.f = cpu_ops::set_flag(0, CpuFlag::C, new_c);
+                self.registers.f = registers::set_flag(0, cpu::Flag::C, new_c);
             }
 
             0x1f => {
                 trace!("RRA");
-                let old_c = self.registers.f.has_flag(registers::Flag::C);
+                let old_c = self.registers.f.has_flag(cpu::Flag::C);
                 let new_c = self.registers.a & 1 > 0;
                 self.registers.a = self.registers.a >> 1 | ((old_c as u8) << 7);
-                self.registers.f = cpu_ops::set_flag(0, CpuFlag::C, new_c);
+                self.registers.f = registers::set_flag(0, cpu::Flag::C, new_c);
             }
 
             0x3f => {
                 trace!("CCF");
-                let c = !self.registers.f.has_flag(registers::Flag::C);
-                let mut f = cpu_ops::set_flag(self.registers.f, CpuFlag::C, c);
-                f = cpu_ops::set_flag(f, CpuFlag::N, false);
-                f = cpu_ops::set_flag(f, CpuFlag::H, false);
+                let c = !self.registers.f.has_flag(cpu::Flag::C);
+                let mut f = registers::set_flag(self.registers.f, cpu::Flag::C, c);
+                f = registers::set_flag(f, cpu::Flag::N, false);
+                f = registers::set_flag(f, cpu::Flag::H, false);
                 self.registers.f = f;
             }
 
