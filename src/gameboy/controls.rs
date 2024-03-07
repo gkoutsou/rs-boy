@@ -56,14 +56,7 @@ impl Joypad {
                 {
                     keys &= 0xfe; // 11111110
                 }
-                let result = self.joypad & keys;
-                trace!(
-                    "reading joypad: {:#b} - {},{}",
-                    result,
-                    self.buttons_selected(),
-                    self.dpad_selected()
-                );
-                result
+                self.joypad & keys
             }
 
             _ => panic!("controls location read: {:#x}", location),
@@ -82,15 +75,12 @@ impl Joypad {
     }
 
     fn buttons_selected(&self) -> bool {
-         // flipped semantics
-                                                 // println!("== {}", val);
+        // flipped semantics
         (self.joypad & (1 << 5)) == 0
     }
     fn dpad_selected(&self) -> bool {
-        // println!("joy: {:#b}\nmask: {:#b}", self.joypad, (1 << 4));
-        let val = self.joypad & (1 << 4); // flipped semantics
-                                            // println!("==> {}", val);
-        val == 0
+        // flipped semantics
+        self.joypad & (1 << 4) == 0
     }
 
     pub fn key_pressed(&mut self, pressed_keys: Vec<minifb::Key>) {

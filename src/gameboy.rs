@@ -169,8 +169,6 @@ impl GameBoy {
         match self.gpu_mode {
             graphics::Mode::Two => {
                 let _line = self.graphics.ly;
-                // trace!("OAM Scan: line {} ({})", line, self.cpu_cycles);
-                // 80 dots
                 if self.cpu_cycles >= 80 {
                     // scan pixels TODO ideally I should follow the ticks, not do it at once
                     self.cpu_cycles -= 80;
@@ -178,12 +176,6 @@ impl GameBoy {
                 }
             }
             graphics::Mode::One => {
-                // trace!(
-                //     "VBlank: line {} ({})",
-                //     self.graphics.ly,
-                //     self.cpu_cycles
-                // );
-
                 if self.cpu_cycles >= 456 {
                     self.graphics.ly += 1;
                     self.cpu_cycles -= 456;
@@ -198,17 +190,10 @@ impl GameBoy {
                     if self.graphics.ly > 153 {
                         self.graphics.ly = 0;
                         self.set_gpu_mode(graphics::Mode::Two);
-                        // self.memory.dump_tile_data();
                     }
-                    // debug!("line: {}", self.graphics.ly);
                 }
             }
             graphics::Mode::Zero => {
-                // trace!(
-                //     "Horrizontal Blank: line {} ({})",
-                //     self.graphics.ly,
-                //     self.cpu_cycles
-                // );
                 if self.cpu_cycles >= 204 {
                     self.cpu_cycles -= 204;
 
@@ -237,12 +222,6 @@ impl GameBoy {
             }
             graphics::Mode::Three => {
                 let line = self.graphics.ly;
-                // trace!(
-                //     "Drawing Pixels: line {} ({})",
-                //     self.graphics.ly,
-                //     self.cpu_cycles
-                // );
-                //todo hack
 
                 if self.cpu_cycles >= 172 {
                     self.display.wipe_line(line);
