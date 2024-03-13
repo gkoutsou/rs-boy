@@ -11,14 +11,12 @@ mod timer;
 
 use cartridge::Cartridge;
 use controls::Joypad;
+use graphics::Display;
 use log::{debug, info, trace};
 use memory::Memory;
+use registers::operations::Operations;
 use registers::Registers;
 use timer::Timer;
-
-use registers::operations::Operations;
-
-use self::graphics::Display;
 
 fn u16_to_u8s(input: u16) -> (u8, u8) {
     let hs = (input >> 8) as u8;
@@ -36,7 +34,6 @@ pub(crate) struct GameBoy {
     joypad: Joypad,
     registers: Registers,
     memory: Memory,
-
     timer: Timer,
 
     cpu_cycles: u32,
@@ -45,6 +42,7 @@ pub(crate) struct GameBoy {
     // lcd_prev_state: bool,
     /// Interrupt Master Enable
     ime: bool,
+    interrupt_flag: u8,
     set_ei: bool,
 }
 
@@ -61,7 +59,7 @@ impl GameBoy {
         self.timer_step(ticks);
 
         let (gpu_interrupts, keys) = self.display.gpu_step(self.cpu_cycles);
-        self.memory.io_registers.interrupt_flag |= gpu_interrupts;
+        self.interrupt_flag |= gpu_interrupts;
         self.joypad.key_pressed(keys);
 
         self.cpu_cycles = 0;
@@ -80,7 +78,7 @@ impl GameBoy {
     fn timer_step(&mut self, ticks: u32) {
         if self.timer.step_timer(ticks) {
             println!("enabling timer interrupt");
-            self.memory.io_registers.enable_timer_interrupt();
+            self.interrupt_flag |= interrupts::TIMER;
         }
     }
 
@@ -90,7 +88,7 @@ impl GameBoy {
             self.set_ei = false;
             return false;
         }
-        let interrupts = self.memory.interrupt_enable & self.memory.io_registers.interrupt_flag;
+        let interrupts = self.memory.interrupt_enable & self.interrupt_flag;
         if interrupts == 0 {
             return false;
         }
@@ -104,37 +102,34 @@ impl GameBoy {
         self.push_stack(self.registers.pc);
 
         if interrupts & interrupts::VBLANK > 0 {
-            self.memory.io_registers.interrupt_flag &= !interrupts::VBLANK;
+            self.interrupt_flag &= !interrupts::VBLANK;
             debug!("VBlank Interrupt Handler from: {:#x}", self.registers.pc);
             self.registers.set_pc(0x40);
             return true;
         }
         if interrupts & interrupts::STAT > 0 {
-            self.memory.io_registers.interrupt_flag &= !interrupts::STAT;
+            self.interrupt_flag &= !interrupts::STAT;
             debug!("VBlank Interrupt Handler from: {:#x}", self.registers.pc);
             self.registers.set_pc(0x48);
             return true;
         }
 
         if interrupts & interrupts::TIMER > 0 {
-            self.memory.io_registers.interrupt_flag &= !interrupts::TIMER;
+            self.interrupt_flag &= !interrupts::TIMER;
             println!("Timer Interrupt Handler from: {:#x}", self.registers.pc);
             self.registers.set_pc(0x50);
             return true;
         }
 
         if interrupts & interrupts::SERIAL > 0 {
-            self.memory.io_registers.interrupt_flag &= !interrupts::SERIAL;
+            self.interrupt_flag &= !interrupts::SERIAL;
             println!("Serial Interrupt Handler from: {:#x}", self.registers.pc);
             self.registers.set_pc(0x58);
             return true;
         }
 
         println!("Interrupt enable: {:#8b}", self.memory.interrupt_enable);
-        println!(
-            "Interrupt flag: {:#8b}",
-            self.memory.io_registers.interrupt_flag
-        );
+        println!("Interrupt flag: {:#8b}", self.interrupt_flag);
         self.memory.dump_tile_data();
         panic!("found interrupt")
     }
@@ -179,6 +174,7 @@ impl GameBoy {
             0x9800..=0x9FFF => self.display.get(location),
 
             0xff04..=0xff07 => self.timer.get(location),
+            0xff0f => self.interrupt_flag,
 
             controls::REGISTER_LOCATION => self.joypad.get(location),
 
@@ -206,6 +202,7 @@ impl GameBoy {
             0x9800..=0x9FFF => self.display.write(location, value),
 
             0xff04..=0xff07 => self.timer.write(location, value),
+            0xff0f => self.interrupt_flag = value,
 
             controls::REGISTER_LOCATION => self.joypad.write(location, value),
 
@@ -2117,10 +2114,10 @@ impl GameBoy {
             registers: Registers::default(),
             memory: Memory::default(),
             joypad: Joypad::default(),
-
             timer: Timer::default(),
 
             ime: false,
+            interrupt_flag: 0xe1,
             set_ei: false,
 
             cpu_cycles: 0,

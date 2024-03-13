@@ -1,10 +1,6 @@
 use log::{debug, info, trace};
 
-use crate::gameboy::interrupts;
-
 pub struct IORegisters {
-    pub interrupt_flag: u8,
-
     /// ff01
     serial_transfer_data: u8,
     /// ff02
@@ -21,8 +17,6 @@ impl IORegisters {
             0xff01 => self.serial_transfer_data,
             0xff02 => self.serial_transfer_control,
 
-            0xff0f => self.interrupt_flag,
-
             // ignore
             // 0xFF4D => 0,
             // sound
@@ -37,7 +31,6 @@ impl IORegisters {
         match location {
             0xff01 => self.serial_transfer_data = value,
             0xff02 => self.serial_transfer_control = value,
-            0xff0f => self.interrupt_flag = value,
 
             // ignore
             0xFF4D => (),
@@ -62,22 +55,9 @@ impl IORegisters {
         }
     }
 
-    pub fn enable_video_interrupt(&mut self) {
-        self.interrupt_flag |= interrupts::VBLANK;
-    }
-
-    pub fn enable_stat_interrupt(&mut self) {
-        self.interrupt_flag |= interrupts::STAT;
-    }
-
-    pub fn enable_timer_interrupt(&mut self) {
-        self.interrupt_flag |= interrupts::TIMER;
-    }
-
     pub fn default() -> IORegisters {
         IORegisters {
             // scanline: 0,
-            interrupt_flag: 0xe1,
             serial_transfer_data: 0,
             serial_transfer_control: 0,
             audio_master: 0xf1, // todo crosscheck
