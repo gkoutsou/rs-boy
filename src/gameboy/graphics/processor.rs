@@ -110,14 +110,8 @@ impl Processor {
                 self.lcd_control = value;
             }
             0xff41 => self.lcd_status = value,
-            0xff42 => {
-                println!("SCY: {}", value);
-                self.scy = value
-            }
-            0xff43 => {
-                println!("SCX: {}", value);
-                self.scx = value
-            }
+            0xff42 => self.scy = value,
+            0xff43 => self.scx = value,
             0xff45 => {
                 if value == self.ly {
                     todo!("Do I need to trigger STAT interrupt?");
@@ -128,14 +122,8 @@ impl Processor {
             0xff47 => self.bgp = value,
             0xff48 => self.obp0 = value,
             0xff49 => self.obp1 = value,
-            0xff4a => {
-                info!("wy: {}", value);
-                self.wy = value
-            }
-            0xff4b => {
-                info!("wx: {}", value);
-                self.wx = value
-            }
+            0xff4a => self.wy = value,
+            0xff4b => self.wx = value,
             0xff44 => panic!("writing to scanline"),
 
             _ => {

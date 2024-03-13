@@ -1,8 +1,6 @@
 use log::trace;
 use minifb::{Key, Window, WindowOptions};
 
-use super::graphics;
-
 pub const WIDTH: usize = 160;
 const HEIGHT: usize = 144;
 
@@ -11,11 +9,11 @@ const LIGHT_GRAY: u32 = 0xa9a9a9;
 const DARK_GRAY: u32 = 0x545454;
 const BLACK: u32 = 0x000000;
 
-pub struct Display {
+pub struct Engine {
     screen: Vec<u32>,
     window: Window,
 }
-impl Display {
+impl Engine {
     pub fn wipe_line(&mut self, line: u8) {
         for p in 0..WIDTH {
             self.screen[line as usize * WIDTH + p] = 0xffffff;
@@ -45,7 +43,7 @@ impl Display {
         self.screen[y as usize * WIDTH + x as usize] = color
     }
 
-    pub fn draw_tile(&mut self, tile: graphics::Tile, y: u8, tile_data: (u8, u8), palette: u8) {
+    pub fn draw_tile(&mut self, tile: super::Tile, y: u8, tile_data: (u8, u8), palette: u8) {
         let skip = if tile.x < 8 { 8 - tile.x } else { 0 };
 
         let range: Box<dyn Iterator<Item = u8>> = if tile.is_x_flipped() {
@@ -84,7 +82,7 @@ impl Display {
         }
     }
 
-    pub fn default() -> Display {
+    pub fn default() -> Engine {
         let screen_buffer: Vec<u32> = vec![0; WIDTH * HEIGHT];
 
         let mut window_opts = WindowOptions::default();
@@ -99,7 +97,7 @@ impl Display {
         window.limit_update_rate(Some(std::time::Duration::from_micros(16666)));
         // window.limit_update_rate(None);
 
-        Display {
+        Engine {
             screen: screen_buffer,
             window,
         }

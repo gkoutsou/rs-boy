@@ -3,7 +3,6 @@ use std::{path, thread, time};
 mod cartridge;
 mod controls;
 mod cpu;
-mod display;
 mod graphics;
 mod interrupts;
 mod memory;
@@ -12,13 +11,14 @@ mod timer;
 
 use cartridge::Cartridge;
 use controls::Joypad;
-use display::Display;
 use log::{debug, info, trace};
 use memory::Memory;
 use registers::Registers;
 use timer::Timer;
 
 use registers::operations::Operations;
+
+use self::graphics::Display;
 
 fn u16_to_u8s(input: u16) -> (u8, u8) {
     let hs = (input >> 8) as u8;
@@ -32,7 +32,6 @@ fn u8s_to_u16(ls: u8, hs: u8) -> u16 {
 
 pub(crate) struct GameBoy {
     cartridge: Cartridge,
-    graphics: graphics::Processor,
     display: Display,
     joypad: Joypad,
     registers: Registers,
@@ -41,8 +40,6 @@ pub(crate) struct GameBoy {
     timer: Timer,
 
     cpu_cycles: u32,
-    gpu_mode: graphics::Mode,
-
     halt: bool,
 
     // lcd_prev_state: bool,
@@ -63,7 +60,11 @@ impl GameBoy {
 
         self.timer_step(ticks);
 
-        self.gpu_step();
+        let (gpu_interrupts, keys) = self.display.gpu_step(self.cpu_cycles);
+        self.memory.io_registers.interrupt_flag |= gpu_interrupts;
+        self.joypad.key_pressed(keys);
+
+        self.cpu_cycles = 0;
     }
 
     fn cpu_step(&mut self) -> u32 {
@@ -157,231 +158,6 @@ impl GameBoy {
         }
     }
 
-    fn gpu_step(&mut self) {
-        if !self.graphics.lcd_enabled() {
-            trace!("LCD disabled!");
-            self.cpu_cycles = 0;
-            self.graphics.ly = 0;
-            self.set_gpu_mode(graphics::Mode::Two);
-            return;
-        }
-
-        match self.gpu_mode {
-            graphics::Mode::Two => {
-                let _line = self.graphics.ly;
-                if self.cpu_cycles >= 80 {
-                    // scan pixels TODO ideally I should follow the ticks, not do it at once
-                    self.cpu_cycles -= 80;
-                    self.set_gpu_mode(graphics::Mode::Three);
-                }
-            }
-            graphics::Mode::One => {
-                if self.cpu_cycles >= 456 {
-                    self.graphics.ly += 1;
-                    self.cpu_cycles -= 456;
-                    if self.graphics.should_trigger_lyc_stat_interrupt() {
-                        self.memory.io_registers.enable_stat_interrupt();
-                        println!(
-                            "todo: check and enable interrupt - lyc - One {}-{}",
-                            self.graphics.lyc, self.graphics.ly
-                        )
-                    }
-
-                    if self.graphics.ly > 153 {
-                        self.graphics.ly = 0;
-                        self.set_gpu_mode(graphics::Mode::Two);
-                    }
-                }
-            }
-            graphics::Mode::Zero => {
-                if self.cpu_cycles >= 204 {
-                    self.cpu_cycles -= 204;
-
-                    self.graphics.ly += 1;
-                    if self.graphics.should_trigger_lyc_stat_interrupt() {
-                        self.memory.io_registers.enable_stat_interrupt();
-                        println!(
-                            "todo: check and enable interrupt - lyc - Zero {}-{}",
-                            self.graphics.lyc, self.graphics.ly
-                        );
-                    }
-
-                    if self.graphics.ly == 144 {
-                        self.memory.io_registers.enable_video_interrupt();
-
-                        self.display.refresh_buffer();
-
-                        let keys = self.display.get_pressed_keys();
-                        self.joypad.key_pressed(keys);
-
-                        self.set_gpu_mode(graphics::Mode::One);
-                    } else {
-                        self.set_gpu_mode(graphics::Mode::Two);
-                    }
-                }
-            }
-            graphics::Mode::Three => {
-                let line = self.graphics.ly;
-
-                if self.cpu_cycles >= 172 {
-                    self.display.wipe_line(line);
-                    self.draw_background();
-                    self.draw_sprites(line);
-
-                    self.set_gpu_mode(graphics::Mode::Zero);
-                    self.cpu_cycles -= 172;
-                }
-            }
-        }
-    }
-
-    fn draw_sprites(&mut self, line: u8) {
-        if !self.graphics.is_object_enabled() {
-            trace!("objects are disabled :sadge:");
-            return;
-        }
-
-        let double_size = self.graphics.is_object_double_size();
-
-        let mut object_counter = 0;
-        let mut previous_x_coordinate = 255;
-        for i in 0..40 {
-            let tile = self.memory.get_oam_object(i);
-
-            if tile.object_in_scanline(line, double_size) {
-                object_counter += 1;
-                debug!("{}: found object {:?}", line, tile);
-                if object_counter > 10 {
-                    trace!("too many sprites on the line. Is it a bug?");
-                    break;
-                }
-
-                // If same X coordinate, the previous has priority
-                if tile.x == previous_x_coordinate {
-                    info!("same x, previous has priority");
-                    // todo!("this is wrong.. only if opaque!")
-                    // continue;
-                }
-                previous_x_coordinate = tile.x;
-
-                if tile.x == 0 || tile.x >= 168 {
-                    debug!("sprite's x is outside of bounds. ignoring");
-                    continue;
-                }
-
-                let index = if double_size {
-                    if line + 16 - tile.y < 8 {
-                        tile.tile_index & 0xfe
-                    } else {
-                        tile.tile_index | 0x01
-                    }
-                } else {
-                    tile.tile_index
-                };
-
-                // if not double size or the top tile for double
-                // let y_pos = if !double_size || line + 16 - tile.y < 8 {
-                //     16 + line as usize - tile.y as usize
-                // } else {
-                //     16 + line as usize - (tile.y + 8) as usize
-                // };
-                let y_pos = 16 + line as usize - tile.y as usize;
-                let final_y_pos = if !tile.is_y_flipped() {
-                    y_pos % 8
-                } else {
-                    // TODO flipped - double is probably broken
-                    7 - (y_pos % 8)
-                };
-
-                debug!("line: {} tile.y: {}", line, tile.y);
-                let tile_data = self.memory.get_tile_data(0x8000, index, final_y_pos);
-
-                let palette = if (tile.flags & (1 << 4)) > 0 {
-                    self.graphics.obp1
-                } else {
-                    self.graphics.obp0
-                };
-                self.display.draw_tile(tile, line, tile_data, palette);
-            }
-        }
-    }
-
-    fn draw_background(&mut self) {
-        let line = self.graphics.ly;
-        if !self.graphics.is_bg_window_enabled() {
-            trace!("bg/window is disabled. must draw white :sadge:");
-            // todo we also wipe_line one up. probably uneccessary
-            self.display.wipe_line(line);
-            return;
-        }
-
-        let wx = self.graphics.wx;
-        let wy = self.graphics.wy;
-        let in_window =
-            self.graphics.is_window_enabled() && line >= wy && wx <= (display::WIDTH + 7) as u8;
-
-        for x in 0..160u8 {
-            let in_window = in_window && x + 7 >= wx;
-
-            let y_pos = if in_window {
-                self.graphics.win_y_counter
-            } else {
-                self.graphics.scy.wrapping_add(line)
-            };
-
-            // which of the 8 vertical pixels of the current
-            // tile is the scanline on?
-            let tile_row = y_pos / 8;
-
-            let tile_map = self.graphics.get_tile_map(in_window);
-
-            // translate the current x pos to window space if necessary
-            let x_pos = if in_window {
-                x + 7 - wx
-            } else {
-                x.wrapping_add(self.graphics.scx)
-            };
-
-            let tile_col = x_pos / 8;
-
-            // if in_window {
-            //     println!(
-            //         "tilemap: {:#x} -> {:#x} (tile_row/col {}-{}) - (xpos/ypos {}-{}) - line/counter/wy {}-{}-{}",
-            //         tile_map,
-            //         tile_map + tile_row as usize * 32 + tile_col as usize,
-            //         tile_row,
-            //         tile_col,
-            //         x_pos,
-            //         y_pos,
-            //         line,
-            //         self.graphics.win_y_counter,
-            //         wy
-            //     );
-            // }
-
-            let tile_id = self
-                .memory
-                .get(tile_map + tile_row as usize * 32 + tile_col as usize);
-
-            let tile_data_baseline = self.graphics.get_tile_data_baseline();
-
-            let tile_data =
-                self.memory
-                    .get_tile_data(tile_data_baseline, tile_id, y_pos as usize % 8);
-
-            let palette = self.graphics.bgp;
-            self.display
-                .draw_bg_tile(x_pos, x, line, tile_data, palette);
-        }
-        if in_window {
-            println!(
-                "GKO: c:{} - ly:{} - wy:{}",
-                self.graphics.win_y_counter, line, wy
-            );
-            self.graphics.win_y_counter += 1;
-        }
-    }
-
     pub fn get_ffxx(&self, steps: usize) -> u8 {
         let location = 0xff00 + steps;
         self.memory_read(location)
@@ -398,8 +174,9 @@ impl GameBoy {
 
             0xA000..=0xBFFF => self.cartridge.get(location),
 
-            0xff46 => self.memory.get(location),
-            0xff40..=0xff4b => self.graphics.get(location),
+            0xff40..=0xff4b => self.display.get(location),
+            0x8000..=0x97FF => self.display.get(location),
+            0x9800..=0x9FFF => self.display.get(location),
 
             0xff04..=0xff07 => self.timer.get(location),
 
@@ -414,8 +191,19 @@ impl GameBoy {
 
             0xA000..=0xBFFF => self.cartridge.write(location, value),
 
-            0xff46 => self.memory.write(location, value),
-            0xff40..=0xff4b => self.graphics.write(location, value),
+            0xff46 => {
+                let location = (value as u16) << 8;
+                debug!(
+                    "Triggering DMA transfter to OAM! {:#x} --> {:#x}",
+                    value, location
+                );
+                for i in 0..0xA0 {
+                    self.display.oam[i] = self.memory_read(location as usize + i);
+                }
+            }
+            0xff40..=0xff4b => self.display.write(location, value),
+            0x8000..=0x97FF => self.display.write(location, value),
+            0x9800..=0x9FFF => self.display.write(location, value),
 
             0xff04..=0xff07 => self.timer.write(location, value),
 
@@ -524,7 +312,7 @@ impl GameBoy {
                 trace!("############");
                 if !self.registers.f.has_flag(cpu::Flag::Z) {
                     let new_location = (self.registers.pc as i32 + steps) as u16;
-                    info!(
+                    debug!(
                         "JUMP - Current location: {:#x}, next: {:#x}",
                         self.registers.pc, new_location
                     );
@@ -2317,22 +2105,6 @@ impl GameBoy {
         }
     }
 
-    fn set_gpu_mode(&mut self, mode: graphics::Mode) {
-        self.gpu_mode = mode;
-        self.graphics.lcd_status &= !3; // wipe 2 first digits
-        self.graphics.lcd_status |= mode as u8;
-
-        if self.graphics.should_trigger_mode_stat_interrupt(mode) {
-            self.memory.io_registers.enable_stat_interrupt();
-            println!("todo: check and enable interrupt - mode");
-        }
-
-        if mode == graphics::Mode::Two && self.graphics.wy == self.graphics.ly {
-            // reset window counter
-            self.graphics.win_y_counter = 0
-        }
-    }
-
     pub fn start(&mut self) {
         loop {
             self.step();
@@ -2342,7 +2114,6 @@ impl GameBoy {
     pub fn new(path: &str) -> GameBoy {
         GameBoy {
             cartridge: Cartridge::default(path::PathBuf::from(path)),
-            graphics: graphics::Processor::default(),
             registers: Registers::default(),
             memory: Memory::default(),
             joypad: Joypad::default(),
@@ -2352,9 +2123,8 @@ impl GameBoy {
             ime: false,
             set_ei: false,
 
-            halt: false,
             cpu_cycles: 0,
-            gpu_mode: graphics::Mode::Two,
+            halt: false,
             display: Display::default(),
             // lcd_prev_state: true,
         }

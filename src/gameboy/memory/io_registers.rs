@@ -1,4 +1,4 @@
-use log::{info, trace};
+use log::{debug, info, trace};
 
 use crate::gameboy::interrupts;
 
@@ -16,7 +16,7 @@ pub struct IORegisters {
 
 impl IORegisters {
     pub fn get(&self, location: usize) -> u8 {
-        info!("Read io/memory: {:#x}", location);
+        debug!("Read io/memory: {:#x}", location);
         match location {
             0xff01 => self.serial_transfer_data,
             0xff02 => self.serial_transfer_control,
@@ -51,7 +51,6 @@ impl IORegisters {
 
             0xFF56 => (),
 
-            // 0xff0f => self.interrupt_flag,
             _ => {
                 // let ten_millis = time::Duration::from_secs(10);
                 // thread::sleep(ten_millis);
