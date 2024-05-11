@@ -2110,7 +2110,7 @@ impl GameBoy {
 
     pub fn new(path: &str) -> GameBoy {
         GameBoy {
-            cartridge: Cartridge::default(path::PathBuf::from(path)),
+            cartridge: Cartridge::load(path::PathBuf::from(path)),
             registers: Registers::default(),
             memory: Memory::default(),
             joypad: Joypad::default(),

@@ -1,7 +1,7 @@
 mod io_registers;
 
 pub use io_registers::IORegisters;
-use log::{debug, info, trace};
+use log::{debug, trace};
 
 pub struct Memory {
     high_ram: Vec<u8>,
@@ -15,19 +15,15 @@ pub struct Memory {
 
 impl Memory {
     pub fn get(&self, location: usize) -> u8 {
-        if (0xff80..=0xfffe).contains(&location) {
-            trace!("HRAM Read: {:#x}", location);
-            self.high_ram[location - 0xff80]
-        } else if (0xc000..=0xdfff).contains(&location) {
-            trace!("WRAM Read: {:#x}", location);
-            self.work_ram[location - 0xc000]
-        } else if (0xff00..=0xff77).contains(&location) {
-            self.io_registers.get(location)
-        } else if location == 0xffff {
-            trace!("IME");
-            self.interrupt_enable
-        } else {
-            panic!("Unknown location: {:#x}", location)
+        match location {
+            0xff80..=0xfffe => self.high_ram[location - 0xff80],
+            0xc000..=0xdfff => self.work_ram[location - 0xc000],
+            0xff00..=0xff77 => self.io_registers.get(location),
+            0xffff => {
+                trace!("IME");
+                self.interrupt_enable
+            }
+            _ => panic!("Unknown location: {:#x}", location),
         }
     }
 
@@ -84,7 +80,7 @@ impl Memory {
         // println!("DUMPING TILE DATA COMPLETED");
     }
 
-    pub fn dump_oam(&self) {
+    pub fn _dump_oam(&self) {
         // println!("DUMPING OAM DATA");
         // for object in 0..40 {
         //     let tile = self.get_oam_object(object);

@@ -1,7 +1,7 @@
 use std::{
     fs::File,
     io::{self, Read, Write},
-    path::{self, Path},
+    path::{self},
     str,
 };
 
@@ -133,7 +133,7 @@ impl Cartridge {
         Ok(buffer)
     }
 
-    pub fn default(file_path: path::PathBuf) -> Cartridge {
+    pub fn load(file_path: path::PathBuf) -> Cartridge {
         let result = Self::load_file(file_path.as_path());
 
         let buffer = result.unwrap();
