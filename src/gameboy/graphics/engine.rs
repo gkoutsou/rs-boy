@@ -1,5 +1,5 @@
 use log::trace;
-use minifb::{Key, Window, WindowOptions};
+use minifb::{Key, Window};
 
 pub const WIDTH: usize = 160;
 const HEIGHT: usize = 144;
@@ -82,11 +82,13 @@ impl Engine {
         }
     }
 
-    pub fn default() -> Engine {
+    pub fn new() -> Self {
         let screen_buffer: Vec<u32> = vec![0; WIDTH * HEIGHT];
 
-        let mut window_opts = WindowOptions::default();
-        window_opts.scale = minifb::Scale::X2;
+        let window_opts = minifb::WindowOptions {
+            scale: minifb::Scale::X2,
+            ..Default::default()
+        };
 
         let mut window = Window::new("Test - ESC to exit", WIDTH, HEIGHT, window_opts)
             .unwrap_or_else(|e| {

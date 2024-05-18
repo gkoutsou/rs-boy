@@ -195,13 +195,23 @@ impl Cartridge {
             None
         };
 
-        let external_ram = if save_file.is_none() {
-            None
-        } else if !save_file.as_ref().unwrap().exists() {
-            Some(vec![0; external_ram_size.unwrap()])
+        let external_ram = if let Some(file_path) = &save_file {
+            if file_path.exists() {
+                Some(Self::load_file(file_path).unwrap())
+            } else {
+                Some(vec![0; external_ram_size.unwrap()])
+            }
         } else {
-            Some(Self::load_file(save_file.as_ref().unwrap().as_path()).unwrap())
+            None
         };
+
+        // let external_ram = if save_file.is_none() {
+        //     None
+        // } else if !save_file.as_ref().unwrap().exists() {
+        //     Some(vec![0; external_ram_size.unwrap()])
+        // } else {
+        //     Some(Self::load_file(save_file.as_ref().unwrap().as_path()).unwrap())
+        // };
 
         Cartridge {
             mbc_type,
@@ -220,7 +230,7 @@ impl Drop for Cartridge {
     fn drop(&mut self) {
         if let Some(filepath) = &self.save_file {
             let mut file = File::create(filepath).unwrap();
-            let res = file.write_all(&self.ram.as_ref().unwrap());
+            let res = file.write_all(self.ram.as_ref().unwrap());
             if res.is_err() {
                 panic!("{:?}", res);
             }

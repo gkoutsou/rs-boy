@@ -78,7 +78,7 @@ impl Registers {
         (result, f)
     }
 
-    pub fn default() -> Registers {
+    pub fn new() -> Self {
         Registers {
             // Classic
             pc: 0x100,

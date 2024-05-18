@@ -102,7 +102,7 @@ impl Timer {
         }
     }
 
-    pub fn default() -> Timer {
+    pub fn new() -> Self {
         Timer {
             div: 0xab,
             tima: 0,

@@ -204,7 +204,7 @@ impl Processor {
         false
     }
 
-    pub fn default() -> Processor {
+    pub fn new() -> Self {
         Processor {
             // scanline: 0,
             lcd_control: 0x91,

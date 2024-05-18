@@ -311,10 +311,10 @@ impl Display {
         }
     }
 
-    pub(crate) fn default() -> Display {
+    pub(crate) fn new() -> Self {
         Display {
-            engine: Engine::default(),
-            processor: Processor::default(),
+            engine: Engine::new(),
+            processor: Processor::new(),
 
             tile_data: vec![0; 0x97FF - 0x8000 + 1],
             tile_maps: vec![0; 0x9FFF - 0x9800 + 1],

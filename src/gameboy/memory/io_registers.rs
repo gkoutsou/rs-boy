@@ -1,4 +1,4 @@
-use log::{debug, info, trace};
+use log::{debug, trace};
 
 pub struct IORegisters {
     /// ff01
@@ -55,7 +55,7 @@ impl IORegisters {
         }
     }
 
-    pub fn default() -> IORegisters {
+    pub fn new() -> IORegisters {
         IORegisters {
             // scanline: 0,
             serial_transfer_data: 0,

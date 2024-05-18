@@ -2111,10 +2111,10 @@ impl GameBoy {
     pub fn new(path: &str) -> GameBoy {
         GameBoy {
             cartridge: Cartridge::load(path::PathBuf::from(path)),
-            registers: Registers::default(),
-            memory: Memory::default(),
-            joypad: Joypad::default(),
-            timer: Timer::default(),
+            registers: Registers::new(),
+            memory: Memory::new(),
+            joypad: Joypad::new(),
+            timer: Timer::new(),
 
             ime: false,
             interrupt_flag: 0xe1,
@@ -2122,7 +2122,7 @@ impl GameBoy {
 
             cpu_cycles: 0,
             halt: false,
-            display: Display::default(),
+            display: Display::new(),
             // lcd_prev_state: true,
         }
     }

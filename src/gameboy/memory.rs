@@ -89,12 +89,12 @@ impl Memory {
         // println!("DUMPING OAM DATA COMPLETED");
     }
 
-    pub fn default() -> Memory {
+    pub fn new() -> Self {
         Memory {
             high_ram: vec![0; 0xfffe - 0xff80 + 1],
             work_ram: vec![0; 0xdfff - 0xc000 + 1], // 4+4 but half could be rotatable..
 
-            io_registers: IORegisters::default(),
+            io_registers: IORegisters::new(),
 
             interrupt_enable: 0,
         }
