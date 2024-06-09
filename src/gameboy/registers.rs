@@ -83,7 +83,7 @@ impl Registers {
             // Classic
             pc: 0x100,
             sp: 0xFFFE,
-            a: 0xff,
+            a: 0x01, // 0xFF for GameBoy Pocket
             l: 0x4d,
             f: 0xB0,
             b: 0x00,

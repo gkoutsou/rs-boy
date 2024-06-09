@@ -197,6 +197,7 @@ impl GameBoy {
                     self.display.oam[i] = self.memory_read(location as usize + i);
                 }
             }
+            0xfe00..=0xfe9f => self.display.write(location, value),
             0xff40..=0xff4b => self.display.write(location, value),
             0x8000..=0x97FF => self.display.write(location, value),
             0x9800..=0x9FFF => self.display.write(location, value),
