@@ -11,16 +11,16 @@ While the emulator is usable in some level, it is not fully implementing all the
  - [x] Keyboard controls
 
 ## Missing features
-- [] Audio
-- [] GamePad support
-- [] RTC Register for MBC3 cartridges.
+- [ ] Audio
+- [ ] GamePad support
+- [ ] RTC Register for MBC3 cartridges.
 
 ## Test Suites
 ### Blargg's test ROMs
 - [x] CPU Instructions
-- [] Instruction Timing
-- [] Interrupt Timing
-- [] Memory Timing
+- [ ] Instruction Timing
+- [ ] Interrupt Timing
+- [ ] Memory Timing
 
 ### Acid2:
 - Failed `Object Priority Same X Coordinate`
