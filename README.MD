@@ -6,7 +6,7 @@ While the emulator is usable in some level, it is not fully implementing all the
 
  ## Implemented features
  - [x] All CPU instructions
- - [x] MBC1/MBC3 Cartridge types (Though missing RTC Register)
+ - [x] Basic support for NoMBC/MBC1/MBC3 Cartridge types
  - [x] Timer/VBlank/STAT Interrupts
  - [x] Keyboard controls
 

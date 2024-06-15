@@ -9,6 +9,7 @@ use log::{debug, info, warn};
 
 #[derive(PartialEq, Eq, Debug)]
 enum Type {
+    NoMBC,
     MBC1,
     MBC3,
 }
@@ -24,8 +25,11 @@ pub struct Cartridge {
     ram: Option<Vec<u8>>,
     ram_bank: u8,
 
-    save_file: Option<path::PathBuf>,
+    // MBC Speficit
+    rtc_access: bool,
     rtc_latched: bool,
+
+    save_file: Option<path::PathBuf>,
 }
 
 impl Cartridge {
@@ -38,6 +42,9 @@ impl Cartridge {
     }
 
     pub fn write(&mut self, location: usize, value: u8) {
+        if self.mbc_type == Type::NoMBC {
+            panic!("no cartridge registers")
+        }
         match location {
             0x0000..=0x1fff => {
                 info!(
@@ -46,12 +53,18 @@ impl Cartridge {
                     value & 0x0f == 0x0a
                 );
                 self.ram_enabled = value & 0x0f == 0x0a
+                // For MBC3 it also enables writing to Timer Registers
             }
 
             0x2000..=0x3fff => {
                 match self.mbc_type {
                     Type::MBC1 => self.rom_bank = value & 0b11111,
                     Type::MBC3 => self.rom_bank = value,
+                    _ => todo!(
+                        "Writing to location {:#x} for: {:?}",
+                        location,
+                        self.mbc_type
+                    ),
                 };
 
                 if self.rom_bank == 0 {
@@ -67,25 +80,36 @@ impl Cartridge {
             0x4000..=0x5fff => {
                 if value <= 0x3 {
                     info!("Changing to memory bank: {}", self.ram_bank);
-                    self.ram_bank = value
-                } else {
+                    self.ram_bank = value;
+                    self.rtc_access = false;
+                } else if self.mbc_type == Type::MBC3 {
+                    self.rtc_access = true;
                     todo!("support RTC registers");
+                } else {
+                    todo!("{:?}: not handled write to {:#x}", self.mbc_type, location)
                 }
+                // TODO In 1MB MBC1 multi-carts (see below), this 2-bit register is instead applied to bits 4-5 of the
+                // ROM bank number and the top bit of the main 5-bit main ROM banking register is ignored.
             }
             0x6000..=0x7fff => {
-                let set_one = value == 1;
-                info!("Latch-change {} => {}", self.rtc_latched, set_one);
-                if !self.rtc_latched && set_one {
-                    // todo here we should actually set some internal variables so that we can read
-                    // todo!("Latching!")
-                } else if self.rtc_latched && set_one {
-                    panic!("from latched to latched!")
-                } else if self.rtc_latched && !set_one {
-                    todo!("latch => 0!")
-                } else if !self.rtc_latched && !set_one {
-                    warn!("from not-latched to not-latched!")
+                match self.mbc_type {
+                    Type::MBC3 => {
+                        let set_one = value == 1;
+                        info!("Latch-change {} => {}", self.rtc_latched, set_one);
+                        if !self.rtc_latched && set_one {
+                            // todo here we should actually set some internal variables so that we can read
+                            // todo!("Latching!")
+                        } else if self.rtc_latched && set_one {
+                            panic!("from latched to latched!")
+                        } else if self.rtc_latched && !set_one {
+                            todo!("latch => 0!")
+                        } else if !self.rtc_latched && !set_one {
+                            warn!("from not-latched to not-latched!")
+                        }
+                        // todo!("Latch RTC")
+                    }
+                    _ => todo!("{:?}: Writing to location {:#x}", self.mbc_type, location,),
                 }
-                // todo!("Latch RTC")
             }
             0xa000..=0xbfff => {
                 if !self.ram_enabled {
@@ -94,6 +118,11 @@ impl Cartridge {
                 if self.ram.is_none() {
                     panic!("no external memory defined");
                 }
+
+                if self.mbc_type == Type::MBC3 && self.rtc_access {
+                    todo!("MBC3: need to write RTC memory instead")
+                }
+
                 let relative_loc = location - 0xa000;
                 let actual_loc = relative_loc + (self.ram_bank as usize) * 0x2000;
                 self.ram
@@ -111,6 +140,7 @@ impl Cartridge {
         if location <= 0x3fff {
             self.rom[location]
         } else if (0x4000..=0x7fff).contains(&location) {
+            // TODO handle 1MB MBC1 ROMs
             let relative_loc = location - 0x4000;
             let actual_loc = relative_loc + (self.rom_bank as usize) * 0x4000;
             self.rom[actual_loc]
@@ -120,6 +150,9 @@ impl Cartridge {
     }
 
     fn get_external_ram(&self, location: usize) -> u8 {
+        if self.mbc_type == Type::MBC3 && self.rtc_access {
+            todo!("MBC3: need to read RTC memory instead")
+        }
         let relative_loc = location - 0xA000;
         let actual_loc = relative_loc + (self.ram_bank as usize) * 0x2000;
         self.ram.as_ref().unwrap()[actual_loc]
@@ -155,6 +188,7 @@ impl Cartridge {
 
         let cartridge_type = buffer[0x147];
         let mbc_type = match cartridge_type {
+            0x0 => Type::NoMBC,
             0x1..=0x3 => Type::MBC1,
             0x0f..=0x13 => Type::MBC3,
 
@@ -222,6 +256,7 @@ impl Cartridge {
             ram_bank: 0,
             save_file,
             rtc_latched: false,
+            rtc_access: false,
         }
     }
 }
