@@ -29,7 +29,7 @@ fn u8s_to_u16(ls: u8, hs: u8) -> u16 {
 }
 
 pub(crate) struct GameBoy {
-    cartridge: Cartridge,
+    cartridge: Box<dyn Cartridge>,
     display: Display,
     joypad: Joypad,
     registers: Registers,
@@ -2111,7 +2111,7 @@ impl GameBoy {
 
     pub fn new(path: &str) -> GameBoy {
         GameBoy {
-            cartridge: Cartridge::load(path::PathBuf::from(path)),
+            cartridge: cartridge::load(path::PathBuf::from(path)),
             registers: Registers::new(),
             memory: Memory::new(),
             joypad: Joypad::new(),
