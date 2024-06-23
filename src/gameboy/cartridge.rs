@@ -1,6 +1,6 @@
 use std::{
     fs::File,
-    io::{self, Read, Write},
+    io::{self, Read},
     path::{self},
     str,
 };
@@ -9,7 +9,7 @@ mod mbc1;
 mod mbc3;
 mod nombc;
 
-use log::{debug, info, warn};
+use log::info;
 
 #[derive(PartialEq, Eq, Debug)]
 enum Type {
@@ -113,7 +113,7 @@ pub fn load(file_path: path::PathBuf) -> Box<dyn Cartridge> {
     // };
 
     match mbc_type {
-        Type::NoMBC => Box::new(nombc::NO_MBC::new(buffer)),
+        Type::NoMBC => Box::new(nombc::NoMBC::new(buffer)),
         Type::MBC1 => Box::new(mbc1::MBC1::new(buffer, external_ram, save_file)),
         Type::MBC3 => Box::new(mbc3::MBC3::new(buffer, external_ram, save_file)),
     }

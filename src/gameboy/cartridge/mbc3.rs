@@ -1,9 +1,8 @@
 use log::{debug, info, warn};
 use std::{
     fs::File,
-    io::{self, Read, Write},
+    io::{Write},
     path::{self},
-    str,
 };
 
 pub struct MBC3 {

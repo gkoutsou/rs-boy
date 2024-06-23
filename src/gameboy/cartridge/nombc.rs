@@ -1,8 +1,8 @@
-pub struct NO_MBC {
+pub struct NoMBC {
     rom: Vec<u8>,
 }
 
-impl super::Cartridge for NO_MBC {
+impl super::Cartridge for NoMBC {
     fn get(&self, location: usize) -> u8 {
         match location {
             0x000..=0x7fff => self.rom[location],
@@ -10,13 +10,13 @@ impl super::Cartridge for NO_MBC {
         }
     }
 
-    fn write(&mut self, location: usize, value: u8) {
+    fn write(&mut self, _location: usize, _value: u8) {
         panic!("no cartridge registers")
     }
 }
 
-impl NO_MBC {
+impl NoMBC {
     pub fn new(buffer: Vec<u8>) -> Self {
-        NO_MBC { rom: buffer }
+        NoMBC { rom: buffer }
     }
 }
