@@ -267,16 +267,13 @@ impl Display {
     }
 
     pub fn get(&self, location: usize) -> u8 {
-        if (0x8000..=0x97FF).contains(&location) {
-            // trace!("Getting Tile Data: {:#x}", location);
-            self.tile_data[location - 0x8000]
-        } else if (0x9800..=0x9FFF).contains(&location) {
-            // debug!("Reading Tile Map");
-            self.tile_maps[location - 0x9800]
-        } else if (0xff40..=0xff4b).contains(&location) {
-            self.processor.get(location)
-        } else {
-            panic!("Unknown location: {:#x}", location)
+        match location {
+            0x8000..=0x97FF => self.tile_data[location - 0x8000],
+            0x9800..=0x9FFF => self.tile_maps[location - 0x9800],
+            0xff40..=0xff4b => self.processor.get(location),
+            0xFE00..=0xFE9F => self.oam[location - 0xFE00],
+
+            _ => panic!("Unknown location: {:#x}", location),
         }
     }
 

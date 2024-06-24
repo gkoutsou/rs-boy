@@ -172,6 +172,7 @@ impl GameBoy {
             0xff40..=0xff4b => self.display.get(location),
             0x8000..=0x97FF => self.display.get(location),
             0x9800..=0x9FFF => self.display.get(location),
+            0xFE00..=0xFE9F => self.display.get(location),
 
             0xff04..=0xff07 => self.timer.get(location),
             0xff0f => self.interrupt_flag,

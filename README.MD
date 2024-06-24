@@ -2,7 +2,7 @@
 
 This is a pet project in an attempt to learn Rust by doing a real life project.
 
-While the emulator is usable in some level, it is not fully implementing all the hardware's features so most games will not work as expected.
+While the emulator is usable in some extend, it is not fully implementing all the hardware's features so most games will not work as expected.
 
  ## Implemented features
  - [x] All CPU instructions
