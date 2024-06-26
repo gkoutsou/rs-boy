@@ -6,6 +6,7 @@ mod cpu;
 mod graphics;
 mod interrupts;
 mod memory;
+mod memory_bus;
 mod registers;
 mod timer;
 
@@ -14,6 +15,7 @@ use controls::Joypad;
 use graphics::Display;
 use log::{debug, info, trace};
 use memory::Memory;
+use memory_bus::MemoryAccessor;
 use registers::operations::Operations;
 use registers::Registers;
 use timer::Timer;

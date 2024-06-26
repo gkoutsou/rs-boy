@@ -2,15 +2,13 @@ pub(crate) mod engine;
 mod processor;
 mod tile;
 
+use super::memory_bus::MemoryAccessor;
+use crate::gameboy::interrupts;
 pub use engine::Engine;
-use log::debug;
-use log::info;
-use log::trace;
+use log::{debug, info, trace};
 pub use processor::Mode;
 pub use processor::Processor;
 pub use tile::Tile;
-
-use crate::gameboy::interrupts;
 
 pub struct Display {
     engine: Engine,
@@ -266,7 +264,24 @@ impl Display {
         (a, b)
     }
 
-    pub fn get(&self, location: usize) -> u8 {
+    pub(crate) fn new() -> Self {
+        Display {
+            engine: Engine::new(),
+            processor: Processor::new(),
+
+            tile_data: vec![0; 0x97FF - 0x8000 + 1],
+            tile_maps: vec![0; 0x9FFF - 0x9800 + 1],
+            oam: vec![0; 0xFE9F - 0xFE00 + 1],
+
+            dots: 0,
+            gpu_mode: Mode::Two,
+            interrupt: 0,
+        }
+    }
+}
+
+impl MemoryAccessor for Display {
+    fn get(&self, location: usize) -> u8 {
         match location {
             0x8000..=0x97FF => self.tile_data[location - 0x8000],
             0x9800..=0x9FFF => self.tile_maps[location - 0x9800],
@@ -277,7 +292,7 @@ impl Display {
         }
     }
 
-    pub fn write(&mut self, location: usize, value: u8) {
+    fn write(&mut self, location: usize, value: u8) {
         match location {
             0xfe00..=0xfe9f => {
                 self.oam[location - 0xfe00] = value;
@@ -305,21 +320,6 @@ impl Display {
                     location, value
                 );
             }
-        }
-    }
-
-    pub(crate) fn new() -> Self {
-        Display {
-            engine: Engine::new(),
-            processor: Processor::new(),
-
-            tile_data: vec![0; 0x97FF - 0x8000 + 1],
-            tile_maps: vec![0; 0x9FFF - 0x9800 + 1],
-            oam: vec![0; 0xFE9F - 0xFE00 + 1],
-
-            dots: 0,
-            gpu_mode: Mode::Two,
-            interrupt: 0,
         }
     }
 }

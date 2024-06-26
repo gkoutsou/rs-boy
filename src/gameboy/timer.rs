@@ -1,5 +1,7 @@
 use log::{info, trace};
 
+use super::memory_bus::MemoryAccessor;
+
 pub struct Timer {
     /// FF04
     /// This register is incremented at a rate of 16384Hz (~16779Hz on SGB).
@@ -74,7 +76,22 @@ impl Timer {
         false
     }
 
-    pub fn get(&self, location: usize) -> u8 {
+    pub fn new() -> Self {
+        Timer {
+            div: 0xab,
+            tima: 0,
+            tma: 0,
+            tac: 0xf8,
+            // helpers
+            div_counter: 0,
+            tima_counter: 0,
+            tima_clock: 0,
+        }
+    }
+}
+
+impl MemoryAccessor for Timer {
+    fn get(&self, location: usize) -> u8 {
         trace!("Read Timer: {:#x}", location);
         match location {
             0xFF04 => self.div,
@@ -85,7 +102,7 @@ impl Timer {
         }
     }
 
-    pub fn write(&mut self, location: usize, value: u8) {
+    fn write(&mut self, location: usize, value: u8) {
         trace!("Writting to Timer Register: {:#x}: {:#b}", location, value);
         match location {
             0xFF04 => self.div = 0, // writing any value resets it
@@ -99,19 +116,6 @@ impl Timer {
                 "timer register location write: {:#x} - {:#x}",
                 location, value
             ),
-        }
-    }
-
-    pub fn new() -> Self {
-        Timer {
-            div: 0xab,
-            tima: 0,
-            tma: 0,
-            tac: 0xf8,
-            // helpers
-            div_counter: 0,
-            tima_counter: 0,
-            tima_clock: 0,
         }
     }
 }

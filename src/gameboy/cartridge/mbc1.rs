@@ -1,7 +1,9 @@
+use super::Cartridge;
+use crate::gameboy::memory_bus::MemoryAccessor;
 use log::{debug, info};
 use std::{
     fs::File,
-    io::{Write},
+    io::Write,
     path::{self},
 };
 
@@ -17,7 +19,9 @@ pub struct MBC1 {
     save_file: Option<path::PathBuf>,
 }
 
-impl super::Cartridge for MBC1 {
+impl Cartridge for MBC1 {}
+
+impl MemoryAccessor for MBC1 {
     fn get(&self, location: usize) -> u8 {
         match location {
             0x000..=0x7fff => self.get_rom(location),

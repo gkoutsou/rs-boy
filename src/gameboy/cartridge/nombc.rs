@@ -1,8 +1,13 @@
+use super::Cartridge;
+use crate::gameboy::memory_bus::MemoryAccessor;
+
 pub struct NoMBC {
     rom: Vec<u8>,
 }
 
-impl super::Cartridge for NoMBC {
+impl Cartridge for NoMBC {}
+
+impl MemoryAccessor for NoMBC {
     fn get(&self, location: usize) -> u8 {
         match location {
             0x000..=0x7fff => self.rom[location],

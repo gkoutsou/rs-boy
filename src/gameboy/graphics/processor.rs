@@ -1,5 +1,7 @@
 use log::{info, trace};
 
+use crate::gameboy::memory_bus::MemoryAccessor;
+
 pub enum LcdStatusFlag {
     LcdEnabled = 1 << 7,
     WindowTileMapArea = 1 << 6,
@@ -75,8 +77,8 @@ pub struct Processor {
     pub win_y_counter: u8,
 }
 
-impl Processor {
-    pub fn get(&self, location: usize) -> u8 {
+impl MemoryAccessor for Processor {
+    fn get(&self, location: usize) -> u8 {
         trace!("Read: {:#x}", location);
         match location {
             0xff40 => self.lcd_control,
@@ -98,7 +100,7 @@ impl Processor {
         }
     }
 
-    pub fn write(&mut self, location: usize, value: u8) {
+    fn write(&mut self, location: usize, value: u8) {
         trace!("Writting to gpu registers: {:#x}: {:#b}", location, value);
         match location {
             0xff40 => {
@@ -136,7 +138,9 @@ impl Processor {
             }
         }
     }
+}
 
+impl Processor {
     pub fn is_object_double_size(&self) -> bool {
         self.has_lcd_flag(LcdStatusFlag::ObjectSize)
     }

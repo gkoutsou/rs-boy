@@ -11,6 +11,8 @@ mod nombc;
 
 use log::info;
 
+use super::memory_bus::MemoryAccessor;
+
 #[derive(PartialEq, Eq, Debug)]
 enum Type {
     NoMBC,
@@ -18,10 +20,7 @@ enum Type {
     MBC3,
 }
 
-pub(crate) trait Cartridge {
-    fn get(&self, location: usize) -> u8;
-    fn write(&mut self, location: usize, value: u8);
-}
+pub(crate) trait Cartridge: MemoryAccessor {}
 
 fn load_file(file_path: &path::Path) -> io::Result<Vec<u8>> {
     let mut f = File::open(file_path)?;
