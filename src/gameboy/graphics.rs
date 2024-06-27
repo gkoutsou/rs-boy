@@ -1,17 +1,20 @@
 pub(crate) mod engine;
 mod processor;
 mod tile;
+mod window;
 
 use super::memory_bus::MemoryAccessor;
 use crate::gameboy::interrupts;
-pub use engine::Engine;
+pub use engine::Buffer;
 use log::{debug, info, trace};
 pub use processor::Mode;
 pub use processor::Processor;
 pub use tile::Tile;
+use window::Screen;
 
 pub struct Display {
-    engine: Engine,
+    engine: Buffer,
+    window: Box<dyn window::DrawingWindow>,
     processor: Processor,
 
     tile_data: Vec<u8>,
@@ -80,9 +83,9 @@ impl Display {
                     if self.processor.ly == 144 {
                         self.interrupt |= interrupts::VBLANK;
 
-                        self.engine.refresh_buffer();
+                        self.window.refresh_buffer(&self.engine.screen);
 
-                        let keys = self.engine.get_pressed_keys();
+                        let keys = self.window.get_pressed_keys();
                         pressed_keys = Some(keys);
 
                         self.set_gpu_mode(Mode::One);
@@ -190,7 +193,7 @@ impl Display {
         let wx = self.processor.wx;
         let wy = self.processor.wy;
         let in_window =
-            self.processor.is_window_enabled() && line >= wy && wx <= (engine::WIDTH + 7) as u8;
+            self.processor.is_window_enabled() && line >= wy && wx <= (window::WIDTH + 7) as u8;
 
         for x in 0..160u8 {
             let in_window = in_window && x + 7 >= wx;
@@ -266,7 +269,8 @@ impl Display {
 
     pub(crate) fn new() -> Self {
         Display {
-            engine: Engine::new(),
+            engine: Buffer::new(),
+            window: Box::new(Screen::new()),
             processor: Processor::new(),
 
             tile_data: vec![0; 0x97FF - 0x8000 + 1],

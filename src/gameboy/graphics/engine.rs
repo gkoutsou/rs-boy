@@ -1,19 +1,16 @@
+use super::window::{HEIGHT, WIDTH};
 use log::trace;
 use minifb::{Key, Window};
-
-pub const WIDTH: usize = 160;
-const HEIGHT: usize = 144;
 
 const WHITE: u32 = 0xffffff;
 const LIGHT_GRAY: u32 = 0xa9a9a9;
 const DARK_GRAY: u32 = 0x545454;
 const BLACK: u32 = 0x000000;
 
-pub struct Engine {
-    screen: Vec<u32>,
-    window: Window,
+pub struct Buffer {
+    pub screen: Vec<u32>,
 }
-impl Engine {
+impl Buffer {
     pub fn wipe_line(&mut self, line: u8) {
         for p in 0..WIDTH {
             self.screen[line as usize * WIDTH + p] = 0xffffff;
@@ -84,39 +81,9 @@ impl Engine {
 
     pub fn new() -> Self {
         let screen_buffer: Vec<u32> = vec![0; WIDTH * HEIGHT];
-
-        let window_opts = minifb::WindowOptions {
-            scale: minifb::Scale::X2,
-            ..Default::default()
-        };
-
-        let mut window = Window::new("Test - ESC to exit", WIDTH, HEIGHT, window_opts)
-            .unwrap_or_else(|e| {
-                panic!("{}", e);
-            });
-
-        // Limit to max ~60 fps update rate
-        window.limit_update_rate(Some(std::time::Duration::from_micros(16666)));
-        // window.limit_update_rate(None);
-
-        Engine {
+        Buffer {
             screen: screen_buffer,
-            window,
         }
-    }
-
-    pub fn refresh_buffer(&mut self) {
-        if self.window.is_open() && !self.window.is_key_down(Key::Escape) {
-            self.window
-                .update_with_buffer(&self.screen, WIDTH, HEIGHT)
-                .unwrap();
-        } else {
-            panic!("window deado")
-        }
-    }
-
-    pub fn get_pressed_keys(&self) -> Vec<minifb::Key> {
-        self.window.get_keys()
     }
 }
 
