@@ -47,3 +47,12 @@ impl Screen {
         Screen { window: window }
     }
 }
+
+pub struct FakeScreen {}
+impl DrawingWindow for FakeScreen {
+    fn refresh_buffer(&mut self, _screen: &Vec<u32>) {}
+
+    fn get_pressed_keys(&self) -> Vec<minifb::Key> {
+        return vec![];
+    }
+}

@@ -30,11 +30,11 @@ fn u8s_to_u16(ls: u8, hs: u8) -> u16 {
     (hs as u16) << 8 | ls as u16
 }
 
-pub(crate) struct GameBoy {
+pub struct GameBoy {
     cartridge: Box<dyn Cartridge>,
     display: Display,
     joypad: Joypad,
-    registers: Registers,
+    pub registers: Registers,
     memory: Memory,
     timer: Timer,
 
@@ -49,7 +49,7 @@ pub(crate) struct GameBoy {
 }
 
 impl GameBoy {
-    fn step(&mut self) {
+    pub fn step(&mut self) {
         if self.interrupt_step() {
             self.cpu_cycles += 20; // todo 16 or 12?
             return;
@@ -2107,6 +2107,7 @@ impl GameBoy {
     }
 
     pub fn start(&mut self) {
+        self.display.start_window();
         loop {
             self.step();
         }
@@ -2119,7 +2120,6 @@ impl GameBoy {
             memory: Memory::new(),
             joypad: Joypad::new(),
             timer: Timer::new(),
-
             ime: false,
             interrupt_flag: 0xe1,
             set_ei: false,
@@ -2127,7 +2127,6 @@ impl GameBoy {
             cpu_cycles: 0,
             halt: false,
             display: Display::new(),
-            // lcd_prev_state: true,
         }
     }
 }

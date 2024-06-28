@@ -1,6 +1,5 @@
 use super::window::{HEIGHT, WIDTH};
 use log::trace;
-use minifb::{Key, Window};
 
 const WHITE: u32 = 0xffffff;
 const LIGHT_GRAY: u32 = 0xa9a9a9;

@@ -10,7 +10,7 @@ use log::{debug, info, trace};
 pub use processor::Mode;
 pub use processor::Processor;
 pub use tile::Tile;
-use window::Screen;
+use window::{FakeScreen, Screen};
 
 pub struct Display {
     engine: Buffer,
@@ -267,10 +267,14 @@ impl Display {
         (a, b)
     }
 
+    pub fn start_window(&mut self) {
+        self.window = Box::new(Screen::new())
+    }
+
     pub(crate) fn new() -> Self {
         Display {
             engine: Buffer::new(),
-            window: Box::new(Screen::new()),
+            window: Box::new(FakeScreen {}), //TODO ugly.. setting a FakeScreen for sake of tests..
             processor: Processor::new(),
 
             tile_data: vec![0; 0x97FF - 0x8000 + 1],

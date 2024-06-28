@@ -1,9 +1,6 @@
-use std::env;
-
-mod gameboy;
-
 use env_logger::Env;
-use gameboy::GameBoy;
+use rs_boy::gameboy::GameBoy;
+use std::env;
 
 fn main() {
     env_logger::Builder::from_env(Env::default().default_filter_or("info"))
