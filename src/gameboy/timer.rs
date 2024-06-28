@@ -105,7 +105,11 @@ impl MemoryAccessor for Timer {
     fn write(&mut self, location: usize, value: u8) {
         trace!("Writting to Timer Register: {:#x}: {:#b}", location, value);
         match location {
-            0xFF04 => self.div = 0, // writing any value resets it
+            0xFF04 => {
+                // writing any value resets it
+                self.div = 0;
+                self.tima_counter = 0;
+            }
             0xFF05 => self.tima = value,
             0xFF06 => self.tma = value,
             0xFF07 => {
