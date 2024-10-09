@@ -484,6 +484,7 @@ dependencies = [
  "env_logger",
  "log",
  "minifb",
+ "sdl2",
 ]
 
 [[package]]

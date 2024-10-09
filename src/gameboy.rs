@@ -1,5 +1,6 @@
 use std::{path, thread, time};
 
+mod audio;
 mod cartridge;
 mod controls;
 mod cpu;
@@ -10,6 +11,7 @@ mod memory_bus;
 mod registers;
 mod timer;
 
+use audio::Speaker;
 use cartridge::Cartridge;
 use controls::Joypad;
 use graphics::Display;
@@ -31,6 +33,7 @@ fn u8s_to_u16(ls: u8, hs: u8) -> u16 {
 }
 
 pub struct GameBoy {
+    speaker: Speaker,
     cartridge: Box<dyn Cartridge>,
     display: Display,
     joypad: Joypad,
@@ -2108,6 +2111,7 @@ impl GameBoy {
 
     pub fn start(&mut self) {
         self.display.start_window();
+        self.speaker.start();
         loop {
             self.step();
         }
@@ -2115,6 +2119,7 @@ impl GameBoy {
 
     pub fn new(path: &str) -> GameBoy {
         GameBoy {
+            speaker: Speaker::new(),
             cartridge: cartridge::load(path::PathBuf::from(path)),
             registers: Registers::new(),
             memory: Memory::new(),
