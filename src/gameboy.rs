@@ -60,6 +60,7 @@ impl GameBoy {
         }
 
         let ticks = self.cpu_step();
+        self.speaker.step(ticks);
 
         self.timer_step(ticks);
 
@@ -174,6 +175,8 @@ impl GameBoy {
 
             0xA000..=0xBFFF => self.cartridge.get(location),
 
+            0xff10..=0xff26 => self.speaker.get(location),
+
             0xff40..=0xff4b => self.display.get(location),
             0x8000..=0x97FF => self.display.get(location),
             0x9800..=0x9FFF => self.display.get(location),
@@ -210,6 +213,8 @@ impl GameBoy {
 
             0xff04..=0xff07 => self.timer.write(location, value),
             0xff0f => self.interrupt_flag = value,
+
+            0xff10..=0xff26 => self.speaker.write(location, value),
 
             controls::REGISTER_LOCATION => self.joypad.write(location, value),
 

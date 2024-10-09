@@ -7,9 +7,6 @@ pub struct IORegisters {
     serial_transfer_data: u8,
     /// ff02
     serial_transfer_control: u8,
-
-    /// FF26
-    audio_master: u8,
 }
 
 impl MemoryAccessor for IORegisters {
@@ -21,9 +18,6 @@ impl MemoryAccessor for IORegisters {
 
             // ignore
             // 0xFF4D => 0,
-            // sound
-            0xff26 => self.audio_master,
-            0xFF10..=0xFF25 => 0, // todo
             _ => panic!("i/o register location read: {:#x}", location),
         }
     }
@@ -36,12 +30,6 @@ impl MemoryAccessor for IORegisters {
 
             // ignore
             0xFF4D => (),
-            // sound
-            0xff26 => self.audio_master = value,
-            0xFF10..=0xFF25 => {
-                // print!("{:#b}", value);
-                // panic!("{:#x}", location)
-            }
             0xFF30..=0xFF3F => (), // todo
 
             0xFF56 => (),
@@ -64,7 +52,6 @@ impl IORegisters {
             // scanline: 0,
             serial_transfer_data: 0,
             serial_transfer_control: 0,
-            audio_master: 0xf1, // todo crosscheck
         }
     }
 }
