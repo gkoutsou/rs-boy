@@ -7,30 +7,9 @@ mod channel1;
 
 const SAMPLING_FREQUENCY: u32 = 95; // 4.194.304 / 44100
 
-struct SquareWave {
-    phase_inc: f32,
-    phase: f32,
-    volume: f32,
-}
-
-impl AudioCallback for SquareWave {
-    type Channel = f32;
-
-    fn callback(&mut self, out: &mut [f32]) {
-        // Generate a square wave
-        for x in out.iter_mut() {
-            *x = if self.phase <= 0.5 {
-                self.volume
-            } else {
-                -self.volume
-            };
-            self.phase = (self.phase + self.phase_inc) % 1.0;
-        }
-    }
-}
+const VOLUME_ADJUST: f32 = 10.0; // TODO just a random thingy. Find proper value
 
 pub struct Speaker {
-    // device: AudioDevice<SquareWave>,
     queue: AudioQueue<f32>,
     clock: u32,
     channel1: Channel1,
@@ -59,6 +38,9 @@ impl Speaker {
         if !self.is_audio_enabled() {
             return;
         }
+
+        self.channel1.step(steps);
+
         // todo!("Implement sound");
         self.clock += steps;
         if self.clock < SAMPLING_FREQUENCY {
@@ -72,17 +54,17 @@ impl Speaker {
         let (pan_left, pan_right) = self.get_panning(1);
 
         let test = [
-            (ch1 * pan_left as f32 * vol_left as f32),
-            (ch1 * pan_right as f32 * vol_right as f32),
+            (ch1 * pan_left as f32 * vol_left as f32) / VOLUME_ADJUST,
+            (ch1 * pan_right as f32 * vol_right as f32) / VOLUME_ADJUST,
         ];
 
         println!("{:?}", test);
 
+        // TODO send in batches
         self.queue.queue_audio(&test).unwrap();
     }
 
     pub fn start(&mut self) {
-        // self.device.resume();
         self.queue.resume();
     }
 
@@ -95,17 +77,6 @@ impl Speaker {
             channels: Some(2), // stereo
             samples: None,     // default sample size
         };
-
-        // let device = audio_subsystem
-        //     .open_playback(None, &desired_spec, |spec| {
-        //         // initialize the audio callback
-        //         SquareWave {
-        //             phase_inc: 440.0 / spec.freq as f32,
-        //             phase: 0.0,
-        //             volume: 0.25,
-        //         }
-        //     })
-        //     .unwrap();
 
         let queue: AudioQueue<f32> = audio_subsystem.open_queue(None, &desired_spec).unwrap();
 
