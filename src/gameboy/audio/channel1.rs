@@ -1,7 +1,20 @@
 use crate::gameboy::{memory_bus::MemoryAccessor, registers::operations::Operations};
 
-const MAX_LENGTH: u32 = 64;
+const MAX_LENGTH: u8 = 64;
 const AUDIO_STEP_FREQUENCY: u32 = 4194304 / 512;
+const DUTIES: [[u8; 8]; 4] = [
+    [0, 0, 0, 0, 0, 0, 0, 1], // 00 (0x0)
+    [0, 0, 0, 0, 0, 0, 1, 1], // 01 (0x1)
+    [0, 0, 0, 0, 1, 1, 1, 1], // 10 (0x2)
+    [0, 1, 1, 1, 1, 1, 1, 0], // 11 (0x3)
+];
+// Originally copied fron other emu
+// const DUTIES: [[u8; 8]; 4] = [
+//     [0, 0, 0, 0, 0, 0, 0, 1], // 00 (0x0)
+//     [1, 0, 0, 0, 0, 0, 0, 1], // 01 (0x1)
+//     [1, 0, 0, 0, 0, 1, 1, 1], // 10 (0x2)
+//     [0, 1, 1, 1, 1, 1, 1, 0], // 11 (0x3)
+// ];
 
 pub(crate) struct Channel1 {
     enabled: bool,
@@ -12,7 +25,11 @@ pub(crate) struct Channel1 {
     /// Frame of the audio. 1-8
     audio_step_state: u8,
 
-    length_counter: u32,
+    sweep_pace_index: u8,
+    duty_index: u8,
+    current_period: u16,
+
+    length_counter: u8,
     // FF10 — NR10: Channel 1 sweep
     // This register controls CH1’s period sweep functionality.
     // 7	| 6	5 4 | 3	            | 2	1	0
@@ -32,7 +49,7 @@ pub(crate) struct Channel1 {
     // Initial volume	Env dir     Sweep pace
     initial_volume: u8,
     env_dir: bool,
-    sweep_pace: u8,
+    sweep_pace: u8, //todo rename to env_pace
 
     // FF13 — NR13: Channel 1 period low [write-only]
     // FF14 — NR14: Channel 1 period high & control
@@ -49,30 +66,42 @@ impl Channel1 {
     /// - Volume Envelope at 64Hz
     /// - Sweep at 128Hz
     pub fn step(&mut self, step: u32) {
-        self.audio_step_counter += step;
-        if self.audio_step_counter < AUDIO_STEP_FREQUENCY {
-            return;
-        }
+        for _ in 0..step {
+            self.audio_step_counter += 1; // NOTE: += step if I ever remove the loop..
+            if self.audio_step_counter == AUDIO_STEP_FREQUENCY {
+                self.audio_step_counter = 0;
 
-        self.audio_step_counter -= AUDIO_STEP_FREQUENCY;
+                // TODO should this happen once per step?
+                if self.length_enabled
+                    && self.length_counter < MAX_LENGTH
+                    && self.audio_step_state % 2 == 0
+                {
+                    self.length_counter += 1;
+                    if self.length_counter >= MAX_LENGTH {
+                        self.enabled = false;
+                        // Disable ff14
+                    }
+                }
 
-        if self.length_enabled && self.audio_step_state % 2 == 0 {
-            self.length_counter += 1;
-            if self.length_counter >= MAX_LENGTH {
-                self.enabled = false;
-                // Disable ff14
+                if self.audio_step_state == 7 {
+                    self.update_volume();
+                }
+
+                if self.audio_step_state % 4 == 3 {
+                    // TODO every 4th sweep
+                }
+                self.audio_step_state = (self.audio_step_state + 1) % 8;
+            }
+
+            self.current_period -= 1;
+            if self.current_period == 0 {
+                println!("Changing duty_index: {}", self.duty_index);
+                self.current_period = (2048 - self.period) * 4;
+                self.duty_index = (self.duty_index + 1) % 8;
+                // } else {
+                // println!("Current_period: {}", self.current_period);
             }
         }
-
-        if self.audio_step_state == 7 {
-            self.update_volume();
-        }
-
-        if self.audio_step_state % 4 == 3 {
-            // TODO every 4th sweep
-        }
-
-        self.audio_step_state = (self.audio_step_state + 1) % 8;
     }
 
     pub fn sample(&self) -> f32 {
@@ -80,10 +109,27 @@ impl Channel1 {
             println!("samping with disabled channel");
             return 0.0;
         }
-        1.0 * self.volume as f32
+        if DUTIES[self.wave_duty as usize][self.duty_index as usize] as f32 * self.volume as f32
+            == 0.0
+        {
+            println!("{}-{}-{}", self.wave_duty, self.duty_index, self.volume)
+        }
+        DUTIES[self.wave_duty as usize][self.duty_index as usize] as f32 * self.volume as f32
     }
 
+    /// The envelope ticks at 64 Hz, and the channel’s envelope will be increased / decreased
+    /// every Sweep pace of those ticks. A setting of 0 disables the envelope.
     fn update_volume(&mut self) {
+        if self.sweep_pace == 0 {
+            return;
+        }
+        self.sweep_pace_index += 1;
+
+        if self.sweep_pace_index != self.sweep_pace {
+            return;
+        }
+        self.sweep_pace_index -= self.sweep_pace;
+
         if self.volume == 0 && self.env_dir == false {
             println!("vol going minus");
             return;
@@ -102,14 +148,18 @@ impl Channel1 {
 
 impl Default for Channel1 {
     fn default() -> Self {
+        let period = 0xff | (0x7 << 8);
         Self {
             enabled: true,
             volume: 0xf, // todo is this right?
+            current_period: (2048 - period) * 4,
+            duty_index: 0,
+            sweep_pace_index: 0,
             audio_step_state: 0,
             audio_step_counter: 0,
             length_counter: 0,
             length_enabled: false,
-            period: 0xff | (0x7 << 8),
+            period: period,
             trigger: true,
             // FF10 - default 0x80 (unused bit 7 set)
             pace: 0,
@@ -210,8 +260,18 @@ impl MemoryAccessor for Channel1 {
                 self.trigger = value >> 7 > 0;
                 self.length_enabled = value & (1 << 6) > 0;
                 self.period = (self.period & 0xff) | ((value as u16 & 7) << 8);
+                if self.length_enabled {
+                    self.length_counter = self.initial_length_timer;
+                }
                 if self.trigger {
                     self.enabled = true;
+                    // todo check if reset is ok here
+                    self.audio_step_counter = 0;
+                    self.duty_index = 0;
+                    self.current_period = (2048 - self.period) * 4;
+                    self.sweep_pace_index = 0;
+                    self.volume = self.initial_volume;
+                    self.length_counter = self.initial_length_timer;
                     println!("handle triggering channel1")
                 }
             }

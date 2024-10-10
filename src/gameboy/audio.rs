@@ -7,7 +7,7 @@ mod channel1;
 
 const SAMPLING_FREQUENCY: u32 = 95; // 4.194.304 / 44100
 
-const VOLUME_ADJUST: f32 = 10.0; // TODO just a random thingy. Find proper value
+const VOLUME_ADJUST: f32 = 100.0; // TODO just a random thingy. Find proper value
 
 pub struct Speaker {
     queue: AudioQueue<f32>,
