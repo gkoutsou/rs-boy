@@ -1,10 +1,15 @@
 use channel1::Channel1;
+use channel2::Channel2;
 use log::{debug, trace};
 use target::SDL2Output;
+use wave::Wave;
 
 use super::memory_bus::MemoryAccessor;
 mod channel1;
+mod channel2;
+mod pulse_wave;
 mod target;
+mod wave;
 
 const HW_FREQUENCY: i32 = 4194304;
 const AUDIO_SAMPLE_RATE: i32 = 44100;
@@ -16,6 +21,7 @@ pub struct Speaker {
     output_target: Box<dyn target::AudioTarget>,
     clock: u32,
     channel1: Channel1,
+    channel2: Channel2,
     /// FF26 — NR52: Audio master control
     ///
     /// 7            | 6 5 4 | 3 2 1 0
@@ -43,6 +49,7 @@ impl Speaker {
         }
 
         self.channel1.step(steps);
+        self.channel2.step(steps);
 
         // todo!("Implement sound");
         self.clock += steps;
@@ -51,15 +58,19 @@ impl Speaker {
         }
 
         self.clock -= SAMPLING_FREQUENCY;
+        let mut sample = [0.0, 0.0];
 
         let (vol_left, vol_right) = self.get_volume();
         let ch1 = self.channel1.sample();
         let (pan_left, pan_right) = self.get_panning(1);
 
-        let sample = [
-            (ch1 * pan_left as f32 * vol_left as f32) / VOLUME_ADJUST,
-            (ch1 * pan_right as f32 * vol_right as f32) / VOLUME_ADJUST,
-        ];
+        sample[0] += (ch1 * pan_left as f32 * vol_left as f32) / VOLUME_ADJUST;
+        sample[1] += (ch1 * pan_right as f32 * vol_right as f32) / VOLUME_ADJUST;
+
+        let ch2 = self.channel2.sample();
+        let (pan_left, pan_right) = self.get_panning(2);
+        sample[0] += (ch2 * pan_left as f32 * vol_left as f32) / VOLUME_ADJUST;
+        sample[1] += (ch2 * pan_right as f32 * vol_right as f32) / VOLUME_ADJUST;
 
         // if sample[0] != 0.0 {
         //     println!("{:?}", sample);
@@ -75,10 +86,12 @@ impl Speaker {
     pub fn new() -> Self {
         let audio_target = SDL2Output::new();
         let channel1 = channel1::Channel1::default();
+        let channel2 = channel2::Channel2::default();
 
         Speaker {
             output_target: Box::new(audio_target),
             channel1,
+            channel2,
             clock: 0,
             master_volume: 0x77,
             sound_panning: 0xf3,
@@ -108,7 +121,8 @@ impl MemoryAccessor for Speaker {
         debug!("Read speaker memory: {:#x}", location);
         match location {
             0xff10..=0xff14 => self.channel1.get(location),
-            0xff15..=0xff23 => 0, // todo
+            0xff15..=0xff19 => self.channel2.get(location),
+            0xff1a..=0xff23 => 0, // todo
             0xff24 => self.master_volume,
             0xff25 => self.sound_panning,
             0xff26 => self.audio_master, // TODO low bits are read-only
@@ -124,7 +138,8 @@ impl MemoryAccessor for Speaker {
         );
         match location {
             0xff10..=0xff14 => self.channel1.write(location, value),
-            0xff15..=0xff23 => {
+            0xff15..=0xff19 => self.channel2.write(location, value),
+            0xff1a..=0xff23 => {
                 // print!("{:#b}", value);
                 // panic!("{:#x}", location)
             }
