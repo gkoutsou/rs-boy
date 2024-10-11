@@ -2,6 +2,7 @@ use log::trace;
 
 use crate::gameboy::memory_bus::MemoryAccessor;
 
+const MAGIC_VOL_NUMBER: f32 = 15.0;
 const MAX_LENGTH: u8 = 64;
 const AUDIO_STEP_FREQUENCY: u32 = 4194304 / 512;
 const DUTIES: [[u8; 8]; 4] = [
@@ -118,6 +119,7 @@ impl Channel1 {
             trace!("{}-{}-{}", self.wave_duty, self.duty_index, self.volume)
         }
         DUTIES[self.wave_duty as usize][self.duty_index as usize] as f32 * self.volume as f32
+            / MAGIC_VOL_NUMBER // todo magic volume adjuster
     }
 
     /// The envelope ticks at 64 Hz, and the channel’s envelope will be increased / decreased

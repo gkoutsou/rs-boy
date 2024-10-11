@@ -1,6 +1,5 @@
 use channel1::Channel1;
 use log::{debug, trace};
-use sdl2::audio::{AudioQueue, AudioSpecDesired};
 use target::SDL2Output;
 
 use super::memory_bus::MemoryAccessor;
@@ -22,7 +21,7 @@ pub struct Speaker {
     /// 7            | 6 5 4 | 3 2 1 0
     ///
     /// Audio on/off |       | CH4 on?	CH3 on?	CH2 on?	CH1 on?
-    audio_master: u8,
+    audio_master: u8, // TODO implement bits 0-3
     /// FF25 — NR51: Sound panning
     ///
     /// 7	6	5	4	3	2	1	0
@@ -110,7 +109,7 @@ impl MemoryAccessor for Speaker {
         match location {
             0xff10..=0xff14 => self.channel1.get(location),
             0xff15..=0xff23 => 0, // todo
-            0xdd24 => self.master_volume,
+            0xff24 => self.master_volume,
             0xff25 => self.sound_panning,
             0xff26 => self.audio_master, // TODO low bits are read-only
             _ => panic!("speaker register location read: {:#x}", location),
