@@ -1,4 +1,6 @@
-use crate::gameboy::{memory_bus::MemoryAccessor, registers::operations::Operations};
+use log::trace;
+
+use crate::gameboy::memory_bus::MemoryAccessor;
 
 const MAX_LENGTH: u8 = 64;
 const AUDIO_STEP_FREQUENCY: u32 = 4194304 / 512;
@@ -25,6 +27,7 @@ pub(crate) struct Channel1 {
     /// Frame of the audio. 1-8
     audio_step_state: u8,
 
+    pace_index: u8,
     sweep_pace_index: u8,
     duty_index: u8,
     current_period: u16,
@@ -88,14 +91,14 @@ impl Channel1 {
                 }
 
                 if self.audio_step_state % 4 == 3 {
-                    // TODO every 4th sweep
+                    self.update_sweep()
                 }
                 self.audio_step_state = (self.audio_step_state + 1) % 8;
             }
 
             self.current_period -= 1;
             if self.current_period == 0 {
-                println!("Changing duty_index: {}", self.duty_index);
+                trace!("Changing duty_index: {}", self.duty_index);
                 self.current_period = (2048 - self.period) * 4;
                 self.duty_index = (self.duty_index + 1) % 8;
                 // } else {
@@ -106,7 +109,7 @@ impl Channel1 {
 
     pub fn sample(&self) -> f32 {
         if !self.enabled {
-            println!("samping with disabled channel");
+            // println!("samping with disabled channel");
             return 0.0;
         }
         if DUTIES[self.wave_duty as usize][self.duty_index as usize] as f32 * self.volume as f32
@@ -144,16 +147,62 @@ impl Channel1 {
             self.volume -= 1
         }
     }
+
+    fn update_sweep(&mut self) {
+        if self.pace == 0 {
+            return;
+        }
+
+        if self.individual_step == 0 {
+            println!("how to handle step being zero?");
+            return;
+        }
+
+        self.pace_index += 1;
+        if self.pace_index != self.pace {
+            return;
+        }
+        self.pace_index -= self.pace;
+
+        let new_period = if self.sweep_direction {
+            self.period + (self.period >> self.pace)
+        } else {
+            // TODO this might underflow
+            self.period - (self.period >> self.pace)
+        };
+
+        // In addition mode, if the period value would overflow (i.e. is strictly more than $7FF),
+        // the channel is turned off instead. This occurs even if sweep iterations are disabled by
+        // the pace being 0.
+
+        if new_period < 2048 {
+            // panic!("asd");
+            self.period = new_period;
+        } else {
+            self.enabled = false;
+        }
+    }
+
+    pub fn reset(&mut self) {
+        self.audio_step_counter = 0;
+        self.duty_index = 0;
+        self.current_period = (2048 - self.period) * 4;
+        self.pace_index = 0;
+        self.sweep_pace_index = 0;
+        self.volume = self.initial_volume;
+        self.length_counter = self.initial_length_timer;
+    }
 }
 
 impl Default for Channel1 {
     fn default() -> Self {
         let period = 0xff | (0x7 << 8);
         Self {
-            enabled: true,
+            enabled: false,
             volume: 0xf, // todo is this right?
             current_period: (2048 - period) * 4,
             duty_index: 0,
+            pace_index: 0,
             sweep_pace_index: 0,
             audio_step_state: 0,
             audio_step_counter: 0,
@@ -266,12 +315,7 @@ impl MemoryAccessor for Channel1 {
                 if self.trigger {
                     self.enabled = true;
                     // todo check if reset is ok here
-                    self.audio_step_counter = 0;
-                    self.duty_index = 0;
-                    self.current_period = (2048 - self.period) * 4;
-                    self.sweep_pace_index = 0;
-                    self.volume = self.initial_volume;
-                    self.length_counter = self.initial_length_timer;
+                    self.reset();
                     println!("handle triggering channel1")
                 }
             }

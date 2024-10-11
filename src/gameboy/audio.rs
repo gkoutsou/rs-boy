@@ -1,13 +1,15 @@
 use channel1::Channel1;
 use log::{debug, trace};
-use sdl2::audio::{AudioCallback, AudioDevice, AudioQueue, AudioSpecDesired};
+use sdl2::audio::{AudioQueue, AudioSpecDesired};
 
 use super::memory_bus::MemoryAccessor;
 mod channel1;
 
-const SAMPLING_FREQUENCY: u32 = 95; // 4.194.304 / 44100
+const HW_FREQUENCY: i32 = 4194304;
+const AUDIO_SAMPLE_RATE: i32 = 44100;
+const SAMPLING_FREQUENCY: u32 = HW_FREQUENCY as u32 / AUDIO_SAMPLE_RATE as u32; // 95
 
-const VOLUME_ADJUST: f32 = 100.0; // TODO just a random thingy. Find proper value
+const VOLUME_ADJUST: f32 = 1000.0; // TODO just a random thingy. Find proper value
 
 pub struct Speaker {
     queue: AudioQueue<f32>,
@@ -58,7 +60,9 @@ impl Speaker {
             (ch1 * pan_right as f32 * vol_right as f32) / VOLUME_ADJUST,
         ];
 
-        println!("{:?}", test);
+        if test[0] != 0.0 {
+            println!("{:?}", test);
+        }
 
         // TODO send in batches
         self.queue.queue_audio(&test).unwrap();
@@ -73,7 +77,7 @@ impl Speaker {
         let audio_subsystem = sdl_context.audio().unwrap();
 
         let desired_spec = AudioSpecDesired {
-            freq: Some(44100),
+            freq: Some(AUDIO_SAMPLE_RATE),
             channels: Some(2), // stereo
             samples: None,     // default sample size
         };
@@ -136,7 +140,12 @@ impl MemoryAccessor for Speaker {
             }
             0xff24 => self.master_volume = value,
             0xff25 => self.sound_panning = value,
-            0xff26 => self.audio_master = value & 1 << 7,
+            0xff26 => {
+                self.audio_master = value & 1 << 7;
+                // if self.audio_master == 0 {
+                //     self.channel1.reset();
+                // }
+            }
 
             _ => {
                 panic!(
