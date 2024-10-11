@@ -115,7 +115,7 @@ impl Channel1 {
         if DUTIES[self.wave_duty as usize][self.duty_index as usize] as f32 * self.volume as f32
             == 0.0
         {
-            println!("{}-{}-{}", self.wave_duty, self.duty_index, self.volume)
+            trace!("{}-{}-{}", self.wave_duty, self.duty_index, self.volume)
         }
         DUTIES[self.wave_duty as usize][self.duty_index as usize] as f32 * self.volume as f32
     }
@@ -134,11 +134,11 @@ impl Channel1 {
         self.sweep_pace_index -= self.sweep_pace;
 
         if self.volume == 0 && self.env_dir == false {
-            println!("vol going minus");
+            trace!("vol going minus");
             return;
         }
         if self.volume == 15 && self.env_dir == true {
-            println!("vol overloading");
+            trace!("vol overloading");
             return;
         }
         if self.env_dir {

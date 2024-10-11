@@ -1,9 +1,11 @@
 use channel1::Channel1;
 use log::{debug, trace};
 use sdl2::audio::{AudioQueue, AudioSpecDesired};
+use target::SDL2Output;
 
 use super::memory_bus::MemoryAccessor;
 mod channel1;
+mod target;
 
 const HW_FREQUENCY: i32 = 4194304;
 const AUDIO_SAMPLE_RATE: i32 = 44100;
@@ -12,7 +14,7 @@ const SAMPLING_FREQUENCY: u32 = HW_FREQUENCY as u32 / AUDIO_SAMPLE_RATE as u32; 
 const VOLUME_ADJUST: f32 = 1000.0; // TODO just a random thingy. Find proper value
 
 pub struct Speaker {
-    queue: AudioQueue<f32>,
+    output_target: Box<dyn target::AudioTarget>,
     clock: u32,
     channel1: Channel1,
     /// FF26 — NR52: Audio master control
@@ -55,39 +57,28 @@ impl Speaker {
         let ch1 = self.channel1.sample();
         let (pan_left, pan_right) = self.get_panning(1);
 
-        let test = [
+        let sample = [
             (ch1 * pan_left as f32 * vol_left as f32) / VOLUME_ADJUST,
             (ch1 * pan_right as f32 * vol_right as f32) / VOLUME_ADJUST,
         ];
 
-        if test[0] != 0.0 {
-            println!("{:?}", test);
-        }
+        // if sample[0] != 0.0 {
+        //     println!("{:?}", sample);
+        // }
 
-        // TODO send in batches
-        self.queue.queue_audio(&test).unwrap();
+        self.output_target.play(sample[0], sample[1])
     }
 
     pub fn start(&mut self) {
-        self.queue.resume();
+        self.output_target.start();
     }
 
     pub fn new() -> Self {
-        let sdl_context = sdl2::init().unwrap();
-        let audio_subsystem = sdl_context.audio().unwrap();
-
-        let desired_spec = AudioSpecDesired {
-            freq: Some(AUDIO_SAMPLE_RATE),
-            channels: Some(2), // stereo
-            samples: None,     // default sample size
-        };
-
-        let queue: AudioQueue<f32> = audio_subsystem.open_queue(None, &desired_spec).unwrap();
-
+        let audio_target = SDL2Output::new();
         let channel1 = channel1::Channel1::default();
 
         Speaker {
-            queue,
+            output_target: Box::new(audio_target),
             channel1,
             clock: 0,
             master_volume: 0x77,
