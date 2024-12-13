@@ -1,9 +1,6 @@
 use crate::gameboy::memory_bus::MemoryAccessor;
 
-use super::{
-    pulse_wave::{self, Pulse},
-    wave::Wave,
-};
+use super::{pulse_wave::Pulse, wave::Wave};
 const MEMORY_BASE: usize = 0xff10;
 
 pub(crate) struct Channel1 {

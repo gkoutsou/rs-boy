@@ -15,6 +15,8 @@ const HW_FREQUENCY: i32 = 4194304;
 const AUDIO_SAMPLE_RATE: i32 = 44100;
 const SAMPLING_FREQUENCY: u32 = HW_FREQUENCY as u32 / AUDIO_SAMPLE_RATE as u32; // 95
 
+const MAX_VOL: f32 = 7.0;
+const CHANNELS: f32 = 2.0; // TODO 4 channels at the end
 const VOLUME_ADJUST: f32 = 1000.0; // TODO just a random thingy. Find proper value
 
 pub struct Speaker {
@@ -64,17 +66,24 @@ impl Speaker {
         let ch1 = self.channel1.sample();
         let (pan_left, pan_right) = self.get_panning(1);
 
-        sample[0] += (ch1 * pan_left as f32 * vol_left as f32) / VOLUME_ADJUST;
-        sample[1] += (ch1 * pan_right as f32 * vol_right as f32) / VOLUME_ADJUST;
-
+        sample[0] += (ch1 * pan_left as f32 * vol_left as f32) / (MAX_VOL * CHANNELS);
+        sample[1] += (ch1 * pan_right as f32 * vol_right as f32) / (MAX_VOL * CHANNELS);
+        if sample[0] > 1.0 {
+            println!("{},{},{}", pan_left, vol_left, MAX_VOL);
+            panic!("BBBBB");
+        }
         let ch2 = self.channel2.sample();
         let (pan_left, pan_right) = self.get_panning(2);
-        sample[0] += (ch2 * pan_left as f32 * vol_left as f32) / VOLUME_ADJUST;
-        sample[1] += (ch2 * pan_right as f32 * vol_right as f32) / VOLUME_ADJUST;
+        sample[0] += (ch2 * pan_left as f32 * vol_left as f32) / (MAX_VOL * CHANNELS);
+        sample[1] += (ch2 * pan_right as f32 * vol_right as f32) / (MAX_VOL * CHANNELS);
 
         // if sample[0] != 0.0 {
         //     println!("{:?}", sample);
         // }
+        if sample[0] > 1.0 {
+            println!("{},{},{}", pan_left, vol_left, MAX_VOL);
+            panic!("ADASD");
+        }
 
         self.output_target.play(sample[0], sample[1])
     }
@@ -110,8 +119,8 @@ impl Speaker {
     }
 
     fn get_panning(&self, channel: u8) -> (u8, u8) {
-        let right = self.sound_panning & (1 << (channel - 1));
-        let left = self.sound_panning & (1 << (4 + channel - 1));
+        let right = (self.sound_panning >> (channel - 1)) & 1;
+        let left = (self.sound_panning >> (4 + channel - 1)) & 1;
         (left, right)
     }
 }

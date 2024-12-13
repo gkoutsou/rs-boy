@@ -43,7 +43,8 @@ impl SDL2Output {
         let desired_spec = AudioSpecDesired {
             freq: Some(AUDIO_SAMPLE_RATE),
             channels: Some(2), // stereo
-            samples: None,     // default sample size
+            samples: None,
+            // samples: Some(4096),
         };
 
         let queue: AudioQueue<f32> = audio_subsystem.open_queue(None, &desired_spec).unwrap();

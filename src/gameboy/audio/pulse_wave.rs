@@ -4,14 +4,14 @@ use crate::gameboy::memory_bus::MemoryAccessor;
 
 use super::wave::Wave;
 
-const MAGIC_VOL_NUMBER: f32 = 15.0;
+const MAX_ENVELOPE_VOL: f32 = 15.0;
 const MAX_LENGTH: u8 = 64;
 const AUDIO_STEP_FREQUENCY: u32 = 4194304 / 512;
-const DUTIES: [[u8; 8]; 4] = [
-    [0, 0, 0, 0, 0, 0, 0, 1], // 00 (0x0)
-    [0, 0, 0, 0, 0, 0, 1, 1], // 01 (0x1)
-    [0, 0, 0, 0, 1, 1, 1, 1], // 10 (0x2)
-    [0, 1, 1, 1, 1, 1, 1, 0], // 11 (0x3)
+const DUTIES: [[i8; 8]; 4] = [
+    [-1, -1, -1, -1, -1, -1, -1, 1], // 00 (0x0)
+    [-1, -1, -1, -1, -1, -1, 1, 1],  // 01 (0x1)
+    [-1, -1, -1, -1, 1, 1, 1, 1],    // 10 (0x2)
+    [-1, 1, 1, 1, 1, 1, 1, -1],      // 11 (0x3)
 ];
 // Originally copied fron other emu
 // const DUTIES: [[u8; 8]; 4] = [
@@ -122,7 +122,7 @@ impl Wave for Pulse {
             trace!("{}-{}-{}", self.wave_duty, self.duty_index, self.volume)
         }
         DUTIES[self.wave_duty as usize][self.duty_index as usize] as f32 * self.volume as f32
-            / MAGIC_VOL_NUMBER // todo magic volume adjuster
+            / MAX_ENVELOPE_VOL // todo magic volume adjuster
     }
 }
 impl Pulse {
