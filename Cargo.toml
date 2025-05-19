@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-env_logger = "0.11.5"
-log = "0.4.20"
-minifb = "0.27"
+env_logger = "0.11.8"
+log = "0.4.27"
+minifb = "0.28"
 sdl2 = "0.35.2"
