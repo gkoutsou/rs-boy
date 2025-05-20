@@ -69,9 +69,9 @@ pub(crate) struct Pulse {
 
 impl Wave for Pulse {
     /// 512 Hz timer clocking sweep, envelope and length functions of the channels.
-    /// - Length at 256Hz
-    /// - Volume Envelope at 64Hz
-    /// - Sweep at 128Hz
+    /// - Length at 256Hz         - or every 2nd run
+    /// - Volume Envelope at 64Hz - or every 8th run
+    /// - Sweep at 128Hz          - or every 4th
     fn step(&mut self, step: u32) {
         for _ in 0..step {
             self.audio_step_counter += 1; // NOTE: += step if I ever remove the loop..
@@ -85,6 +85,7 @@ impl Wave for Pulse {
                 {
                     self.length_counter += 1;
                     if self.length_counter >= MAX_LENGTH {
+                        // disable channel if its length timer expiring
                         self.enabled = false;
                         // Disable ff14
                     }
@@ -100,10 +101,17 @@ impl Wave for Pulse {
                 self.audio_step_state = (self.audio_step_state + 1) % 8;
             }
 
+            todo!(
+                "maybe change the current period to incremental, then copy over period upon expiry"
+            );
+            // The period divider of pulse and wave channels is an up counter. Each time it is clocked, its
+            // value increases by 1; when it overflows (being clocked when it’s already 2047, or $7FF), its
+            // value is set from the contents of NR13 and NR14.
             self.current_period -= 1;
             if self.current_period == 0 {
                 trace!("Changing duty_index: {}", self.duty_index);
-                self.current_period = (2048 - self.period) * 4;
+                self.current_period = (2048 - self.period) * 4; // TODO this 4 seem weird.
+                todo!("The “duty step” increments at the channel’s sample rate, which is 8 times the channel’s frequency).")
                 self.duty_index = (self.duty_index + 1) % 8;
                 // } else {
                 // println!("Current_period: {}", self.current_period);
@@ -155,7 +163,15 @@ impl Pulse {
     }
 
     fn update_sweep(&mut self) {
+        // On each sweep iteration, the period in NR13 and NR14 is modified and written back.
+        // In addition mode, if the period value would overflow (i.e. is strictly more than $7FF),
+        // the channel is turned off instead. This occurs even if sweep iterations are disabled by
+        // the pace being 0.
+
         if self.pace == 0 {
+            if self.period >= 2048 {
+                self.enabled = false;
+            }
             return;
         }
 
@@ -177,21 +193,17 @@ impl Pulse {
             self.period - (self.period >> self.pace)
         };
 
-        // In addition mode, if the period value would overflow (i.e. is strictly more than $7FF),
-        // the channel is turned off instead. This occurs even if sweep iterations are disabled by
-        // the pace being 0.
-
         if new_period < 2048 {
-            // panic!("asd");
             self.period = new_period;
         } else {
+            // Frequency sweep overflowing the frequency disables the channel
             self.enabled = false;
         }
     }
 
     pub fn reset(&mut self) {
         self.audio_step_counter = 0;
-        self.duty_index = 0;
+        self.duty_index = 0; todo!("The “duty step” counter cannot be reset, except by turning the APU off, which sets both back to 0.");
         self.current_period = (2048 - self.period) * 4;
         self.pace_index = 0;
         self.sweep_pace_index = 0;
@@ -285,6 +297,10 @@ impl MemoryAccessor for Pulse {
                 //        Pace	  Direction	    Individual step
                 self.individual_step = value & 0x7;
                 self.sweep_direction = value & (1 << 3) > 0;
+                // Note that the value written to this field is not re-read by the hardware until a
+                // sweep iteration completes, or the channel is (re)triggered.
+                // However, if 0 is written to this field, then iterations are instantly disabled (but see below), and it will be reloaded as soon as it’s set to something else.
+                todo!("this needs to not affect current iterations!");
                 self.pace = (value >> 4) & 0x7
             }
 
@@ -317,10 +333,28 @@ impl MemoryAccessor for Pulse {
                 self.length_enabled = value & (1 << 6) > 0;
                 self.period = (self.period & 0xff) | ((value as u16 & 7) << 8);
                 if self.length_enabled {
+                    // todo!("should this be 'If length timer expired it is reset.'");
+                    todo!("todo 2.. why do I reset it here? sounds wrong");
                     self.length_counter = self.initial_length_timer;
                 }
                 if self.trigger {
                     self.enabled = true;
+
+                    todo!("all these.. need to happen here");
+                    // Channel is enabled.
+                    // If length timer expired it is reset.
+                    // The period divider is set to the contents of NR13 and NR14.
+                    // Envelope timer is reset.
+                    // Volume is set to contents of NR12 initial volume.
+                    // Sweep does several things.
+
+                    //During a trigger event, several things occur:
+
+                    // CH1 period value is copied to the “shadow register”.
+                    // The “sweep timer” is reset.
+                    // The “enabled flag” is set if either the sweep pace or individual step are non-zero, cleared otherwise.
+                    // If the individual step is non-zero, frequency calculation and overflow check are performed immediately.
+
                     // todo check if reset is ok here
                     self.reset();
                     println!("handle triggering pulse_wave")
