@@ -54,13 +54,11 @@ impl Speaker {
             return;
         }
 
-        //A “DIV-APU” counter is increased every time DIV’s bit 4 (5 in double-speed mode) goes from 1 to 0,
+        // A “DIV-APU” counter is increased every time DIV’s bit 4 (5 in double-speed mode) goes from 1 to 0,
         // therefore at a frequency of 512 Hz (regardless of whether double-speed is active). Thus, the counter
         // can be made to increase faster by writing to DIV while its relevant bit is set (which clears DIV, and
         // triggers the falling edge).
-
-        //own notes: div is once every 256 dots. So div-apu is once every 8*256?
-        todo!("the comment above");
+        // TODO clearing DIV should also affect this.. sigh..
 
         self.channel1.step(steps);
         self.channel2.step(steps);
@@ -78,12 +76,12 @@ impl Speaker {
         let ch1 = self.channel1.sample();
         let (pan_left, pan_right) = self.get_panning(1);
 
-        sample[0] += (ch1 * pan_left as f32 * vol_left as f32) / (MAX_VOL * CHANNELS);
-        sample[1] += (ch1 * pan_right as f32 * vol_right as f32) / (MAX_VOL * CHANNELS);
-        if sample[0] > 1.0 {
-            println!("{},{},{}", pan_left, vol_left, MAX_VOL);
-            panic!("BBBBB");
-        }
+        // sample[0] += (ch1 * pan_left as f32 * vol_left as f32) / (MAX_VOL * CHANNELS);
+        // sample[1] += (ch1 * pan_right as f32 * vol_right as f32) / (MAX_VOL * CHANNELS);
+        // if sample[0] > 1.0 {
+        //     println!("{},{},{}", pan_left, vol_left, MAX_VOL);
+        //     panic!("BBBBB");
+        // }
         let ch2 = self.channel2.sample();
         let (pan_left, pan_right) = self.get_panning(2);
         sample[0] += (ch2 * pan_left as f32 * vol_left as f32) / (MAX_VOL * CHANNELS);
@@ -163,7 +161,7 @@ impl MemoryAccessor for Speaker {
             0xff10..=0xff14 => self.channel1.write(location, value),
             0xff15..=0xff19 => self.channel2.write(location, value),
             0xff1a..=0xff23 => {
-                todo!()
+                // todo!()
                 // print!("{:#b}", value);
                 // panic!("{:#x}", location)
             }
@@ -178,7 +176,7 @@ impl MemoryAccessor for Speaker {
                     todo!("implement the above notes.. Commented out code below looks relevant..");
                     todo!("maybe recreate all the channels instead?");
                     todo!("disabling should not affect div-apu counter..");
-                    //     self.channel1.reset();
+                    // self.channel1.reset();
                 }
             }
 
