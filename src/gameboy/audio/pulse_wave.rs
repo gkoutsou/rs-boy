@@ -1,4 +1,4 @@
-use log::trace;
+use log::{trace, warn};
 
 use crate::gameboy::memory_bus::MemoryAccessor;
 
@@ -8,10 +8,10 @@ const MAX_ENVELOPE_VOL: f32 = 15.0;
 const MAX_LENGTH: u8 = 64;
 const AUDIO_STEP_FREQUENCY: u32 = 4194304 / 512;
 const DUTIES: [[i8; 8]; 4] = [
-    [-1, -1, -1, -1, -1, -1, -1, 1], // 00 (0x0)
-    [-1, -1, -1, -1, -1, -1, 1, 1],  // 01 (0x1)
-    [-1, -1, -1, -1, 1, 1, 1, 1],    // 10 (0x2)
-    [-1, 1, 1, 1, 1, 1, 1, -1],      // 11 (0x3)
+    [0, 0, 0, 0, 0, 0, 0, 1], // 00 (0x0)
+    [0, 0, 0, 0, 0, 0, 1, 1], // 01 (0x1)
+    [0, 0, 0, 0, 1, 1, 1, 1], // 10 (0x2)
+    [0, 1, 1, 1, 1, 1, 1, 0], // 11 (0x3)
 ];
 // Originally copied fron other emu
 // const DUTIES: [[u8; 8]; 4] = [
@@ -32,7 +32,7 @@ pub(crate) struct Pulse {
     audio_step_state: u8,
 
     pace_index: u8,
-    sweep_pace_index: u8,
+    env_pace_index: u8,
     duty_index: u8,
     current_period: u16,
 
@@ -56,7 +56,7 @@ pub(crate) struct Pulse {
     // Initial volume	Env dir     Sweep pace
     initial_volume: u8,
     env_dir: bool,
-    sweep_pace: u8, //todo rename to env_pace
+    env_pace: u8,
 
     // FF13 — NR13: Channel 1 period low [write-only]
     // FF14 — NR14: Channel 1 period high & control
@@ -136,15 +136,15 @@ impl Pulse {
     /// The envelope ticks at 64 Hz, and the channel’s envelope will be increased / decreased
     /// every Sweep pace of those ticks. A setting of 0 disables the envelope.
     fn update_volume(&mut self) {
-        if self.sweep_pace == 0 {
+        if self.env_pace == 0 {
             return;
         }
-        self.sweep_pace_index += 1;
+        self.env_pace_index += 1;
 
-        if self.sweep_pace_index != self.sweep_pace {
+        if self.env_pace_index != self.env_pace {
             return;
         }
-        self.sweep_pace_index -= self.sweep_pace;
+        self.env_pace_index -= self.env_pace;
 
         if self.volume == 0 && self.env_dir == false {
             trace!("vol going minus");
@@ -207,7 +207,7 @@ impl Pulse {
         // Was this reset meant to be used for the APU-turning off, and another should be used for the Trigger?
         self.current_period = self.period;
         self.pace_index = 0;
-        self.sweep_pace_index = 0;
+        self.env_pace_index = 0;
         self.volume = self.initial_volume;
         self.length_counter = self.initial_length_timer;
     }
@@ -223,10 +223,10 @@ impl Default for Pulse {
             current_period: period,
             duty_index: 0,
             pace_index: 0,
-            sweep_pace_index: 0,
+            env_pace_index: 0,
             audio_step_state: 0,
             audio_step_counter: 0,
-            length_counter: 0,
+            length_counter: 0x3f,
             length_enabled: false,
             period: period,
             trigger: true,
@@ -240,7 +240,7 @@ impl Default for Pulse {
             // FF12 - default 0xf3
             initial_volume: 0xf,
             env_dir: false,
-            sweep_pace: 3,
+            env_pace: 3,
         }
     }
 }
@@ -269,7 +269,7 @@ impl MemoryAccessor for Pulse {
             0x2 => {
                 // 7	6	5	4	| 3	        |2	1	0
                 // Initial volume	Env dir     Sweep pace
-                let pace = self.sweep_pace;
+                let pace = self.env_pace;
                 let dir = (self.env_dir as u8) << 3;
                 let volume = self.initial_volume << 4;
                 pace | dir | volume
@@ -317,7 +317,7 @@ impl MemoryAccessor for Pulse {
                 // Initial volume	Env dir     Sweep pace
                 self.initial_volume = value >> 4;
                 self.env_dir = value & (1 << 3) > 0;
-                self.sweep_pace = value & 0x7;
+                self.env_pace = value & 0x7;
 
                 // Setting bits 3-7 of this register all to 0 (initial volume = 0, envelope = decreasing)
                 // turns the DAC off (and thus, the channel as well)
@@ -339,26 +339,35 @@ impl MemoryAccessor for Pulse {
                     self.length_counter = self.initial_length_timer;
                 }
                 if self.trigger {
-                    self.enabled = true;
-
-                    // TODO all these.. need to happen here
                     // Channel is enabled.
-                    // If length timer expired it is reset.
+                    self.enabled = true;
                     // The period divider is set to the contents of NR13 and NR14.
-                    // Envelope timer is reset.
+                    self.current_period = self.period;
                     // Volume is set to contents of NR12 initial volume.
+                    self.volume = self.initial_volume;
+                    // Envelope timer is reset.
+                    self.env_pace_index = 0;
+                    // If length timer expired it is reset.
+                    if self.length_counter >= MAX_LENGTH {
+                        self.length_counter = self.initial_length_timer;
+                    }
                     // Sweep does several things.
-
-                    //During a trigger event, several things occur:
-
-                    // CH1 period value is copied to the “shadow register”.
-                    // The “sweep timer” is reset.
-                    // The “enabled flag” is set if either the sweep pace or individual step are non-zero, cleared otherwise.
-                    // If the individual step is non-zero, frequency calculation and overflow check are performed immediately.
-
-                    // todo I should really not reset here
-                    self.reset();
-                    println!("handle triggering pulse_wave")
+                    if self.has_sweep {
+                        //During a trigger event, several things occur:
+                        // CH1 period value is copied to the “shadow register”.
+                        // The “sweep timer” is reset.
+                        self.pace_index = 0;
+                        // The “enabled flag” is set if either the sweep pace or individual step are non-zero, cleared otherwise.
+                        // self.enabled = self.pace != 0 || self.individual_step != 0;
+                        // todo!("enable the above; breaks sound")
+                        if !self.enabled {
+                            warn!(
+                                "########################  {} - {}",
+                                self.pace, self.individual_step
+                            )
+                        }
+                        // If the individual step is non-zero, frequency calculation and overflow check are performed immediately.
+                    }
                 }
             }
 
