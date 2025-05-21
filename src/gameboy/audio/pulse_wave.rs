@@ -6,7 +6,7 @@ use super::wave::Wave;
 
 const MAX_ENVELOPE_VOL: f32 = 15.0;
 const MAX_LENGTH: u8 = 64;
-const AUDIO_STEP_FREQUENCY: u32 = 4194304 / 512; // == 256 * 32; the div-api step frequency, right?
+const AUDIO_STEP_FREQUENCY: u32 = 4194304 / 512;
 const DUTIES: [[i8; 8]; 4] = [
     [-1, -1, -1, -1, -1, -1, -1, 1], // 00 (0x0)
     [-1, -1, -1, -1, -1, -1, 1, 1],  // 01 (0x1)
@@ -72,8 +72,8 @@ impl Wave for Pulse {
     /// - Length at 256Hz         - or every 2nd run
     /// - Volume Envelope at 64Hz - or every 8th run
     /// - Sweep at 128Hz          - or every 4th
-    fn step(&mut self, div_apu_steps: u32) {
-        for _ in 0..div_apu_steps {
+    fn step(&mut self, step: u32) {
+        for _ in 0..step {
             self.audio_step_counter += 1; // NOTE: += step if I ever remove the loop..
             if self.audio_step_counter == AUDIO_STEP_FREQUENCY {
                 self.audio_step_counter = 0;
@@ -100,11 +100,13 @@ impl Wave for Pulse {
                 }
                 self.audio_step_state = (self.audio_step_state + 1) % 8;
             }
+        }
 
-            // The period divider of pulse and wave channels is an up counter. Each time it is clocked, its
-            // value increases by 1; when it overflows (being clocked when it’s already 2047, or $7FF), its
-            // value is set from the contents of NR13 and NR14.
-            // todo!("shouldn't this happen every 4th dot?");
+        // Should clock every 4th dot
+        // The period divider of pulse and wave channels is an up counter. Each time it is clocked, its
+        // value increases by 1; when it overflows (being clocked when it’s already 2047, or $7FF), its
+        // value is set from the contents of NR13 and NR14.
+        for _ in 0..(step / 4) {
             self.current_period += 1;
             if self.current_period == 2048 {
                 trace!("Changing duty_index: {}", self.duty_index);
