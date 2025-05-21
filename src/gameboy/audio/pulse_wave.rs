@@ -31,7 +31,8 @@ pub(crate) struct Pulse {
     /// Frame of the audio. 1-8
     audio_step_state: u8,
 
-    pace_index: u8,
+    sweep_pace_index: u8,
+    sweep_enabled: bool,
     env_pace_index: u8,
     duty_index: u8,
     current_period: u16,
@@ -41,7 +42,7 @@ pub(crate) struct Pulse {
     // This register controls CH1’s period sweep functionality.
     // 7	| 6	5 4 | 3	            | 2	1	0
     //        Pace	  Direction	    Individual step
-    pace: u8,
+    sweep_pace: u8,
     sweep_direction: bool,
     individual_step: u8,
 
@@ -162,12 +163,25 @@ impl Pulse {
     }
 
     fn update_sweep(&mut self) {
+        // Note 1
         // On each sweep iteration, the period in NR13 and NR14 is modified and written back.
         // In addition mode, if the period value would overflow (i.e. is strictly more than $7FF),
         // the channel is turned off instead. This occurs even if sweep iterations are disabled by
         // the pace being 0.
 
-        if self.pace == 0 {
+        // Note 2
+        // When the “sweep timer” is clocked if the “enabled flag” is set and the sweep pace is not zero,
+        // a new frequency is calculated and the overflow check is performed. If the new frequency is 2047
+        // or less and the individual step is not zero, this new frequency is written back to the
+        // “shadow register” and CH1 frequency in NR13 and NR14, then frequency calculation and overflow check
+        // are run again immediately using this new value, but this second new frequency is not written back.
+
+        // TODO
+        // CH1 frequency can be modified via NR13 and NR14 while sweep is active, but the “shadow register”
+        // won’t be affected so the next time the “sweep timer” updates the channel’s frequency, this modification
+        // will be lost. This can be avoided by triggering the channel.
+
+        if self.sweep_pace == 0 {
             if self.period >= 2048 {
                 self.enabled = false;
             }
@@ -179,17 +193,21 @@ impl Pulse {
             return;
         }
 
-        self.pace_index += 1;
-        if self.pace_index != self.pace {
+        self.sweep_pace_index += 1;
+        if self.sweep_pace_index != self.sweep_pace {
             return;
         }
-        self.pace_index -= self.pace;
+        self.sweep_pace_index -= self.sweep_pace;
+
+        if !self.sweep_enabled {
+            return;
+        }
 
         let new_period = if self.sweep_direction {
-            self.period + (self.period >> self.pace)
+            self.period + (self.period >> self.individual_step)
         } else {
             // TODO this might underflow
-            self.period - (self.period >> self.pace)
+            self.period - (self.period >> self.individual_step)
         };
 
         if new_period < 2048 {
@@ -206,7 +224,7 @@ impl Pulse {
         // TODO "The “duty step” counter cannot be reset, except by turning the APU off, which sets both back to 0.
         // Was this reset meant to be used for the APU-turning off, and another should be used for the Trigger?
         self.current_period = self.period;
-        self.pace_index = 0;
+        self.sweep_pace_index = 0;
         self.env_pace_index = 0;
         self.volume = self.initial_volume;
         self.length_counter = self.initial_length_timer;
@@ -219,10 +237,11 @@ impl Default for Pulse {
         Self {
             enabled: false,
             has_sweep: false,
+            sweep_enabled: true,
             volume: 0xf, // todo is this right?
             current_period: period,
             duty_index: 0,
-            pace_index: 0,
+            sweep_pace_index: 0,
             env_pace_index: 0,
             audio_step_state: 0,
             audio_step_counter: 0,
@@ -231,7 +250,7 @@ impl Default for Pulse {
             period: period,
             trigger: true,
             // FF10 - default 0x80 (unused bit 7 set)
-            pace: 0,
+            sweep_pace: 0,
             sweep_direction: false,
             individual_step: 0,
             // FF11 - default 0xbf
@@ -253,7 +272,7 @@ impl MemoryAccessor for Pulse {
                 //        Pace	  Direction	    Individual step
                 let step = self.individual_step;
                 let direction = (self.sweep_direction as u8) << 3;
-                let pace = self.pace << 4;
+                let pace = self.sweep_pace << 4;
 
                 pace | direction | step
             }
@@ -302,7 +321,7 @@ impl MemoryAccessor for Pulse {
                 // sweep iteration completes, or the channel is (re)triggered.
                 // However, if 0 is written to this field, then iterations are instantly disabled (but see below), and it will be reloaded as soon as it’s set to something else.
                 // TODO this needs to not affect current iterations!
-                self.pace = (value >> 4) & 0x7
+                self.sweep_pace = (value >> 4) & 0x7
             }
 
             0x1 => {
@@ -356,14 +375,14 @@ impl MemoryAccessor for Pulse {
                         //During a trigger event, several things occur:
                         // CH1 period value is copied to the “shadow register”.
                         // The “sweep timer” is reset.
-                        self.pace_index = 0;
+                        self.sweep_pace_index = 0;
                         // The “enabled flag” is set if either the sweep pace or individual step are non-zero, cleared otherwise.
-                        // self.enabled = self.pace != 0 || self.individual_step != 0;
+                        self.sweep_enabled = self.sweep_pace != 0 || self.individual_step != 0;
                         // todo!("enable the above; breaks sound")
-                        if !self.enabled {
+                        if !self.sweep_enabled {
                             warn!(
                                 "########################  {} - {}",
-                                self.pace, self.individual_step
+                                self.sweep_pace, self.individual_step
                             )
                         }
                         // If the individual step is non-zero, frequency calculation and overflow check are performed immediately.

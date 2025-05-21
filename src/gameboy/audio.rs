@@ -76,8 +76,8 @@ impl Speaker {
         let ch1 = self.channel1.sample();
         let (pan_left, pan_right) = self.get_panning(1);
 
-        // sample[0] += (ch1 * pan_left as f32 * vol_left as f32) / (MAX_VOL * CHANNELS);
-        // sample[1] += (ch1 * pan_right as f32 * vol_right as f32) / (MAX_VOL * CHANNELS);
+        sample[0] += (ch1 * pan_left as f32 * vol_left as f32) / (MAX_VOL * CHANNELS);
+        sample[1] += (ch1 * pan_right as f32 * vol_right as f32) / (MAX_VOL * CHANNELS);
         // if sample[0] > 1.0 {
         //     println!("{},{},{}", pan_left, vol_left, MAX_VOL);
         //     panic!("BBBBB");
