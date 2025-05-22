@@ -2,16 +2,17 @@
 
 This is a pet project in an attempt to learn Rust by doing a real life project.
 
-While the emulator is usable in some extend, it is not fully implementing all the hardware's features so most games will not work as expected.
+While the emulator is usable in some extent, it is not fully implementing all the hardware's features so most games will not work as expected.
 
  ## Implemented features
  - [x] All CPU instructions
  - [x] Basic support for NoMBC/MBC1/MBC3 Cartridge types
  - [x] Timer/VBlank/STAT Interrupts
  - [x] Keyboard controls
+ - [x] Audio Channel 1/2
 
 ## Missing features
-- [ ] Audio
+- [ ] Audio Channels 3/4
 - [ ] GamePad support
 - [ ] RTC Register for MBC3 cartridges.
 

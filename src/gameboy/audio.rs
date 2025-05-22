@@ -2,7 +2,7 @@ use channel1::Channel1;
 use channel2::Channel2;
 use channel4::Channel4;
 use log::{debug, trace};
-use target::SDL2Output;
+use target::{FakeSpeaker, SDL2Output};
 use wave::Wave;
 
 use super::memory_bus::MemoryAccessor;
@@ -17,8 +17,8 @@ const HW_FREQUENCY: i32 = 4194304;
 const AUDIO_SAMPLE_RATE: i32 = 44100;
 const SAMPLING_FREQUENCY: u32 = HW_FREQUENCY as u32 / AUDIO_SAMPLE_RATE as u32; // 95
 
-const MAX_VOL: f32 = 7.0;
-const CHANNELS: f32 = 2.0; // TODO 4 channels at the end
+const VOL_DIVIDER: f32 = 50.0; // Used to lower the max volume
+const CHANNELS: f32 = 4.0;
 const VOLUME_ADJUST: f32 = 1000.0; // TODO just a random thingy. Find proper value
 
 pub struct Speaker {
@@ -76,29 +76,32 @@ impl Speaker {
         let ch1 = self.channel1.sample();
         let (pan_left, pan_right) = self.get_panning(1);
 
-        sample[0] += (ch1 * pan_left as f32 * vol_left as f32) / (MAX_VOL * CHANNELS);
-        sample[1] += (ch1 * pan_right as f32 * vol_right as f32) / (MAX_VOL * CHANNELS);
+        sample[0] += (ch1 * pan_left as f32 * vol_left as f32) / (VOL_DIVIDER * CHANNELS);
+        sample[1] += (ch1 * pan_right as f32 * vol_right as f32) / (VOL_DIVIDER * CHANNELS);
         // if sample[0] > 1.0 {
         //     println!("{},{},{}", pan_left, vol_left, MAX_VOL);
         //     panic!("BBBBB");
         // }
         let ch2 = self.channel2.sample();
         let (pan_left, pan_right) = self.get_panning(2);
-        sample[0] += (ch2 * pan_left as f32 * vol_left as f32) / (MAX_VOL * CHANNELS);
-        sample[1] += (ch2 * pan_right as f32 * vol_right as f32) / (MAX_VOL * CHANNELS);
+        sample[0] += (ch2 * pan_left as f32 * vol_left as f32) / (VOL_DIVIDER * CHANNELS);
+        sample[1] += (ch2 * pan_right as f32 * vol_right as f32) / (VOL_DIVIDER * CHANNELS);
 
         // if sample[0] != 0.0 {
         //     println!("{:?}", sample);
         // }
         if sample[0] > 1.0 {
-            println!("{},{},{}", pan_left, vol_left, MAX_VOL);
+            println!("{},{},{}", pan_left, vol_left, VOL_DIVIDER);
             panic!("ADASD");
         }
 
         self.output_target.play(sample[0], sample[1])
     }
 
-    pub fn start(&mut self) {
+    pub fn start(&mut self, use_speakers: bool) {
+        if !use_speakers {
+            self.output_target = Box::new(FakeSpeaker {});
+        }
         self.output_target.start();
     }
 

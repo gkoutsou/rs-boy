@@ -8,13 +8,26 @@ fn main() {
         .target(env_logger::Target::Stdout)
         .init();
 
-    let args: Vec<String> = env::args().collect();
-    if args.len() <= 1 {
+    let mut use_speakers: bool = true;
+    let mut rom_path: String = "".to_owned();
+
+    let mut args = env::args().skip(1);
+    while let Some(arg) = args.next() {
+        match arg.as_str() {
+            "-na" | "--no-audio" => use_speakers = false,
+            _ => {
+                if rom_path.len() > 0 {
+                    panic!("can only pass one rom file");
+                }
+                rom_path = arg;
+            }
+        }
+    }
+
+    if rom_path.len() == 0 {
         panic!("Please provide a rom");
     }
 
-    let path = args[1].as_str();
-
-    let mut gb = GameBoy::new(path);
-    gb.start();
+    let mut gb = GameBoy::new(&rom_path);
+    gb.start(use_speakers);
 }

@@ -2114,9 +2114,9 @@ impl GameBoy {
         }
     }
 
-    pub fn start(&mut self) {
+    pub fn start(&mut self, use_speakers: bool) {
         self.display.start_window();
-        self.speaker.start();
+        self.speaker.start(use_speakers);
         loop {
             self.step();
         }

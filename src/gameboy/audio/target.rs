@@ -55,3 +55,10 @@ impl SDL2Output {
         }
     }
 }
+
+pub struct FakeSpeaker {}
+impl AudioTarget for FakeSpeaker {
+    fn play(&mut self, _: f32, _: f32) {}
+
+    fn start(&self) {}
+}
