@@ -133,7 +133,7 @@ impl Display {
 
                 // If same X coordinate, the previous has priority
                 if tile.x == previous_x_coordinate {
-                    info!("same x, previous has priority");
+                    debug!("same x, previous has priority");
                     // todo!("this is wrong.. only if opaque!")
                     // continue;
                 }

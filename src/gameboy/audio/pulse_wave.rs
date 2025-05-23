@@ -31,13 +31,16 @@ pub(crate) struct Pulse {
     /// Frame of the audio. 1-8
     audio_step_state: u8,
 
-    sweep_pace_index: u8,
-    sweep_enabled: bool,
-    env_pace_index: u8,
     duty_index: u8,
-    current_period: u16,
+    /// The actual timer that ends up updating the duty_index
+    period_divider: u16,
 
     length_counter: u8,
+
+    sweep_enabled: bool,
+    sweep_pace_remaining: u8,
+    /// Shadow register so that period changes don't affect mid-sweep
+    sweep_shadow_period: u16,
     // FF10 — NR10: Channel 1 sweep
     // This register controls CH1’s period sweep functionality.
     // 7	| 6	5 4 | 3	            | 2	1	0
@@ -52,6 +55,8 @@ pub(crate) struct Pulse {
     wave_duty: u8,
     initial_length_timer: u8,
 
+    /// The index used to step the volume / envelope
+    env_pace_index: u8,
     // FF12 — NR12: Channel 1 volume & envelope
     // 7	6	5	4	| 3	        |2	1	0
     // Initial volume	Env dir     Sweep pace
@@ -108,10 +113,10 @@ impl Wave for Pulse {
         // value increases by 1; when it overflows (being clocked when it’s already 2047, or $7FF), its
         // value is set from the contents of NR13 and NR14.
         for _ in 0..(step / 4) {
-            self.current_period += 1;
-            if self.current_period == 2048 {
+            self.period_divider += 1;
+            if self.period_divider == 2048 {
                 trace!("Changing duty_index: {}", self.duty_index);
-                self.current_period = self.period;
+                self.period_divider = self.period;
 
                 // the “duty step” increments at the channel’s sample rate, which is 8 times the channel’s frequency).
                 self.duty_index = (self.duty_index + 1) % 8;
@@ -176,15 +181,28 @@ impl Pulse {
         // “shadow register” and CH1 frequency in NR13 and NR14, then frequency calculation and overflow check
         // are run again immediately using this new value, but this second new frequency is not written back.
 
-        // TODO
+        // Note 3
         // CH1 frequency can be modified via NR13 and NR14 while sweep is active, but the “shadow register”
         // won’t be affected so the next time the “sweep timer” updates the channel’s frequency, this modification
         // will be lost. This can be avoided by triggering the channel.
 
         if self.sweep_pace == 0 {
-            if self.period >= 2048 {
+            // Disable the channel instead of letting it overflow.
+            if self.sweep_shadow_period >= 2048 {
                 self.enabled = false;
             }
+            return;
+        }
+
+        self.sweep_pace_remaining -= 1;
+        if self.sweep_pace_remaining != 0 {
+            return;
+        }
+
+        // Sweep Timer Clocked
+        self.sweep_pace_remaining = self.sweep_pace;
+
+        if !self.sweep_enabled {
             return;
         }
 
@@ -193,38 +211,40 @@ impl Pulse {
             return;
         }
 
-        self.sweep_pace_index += 1;
-        if self.sweep_pace_index != self.sweep_pace {
-            return;
-        }
-        self.sweep_pace_index -= self.sweep_pace;
-
-        if !self.sweep_enabled {
-            return;
-        }
-
-        let new_period = if self.sweep_direction {
-            self.period + (self.period >> self.individual_step)
-        } else {
-            // TODO this might underflow
-            self.period - (self.period >> self.individual_step)
-        };
+        let new_period = self.calculate_new_frequency();
 
         if new_period < 2048 {
+            self.sweep_shadow_period = new_period;
             self.period = new_period;
+
+            // Perform a new overflow check, but ditch the frequency
+            if self.calculate_new_frequency() >= 2048 {
+                self.enabled = false
+            }
         } else {
             // Frequency sweep overflowing the frequency disables the channel
             self.enabled = false;
         }
     }
 
+    fn calculate_new_frequency(&self) -> u16 {
+        let new_period = if self.sweep_direction {
+            self.sweep_shadow_period + (self.sweep_shadow_period >> self.individual_step)
+        } else {
+            // TODO this might underflow
+            self.sweep_shadow_period - (self.sweep_shadow_period >> self.individual_step)
+        };
+        new_period
+    }
+
     pub fn reset(&mut self) {
+        todo!("check reset all over again");
         self.audio_step_counter = 0;
         self.duty_index = 0;
         // TODO "The “duty step” counter cannot be reset, except by turning the APU off, which sets both back to 0.
         // Was this reset meant to be used for the APU-turning off, and another should be used for the Trigger?
-        self.current_period = self.period;
-        self.sweep_pace_index = 0;
+        self.period_divider = self.period;
+        self.sweep_pace_remaining = self.sweep_pace;
         self.env_pace_index = 0;
         self.volume = self.initial_volume;
         self.length_counter = self.initial_length_timer;
@@ -239,15 +259,16 @@ impl Default for Pulse {
             has_sweep: false,
             sweep_enabled: true,
             volume: 0xf, // todo is this right?
-            current_period: period,
+            period_divider: period,
             duty_index: 0,
-            sweep_pace_index: 0,
+            sweep_pace_remaining: 0,
             env_pace_index: 0,
             audio_step_state: 0,
             audio_step_counter: 0,
             length_counter: 0x3f,
             length_enabled: false,
             period: period,
+            sweep_shadow_period: period,
             trigger: true,
             // FF10 - default 0x80 (unused bit 7 set)
             sweep_pace: 0,
@@ -319,9 +340,13 @@ impl MemoryAccessor for Pulse {
                 self.sweep_direction = value & (1 << 3) > 0;
                 // Note that the value written to this field is not re-read by the hardware until a
                 // sweep iteration completes, or the channel is (re)triggered.
-                // However, if 0 is written to this field, then iterations are instantly disabled (but see below), and it will be reloaded as soon as it’s set to something else.
-                // TODO this needs to not affect current iterations!
-                self.sweep_pace = (value >> 4) & 0x7
+                // However, if 0 is written to this field, then iterations are instantly disabled (but see below),
+                // and it will be reloaded as soon as it’s set to something else.
+                let old_sweep = self.sweep_pace;
+                self.sweep_pace = (value >> 4) & 0x7;
+                if old_sweep == 0 {
+                    self.sweep_pace_remaining = self.sweep_pace; // Instantly reload
+                }
             }
 
             0x1 => {
@@ -352,16 +377,12 @@ impl MemoryAccessor for Pulse {
                 self.trigger = value >> 7 > 0;
                 self.length_enabled = value & (1 << 6) > 0;
                 self.period = (self.period & 0xff) | ((value as u16 & 7) << 8);
-                if self.length_enabled {
-                    // todo!("should this be 'If length timer expired it is reset.'");
-                    // TODO "todo 2.. why do I reset it here? sounds wrong"
-                    self.length_counter = self.initial_length_timer;
-                }
+
                 if self.trigger {
                     // Channel is enabled.
                     self.enabled = true;
                     // The period divider is set to the contents of NR13 and NR14.
-                    self.current_period = self.period;
+                    self.period_divider = self.period;
                     // Volume is set to contents of NR12 initial volume.
                     self.volume = self.initial_volume;
                     // Envelope timer is reset.
@@ -372,20 +393,17 @@ impl MemoryAccessor for Pulse {
                     }
                     // Sweep does several things.
                     if self.has_sweep {
-                        //During a trigger event, several things occur:
                         // CH1 period value is copied to the “shadow register”.
+                        self.sweep_shadow_period = self.period;
                         // The “sweep timer” is reset.
-                        self.sweep_pace_index = 0;
+                        self.sweep_pace_remaining = self.sweep_pace;
                         // The “enabled flag” is set if either the sweep pace or individual step are non-zero, cleared otherwise.
                         self.sweep_enabled = self.sweep_pace != 0 || self.individual_step != 0;
-                        // todo!("enable the above; breaks sound")
-                        if !self.sweep_enabled {
-                            warn!(
-                                "########################  {} - {}",
-                                self.sweep_pace, self.individual_step
-                            )
-                        }
                         // If the individual step is non-zero, frequency calculation and overflow check are performed immediately.
+                        if self.individual_step != 0 && self.calculate_new_frequency() >= 2048 {
+                            self.enabled = false;
+                            warn!("I think this is how it should be.. but better check");
+                        }
                     }
                 }
             }
