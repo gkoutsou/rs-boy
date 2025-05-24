@@ -25,6 +25,10 @@ impl Wave for Channel1 {
     fn sample(&self) -> f32 {
         self.pulse.sample()
     }
+
+    fn is_enabled(&self) -> bool {
+        self.pulse.is_enabled()
+    }
 }
 
 impl Default for Channel1 {

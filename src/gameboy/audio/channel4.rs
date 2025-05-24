@@ -97,6 +97,10 @@ impl Wave for Channel4 {
         2.0
         // self.pulse.sample()
     }
+
+    fn is_enabled(&self) -> bool {
+        self.enabled
+    }
 }
 
 impl Channel4 {

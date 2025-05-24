@@ -19,7 +19,6 @@ const SAMPLING_FREQUENCY: u32 = HW_FREQUENCY as u32 / AUDIO_SAMPLE_RATE as u32; 
 
 const VOL_DIVIDER: f32 = 50.0; // Used to lower the max volume
 const CHANNELS: f32 = 4.0;
-const VOLUME_ADJUST: f32 = 1000.0; // TODO just a random thingy. Find proper value
 
 pub struct Speaker {
     output_target: Box<dyn target::AudioTarget>,
@@ -63,7 +62,6 @@ impl Speaker {
         self.channel1.step(steps);
         self.channel2.step(steps);
 
-        // todo!("Implement sound");
         self.clock += steps;
         if self.clock < SAMPLING_FREQUENCY {
             return;
@@ -73,29 +71,20 @@ impl Speaker {
         let mut sample = [0.0, 0.0];
 
         let (vol_left, vol_right) = self.get_volume();
+
         let ch1 = self.channel1.sample();
         let (pan_left, pan_right) = self.get_panning(1);
+        sample[0] += ch1 * pan_left as f32 * vol_left as f32;
+        sample[1] += ch1 * pan_right as f32 * vol_right as f32;
 
-        sample[0] += (ch1 * pan_left as f32 * vol_left as f32) / (VOL_DIVIDER * CHANNELS);
-        sample[1] += (ch1 * pan_right as f32 * vol_right as f32) / (VOL_DIVIDER * CHANNELS);
-        // if sample[0] > 1.0 {
-        //     println!("{},{},{}", pan_left, vol_left, MAX_VOL);
-        //     panic!("BBBBB");
-        // }
         let ch2 = self.channel2.sample();
         let (pan_left, pan_right) = self.get_panning(2);
-        sample[0] += (ch2 * pan_left as f32 * vol_left as f32) / (VOL_DIVIDER * CHANNELS);
-        sample[1] += (ch2 * pan_right as f32 * vol_right as f32) / (VOL_DIVIDER * CHANNELS);
+        sample[0] += ch2 * pan_left as f32 * vol_left as f32;
+        sample[1] += ch2 * pan_right as f32 * vol_right as f32;
 
-        // if sample[0] != 0.0 {
-        //     println!("{:?}", sample);
-        // }
-        if sample[0] > 1.0 {
-            println!("{},{},{}", pan_left, vol_left, VOL_DIVIDER);
-            panic!("ADASD");
-        }
-
-        self.output_target.play(sample[0], sample[1])
+        let left = sample[0] / (VOL_DIVIDER * CHANNELS);
+        let right = sample[1] / (VOL_DIVIDER * CHANNELS);
+        self.output_target.play(left, right);
     }
 
     pub fn start(&mut self, use_speakers: bool) {
@@ -149,7 +138,13 @@ impl MemoryAccessor for Speaker {
             0xff1a..=0xff23 => 0, // todo
             0xff24 => self.master_volume,
             0xff25 => self.sound_panning,
-            0xff26 => self.audio_master, // TODO low bits are read-only
+            0xff26 => {
+                let ch1 = self.channel1.is_enabled() as u8;
+                let ch2 = (self.channel2.is_enabled() as u8) << 1;
+                // TODO add channel 3
+                let ch4 = (self.channel4.is_enabled() as u8) << 3;
+                self.audio_master | ch1 | ch2 | ch4
+            }
             _ => panic!("speaker register location read: {:#x}", location),
         }
     }
@@ -171,8 +166,8 @@ impl MemoryAccessor for Speaker {
             0xff24 => self.master_volume = value,
             0xff25 => self.sound_panning = value,
             0xff26 => {
-                self.audio_master = value & 1 << 7;
-                if self.audio_master == 0 {
+                self.audio_master = value & 0xf0;
+                if !self.is_audio_enabled() {
                     // clears all APU registers and makes them read-only until turned back on, except NR52
                     // Turning the APU off, however, does not affect Wave RAM, which can always be read/written,
                     // nor the DIV-APU counter.

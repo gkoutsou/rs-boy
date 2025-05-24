@@ -126,16 +126,15 @@ impl Wave for Pulse {
 
     fn sample(&self) -> f32 {
         if !self.enabled {
-            // println!("samping with disabled channel");
             return 0.0;
         }
-        if DUTIES[self.wave_duty as usize][self.duty_index as usize] as f32 * self.volume as f32
-            == 0.0
-        {
-            trace!("{}-{}-{}", self.wave_duty, self.duty_index, self.volume)
-        }
-        DUTIES[self.wave_duty as usize][self.duty_index as usize] as f32 * self.volume as f32
-            / MAX_ENVELOPE_VOL // todo magic volume adjuster
+
+        let sample = DUTIES[self.wave_duty as usize][self.duty_index as usize] as f32;
+        ((sample * 2.0) - 1.0) * self.volume as f32 / MAX_ENVELOPE_VOL
+    }
+
+    fn is_enabled(&self) -> bool {
+        self.enabled
     }
 }
 impl Pulse {
@@ -366,6 +365,12 @@ impl MemoryAccessor for Pulse {
                 // Setting bits 3-7 of this register all to 0 (initial volume = 0, envelope = decreasing)
                 // turns the DAC off (and thus, the channel as well)
                 if self.initial_volume == 0 && !self.env_dir {
+                    // TODO
+                    // If a DAC is enabled, the digital range $0 to $F is linearly translated to the analog range -1 to 1,
+                    // in arbitrary units. Importantly, the slope is negative: “digital 0” maps to “analog 1”, not “analog -1”.
+
+                    // If a DAC is disabled, it fades to an analog value of 0, which corresponds to “digital 7.5”. The nature
+                    // of this fade is not entirely deterministic and varies between models.
                     self.enabled = false
                 }
             }
