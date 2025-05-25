@@ -21,8 +21,8 @@ impl AudioTarget for SDL2Output {
         self.buffer[self.index + 1] = right;
         self.index += 2;
 
-        let mut min: f32 = 1000.0;
-        let mut max: f32 = 0.0;
+        // let mut min: f32 = 1000.0;
+        // let mut max: f32 = 0.0;
 
         // If it's full queue the audio
         if self.index >= BUFFER_SIZE {
@@ -32,18 +32,18 @@ impl AudioTarget for SDL2Output {
             self.index = 0;
             self.queue.queue_audio(&self.buffer).unwrap();
 
-            for i in self.buffer.iter().step_by(2) {
-                if *i > max {
-                    max = *i;
-                }
-                if *i < min {
-                    min = *i;
-                }
-            }
-            if min < 0.0 || max > 0.0 {
-                // todo!("why do I get different min/max?");
-                info!("########### min {}, max {}", min, max)
-            }
+            // for i in self.buffer.iter().step_by(2) {
+            //     if *i > max {
+            //         max = *i;
+            //     }
+            //     if *i < min {
+            //         min = *i;
+            //     }
+            // }
+            // if min < 0.0 || max > 0.0 {
+            //     // todo!("why do I get different min/max?");
+            //     info!("########### min {}, max {}", min, max)
+            // }
         }
     }
 

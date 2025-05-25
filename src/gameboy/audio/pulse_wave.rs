@@ -9,8 +9,8 @@ const MAX_LENGTH: u8 = 64;
 const AUDIO_STEP_FREQUENCY: u32 = 4194304 / 512;
 const DUTIES: [[i8; 8]; 4] = [
     [0, 0, 0, 0, 0, 0, 0, 1], // 00 (0x0)
-    [0, 0, 0, 0, 0, 0, 1, 1], // 01 (0x1)
-    [0, 0, 0, 0, 1, 1, 1, 1], // 10 (0x2)
+    [1, 0, 0, 0, 0, 0, 0, 1], // 01 (0x1)
+    [1, 0, 0, 0, 0, 1, 1, 1], // 10 (0x2)
     [0, 1, 1, 1, 1, 1, 1, 0], // 11 (0x3)
 ];
 // Originally copied fron other emu
@@ -130,7 +130,10 @@ impl Wave for Pulse {
         }
 
         let sample = DUTIES[self.wave_duty as usize][self.duty_index as usize] as f32;
-        ((sample * 2.0) - 1.0) * self.volume as f32 / MAX_ENVELOPE_VOL
+        // If a DAC is enabled, the digital range $0 to $F is linearly translated to the analog range -1 to 1,
+        // in arbitrary units. Importantly, the slope is negative: “digital 0” maps to “analog 1”, not “analog -1”.
+        // ((sample * 2.0) - 1.0) * self.volume as f32 / MAX_ENVELOPE_VOL
+        ((0.5 - sample) * 2.0) * self.volume as f32 / MAX_ENVELOPE_VOL
     }
 
     fn is_enabled(&self) -> bool {

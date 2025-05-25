@@ -70,20 +70,19 @@ impl Speaker {
         self.clock -= SAMPLING_FREQUENCY;
         let mut sample = [0.0, 0.0];
 
-        let (vol_left, vol_right) = self.get_volume();
-
         let ch1 = self.channel1.sample();
         let (pan_left, pan_right) = self.get_panning(1);
-        sample[0] += ch1 * pan_left as f32 * vol_left as f32;
-        sample[1] += ch1 * pan_right as f32 * vol_right as f32;
+        sample[0] += ch1 * pan_left as f32;
+        sample[1] += ch1 * pan_right as f32;
 
         let ch2 = self.channel2.sample();
         let (pan_left, pan_right) = self.get_panning(2);
-        sample[0] += ch2 * pan_left as f32 * vol_left as f32;
-        sample[1] += ch2 * pan_right as f32 * vol_right as f32;
+        sample[0] += ch2 * pan_left as f32;
+        sample[1] += ch2 * pan_right as f32;
 
-        let left = sample[0] / (VOL_DIVIDER * CHANNELS);
-        let right = sample[1] / (VOL_DIVIDER * CHANNELS);
+        let (vol_left, vol_right) = self.get_volume();
+        let left = sample[0] * vol_left / (VOL_DIVIDER * CHANNELS);
+        let right = sample[1] * vol_right / (VOL_DIVIDER * CHANNELS);
         self.output_target.play(left, right);
     }
 
@@ -116,10 +115,14 @@ impl Speaker {
         return self.audio_master & (1 << 7) > 0;
     }
 
-    fn get_volume(&self) -> (u8, u8) {
+    /// Returns the scaling done for the left and right channels.
+    ///
+    /// A value of 0 is treated as a volume of 1 (very quiet), and a value of 7 is treated as a volume of 8
+    /// (no volume reduction). Importantly, the amplifier never mutes a non-silent input.
+    fn get_volume(&self) -> (f32, f32) {
         let left = (self.master_volume & (7 << 4)) >> 4;
         let right = self.master_volume & 7;
-        (left, right)
+        ((left + 1) as f32 / 8.0, (right + 1) as f32 / 8.0)
     }
 
     fn get_panning(&self, channel: u8) -> (u8, u8) {
