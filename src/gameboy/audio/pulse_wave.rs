@@ -70,7 +70,7 @@ pub(crate) struct Pulse {
     // Trigger	Length enable		   Period
     length_enabled: bool,
     period: u16,
-    trigger: bool,
+    trigger: bool, // TODO can be deleted right?
 }
 
 impl Wave for Pulse {
@@ -114,6 +114,7 @@ impl Wave for Pulse {
         // value is set from the contents of NR13 and NR14.
         for _ in 0..(step / 4) {
             self.period_divider += 1;
+            // todo!("cross-check this");
             if self.period_divider == 2048 {
                 trace!("Changing duty_index: {}", self.duty_index);
                 self.period_divider = self.period;
@@ -368,12 +369,6 @@ impl MemoryAccessor for Pulse {
                 // Setting bits 3-7 of this register all to 0 (initial volume = 0, envelope = decreasing)
                 // turns the DAC off (and thus, the channel as well)
                 if self.initial_volume == 0 && !self.env_dir {
-                    // TODO
-                    // If a DAC is enabled, the digital range $0 to $F is linearly translated to the analog range -1 to 1,
-                    // in arbitrary units. Importantly, the slope is negative: “digital 0” maps to “analog 1”, not “analog -1”.
-
-                    // If a DAC is disabled, it fades to an analog value of 0, which corresponds to “digital 7.5”. The nature
-                    // of this fade is not entirely deterministic and varies between models.
                     self.enabled = false
                 }
             }

@@ -1,7 +1,7 @@
 use channel1::Channel1;
 use channel2::Channel2;
 use channel4::Channel4;
-use log::{debug, trace};
+use log::{debug, info, trace};
 use target::{FakeSpeaker, SDL2Output};
 use wave::Wave;
 
@@ -17,8 +17,7 @@ const HW_FREQUENCY: i32 = 4194304;
 const AUDIO_SAMPLE_RATE: i32 = 44100;
 const SAMPLING_FREQUENCY: u32 = HW_FREQUENCY as u32 / AUDIO_SAMPLE_RATE as u32; // 95
 
-const VOL_DIVIDER: f32 = 50.0; // Used to lower the max volume
-const CHANNELS: f32 = 4.0;
+const VOL_DIVIDER: f32 = 25.0; // Used to lower the max volume
 
 pub struct Speaker {
     output_target: Box<dyn target::AudioTarget>,
@@ -61,6 +60,7 @@ impl Speaker {
 
         self.channel1.step(steps);
         self.channel2.step(steps);
+        self.channel4.step(steps);
 
         self.clock += steps;
         if self.clock < SAMPLING_FREQUENCY {
@@ -72,17 +72,25 @@ impl Speaker {
 
         let ch1 = self.channel1.sample();
         let (pan_left, pan_right) = self.get_panning(1);
-        sample[0] += ch1 * pan_left as f32;
-        sample[1] += ch1 * pan_right as f32;
+        // sample[0] += ch1 * pan_left as f32;
+        // sample[1] += ch1 * pan_right as f32;
 
         let ch2 = self.channel2.sample();
         let (pan_left, pan_right) = self.get_panning(2);
-        sample[0] += ch2 * pan_left as f32;
-        sample[1] += ch2 * pan_right as f32;
+        // sample[0] += ch2 * pan_left as f32;
+        // sample[1] += ch2 * pan_right as f32;
+
+        let ch4 = self.channel4.sample();
+        let (pan_left, pan_right) = self.get_panning(4);
+        // if ch4 != 0.0 {
+        //     info!("############## {} ({},{})", ch4, pan_left, pan_right);
+        // }
+        sample[0] += ch4 * pan_left as f32;
+        sample[1] += ch4 * pan_right as f32;
 
         let (vol_left, vol_right) = self.get_volume();
-        let left = sample[0] * vol_left / (VOL_DIVIDER * CHANNELS);
-        let right = sample[1] * vol_right / (VOL_DIVIDER * CHANNELS);
+        let left = sample[0] * vol_left / VOL_DIVIDER;
+        let right = sample[1] * vol_right / VOL_DIVIDER;
         self.output_target.play(left, right);
     }
 
@@ -138,6 +146,7 @@ impl MemoryAccessor for Speaker {
         match location {
             0xff10..=0xff14 => self.channel1.get(location),
             0xff15..=0xff19 => self.channel2.get(location),
+            0xff20..=0xff23 => self.channel4.get(location),
             0xff1a..=0xff23 => 0, // todo
             0xff24 => self.master_volume,
             0xff25 => self.sound_panning,
@@ -161,6 +170,7 @@ impl MemoryAccessor for Speaker {
         match location {
             0xff10..=0xff14 => self.channel1.write(location, value),
             0xff15..=0xff19 => self.channel2.write(location, value),
+            0xff20..=0xff23 => self.channel4.write(location, value),
             0xff1a..=0xff23 => {
                 // todo!()
                 // print!("{:#b}", value);
