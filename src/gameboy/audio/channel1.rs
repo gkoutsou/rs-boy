@@ -29,6 +29,10 @@ impl Wave for Channel1 {
     fn is_enabled(&self) -> bool {
         self.pulse.is_enabled()
     }
+
+    fn reset(&mut self) {
+        self.pulse.reset();
+    }
 }
 
 impl Default for Channel1 {

@@ -140,6 +140,38 @@ impl Wave for Pulse {
     fn is_enabled(&self) -> bool {
         self.enabled
     }
+
+    fn reset(&mut self) {
+        // NR10
+        self.sweep_pace = 0;
+        self.sweep_direction = false;
+        self.individual_step = 0;
+
+        // NR11
+        self.wave_duty = 0;
+        self.individual_step = 0;
+
+        // NR12
+        self.initial_volume = 0;
+        self.env_dir = false;
+        self.env_pace = 0;
+
+        // NR14
+        self.length_enabled = false;
+        self.period = 0;
+        self.trigger = false;
+
+        // todo!("check reset all over again");
+        self.audio_step_counter = 0;
+        self.duty_index = 0;
+        // TODO "The “duty step” counter cannot be reset, except by turning the APU off, which sets both back to 0.
+        // Was this reset meant to be used for the APU-turning off, and another should be used for the Trigger?
+        self.period_divider = self.period;
+        self.sweep_pace_remaining = self.sweep_pace;
+        self.env_pace_index = 0;
+        self.volume = self.initial_volume;
+        self.length_counter = self.initial_length_timer;
+    }
 }
 impl Pulse {
     /// The envelope ticks at 64 Hz, and the channel’s envelope will be increased / decreased
@@ -238,19 +270,6 @@ impl Pulse {
             self.sweep_shadow_period - (self.sweep_shadow_period >> self.individual_step)
         };
         new_period
-    }
-
-    pub fn reset(&mut self) {
-        todo!("check reset all over again");
-        self.audio_step_counter = 0;
-        self.duty_index = 0;
-        // TODO "The “duty step” counter cannot be reset, except by turning the APU off, which sets both back to 0.
-        // Was this reset meant to be used for the APU-turning off, and another should be used for the Trigger?
-        self.period_divider = self.period;
-        self.sweep_pace_remaining = self.sweep_pace;
-        self.env_pace_index = 0;
-        self.volume = self.initial_volume;
-        self.length_counter = self.initial_length_timer;
     }
 }
 

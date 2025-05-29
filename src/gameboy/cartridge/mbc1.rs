@@ -96,7 +96,7 @@ impl Drop for MBC1 {
             let mut file = File::create(filepath).unwrap();
             let res = file.write_all(self.ram.as_ref().unwrap());
             if res.is_err() {
-                panic!("{:?}", res);
+                panic!("failed to write to {}:\n {:?}", filepath.display(), res);
             }
         }
     }

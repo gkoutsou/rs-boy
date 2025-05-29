@@ -162,6 +162,10 @@ impl Wave for Channel4 {
     fn is_enabled(&self) -> bool {
         self.enabled
     }
+
+    fn reset(&mut self) {
+        todo!("reset ch4");
+    }
 }
 
 impl Channel4 {

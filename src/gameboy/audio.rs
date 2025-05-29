@@ -48,7 +48,7 @@ pub struct Speaker {
 impl Speaker {
     pub fn step(&mut self, steps: u32) {
         if !self.is_audio_enabled() {
-            todo!("should somehow not affect div-counter...");
+            // todo!("should somehow not affect div-counter...");
             return;
         }
 
@@ -167,6 +167,15 @@ impl MemoryAccessor for Speaker {
             location,
             value
         );
+
+        //
+        if !self.is_audio_enabled() && (location != 0xff26 || (0xff30..=0xff3f).contains(&location))
+        {
+            // makes them read-only until turned back on, except NR52
+            // however, does not affect Wave RAM, which can always be read/written,
+            // nor the DIV-APU counter.
+            return;
+        }
         match location {
             0xff10..=0xff14 => self.channel1.write(location, value),
             0xff15..=0xff19 => self.channel2.write(location, value),
@@ -181,13 +190,11 @@ impl MemoryAccessor for Speaker {
             0xff26 => {
                 self.audio_master = value & 0xf0;
                 if !self.is_audio_enabled() {
-                    // clears all APU registers and makes them read-only until turned back on, except NR52
-                    // Turning the APU off, however, does not affect Wave RAM, which can always be read/written,
-                    // nor the DIV-APU counter.
-                    todo!("implement the above notes.. Commented out code below looks relevant..");
-                    todo!("maybe recreate all the channels instead?");
-                    todo!("disabling should not affect div-apu counter..");
-                    // self.channel1.reset();
+                    self.channel1.reset();
+                    self.channel2.reset();
+                    // self.channel4.reset();
+                    // Turning the APU off, however, does not affect the DIV-APU counter.
+                    // todo!("disabling should not affect div-apu counter..");
                 }
             }
 

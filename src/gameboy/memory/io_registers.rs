@@ -16,6 +16,8 @@ impl MemoryAccessor for IORegisters {
             0xff01 => self.serial_transfer_data,
             0xff02 => self.serial_transfer_control,
 
+            0xff27..=0xff2f => 0, // Unused area
+
             // ignore
             // 0xFF4D => 0,
             _ => panic!("i/o register location read: {:#x}", location),
@@ -30,6 +32,7 @@ impl MemoryAccessor for IORegisters {
 
             // ignore
             0xFF4D => (),
+            0xff27..=0xff2f => (), // Unused area
             0xFF30..=0xFF3F => (), // todo
 
             0xFF56 => (),
