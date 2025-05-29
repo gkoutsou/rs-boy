@@ -80,20 +80,20 @@ impl MemoryAccessor for Memory {
         match location {
             0xc000..=0xdfff => {
                 // in CGB mode, the 2nd 4k are rotatable
-                trace!("Writting to WRAM: {:#x}", location);
+                trace!("Writing to WRAM: {:#x}", location);
                 self.work_ram[location - 0xc000] = value;
             }
 
             0xff00..=0xff7f => self.io_registers.write(location, value),
 
             0xff80..=0xfffe => {
-                trace!("Writting to HRAM: {:#x}", location);
+                trace!("Writing to HRAM: {:#x}", location);
                 self.high_ram[location - 0xff80] = value;
             }
 
             0xffff => {
                 debug!(
-                    "Writting to Interrupt Enable Register {:#b} -> {:#b}",
+                    "Writing to Interrupt Enable Register {:#b} -> {:#b}",
                     self.interrupt_enable, value
                 );
                 self.interrupt_enable = value;

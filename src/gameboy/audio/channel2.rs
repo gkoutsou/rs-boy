@@ -13,7 +13,7 @@ impl MemoryAccessor for Channel2 {
     fn get(&self, location: usize) -> u8 {
         if location == 0xff15 {
             warn!("channel2 has no sweep");
-            return 0;
+            return 0xff;
         }
         self.pulse.get(location - MEMORY_BASE)
     }

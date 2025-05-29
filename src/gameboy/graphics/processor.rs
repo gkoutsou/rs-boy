@@ -101,7 +101,7 @@ impl MemoryAccessor for Processor {
     }
 
     fn write(&mut self, location: usize, value: u8) {
-        trace!("Writting to gpu registers: {:#x}: {:#b}", location, value);
+        trace!("Writing to gpu registers: {:#x}: {:#b}", location, value);
         match location {
             0xff40 => {
                 if value & (1 << 7) == 0 && self.lcd_control & (1 << 7) != 0 {

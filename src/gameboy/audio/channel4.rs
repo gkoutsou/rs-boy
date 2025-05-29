@@ -52,16 +52,21 @@ pub(crate) struct Channel4 {
 impl MemoryAccessor for Channel4 {
     fn get(&self, location: usize) -> u8 {
         match location {
-            0xff20 => self.initial_length_timer,
+            0xff1f => 0xff,
+            0xff20 => {
+                // self.initial_length_timer
+                0xff // write-only
+            }
             0xff21 => self.initial_volume << 4 | (self.env_dir as u8) << 3 | self.env_pace,
             0xff22 => self.clock_shift << 4 | (self.lfsr_7_width as u8) << 3 | self.clock_divider,
-            0xff23 => 0xff & (self.length_enabled as u8) << 6,
+            0xff23 => 0b10111111 | (self.length_enabled as u8) << 6,
             _ => panic!("missing channel 4 get: {:#x}", location),
         }
     }
 
     fn write(&mut self, location: usize, value: u8) {
         match location {
+            0xff1f => (),
             0xff20 => self.initial_length_timer = value & 0x3F,
             0xff21 => {
                 self.initial_volume = value >> 4;
@@ -164,7 +169,7 @@ impl Wave for Channel4 {
     }
 
     fn reset(&mut self) {
-        todo!("reset ch4");
+        info!("reset ch4");
     }
 }
 

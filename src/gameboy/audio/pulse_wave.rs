@@ -70,7 +70,6 @@ pub(crate) struct Pulse {
     // Trigger	Length enable		   Period
     length_enabled: bool,
     period: u16,
-    trigger: bool, // TODO can be deleted right?
 }
 
 impl Wave for Pulse {
@@ -159,7 +158,6 @@ impl Wave for Pulse {
         // NR14
         self.length_enabled = false;
         self.period = 0;
-        self.trigger = false;
 
         // todo!("check reset all over again");
         self.audio_step_counter = 0;
@@ -291,7 +289,6 @@ impl Default for Pulse {
             length_enabled: false,
             period: period,
             sweep_shadow_period: period,
-            trigger: true,
             // FF10 - default 0x80 (unused bit 7 set)
             sweep_pace: 0,
             sweep_direction: false,
@@ -317,13 +314,14 @@ impl MemoryAccessor for Pulse {
                 let direction = (self.sweep_direction as u8) << 3;
                 let pace = self.sweep_pace << 4;
 
-                pace | direction | step
+                1 << 7 | pace | direction | step
             }
 
             0x1 => {
                 // 7	6	    | 5	4	3	2	1	0
                 // Wave duty	Initial length timer
-                let timer = self.initial_length_timer;
+                // let timer = self.initial_length_timer;
+                let timer = 0b00111111; // Timer is read only
                 let duty = self.wave_duty << 6;
                 timer | duty
             }
@@ -337,16 +335,20 @@ impl MemoryAccessor for Pulse {
                 pace | dir | volume
             }
 
-            0x3 => (self.period & 0xff) as u8,
+            0x3 => {
+                //(self.period & 0xff) as u8
+                0xff // it's write only field
+            }
 
             0x4 => {
                 // 7	    | 6	         | 5 4 3 | 2	1	0
                 // Trigger	Length enable		   Period
-                let trigger = (self.trigger as u8) << 7;
+                let trigger = 1 << 7;
                 let length_enable = (self.length_enabled as u8) << 6;
-                let period = (self.period >> 8) as u8;
+                // let period = (self.period >> 8) as u8;
+                let period = 0x7; // write only
 
-                trigger | length_enable | period
+                trigger | length_enable | 0b111000 | period
             }
 
             _ => panic!("missing pulse_wave get: {:#x}", location),
@@ -396,11 +398,11 @@ impl MemoryAccessor for Pulse {
             0x4 => {
                 // 7	    | 6	         | 5 4 3 | 2	1	0
                 // Trigger	Length enable		   Period
-                self.trigger = value >> 7 > 0;
+                let trigger = value >> 7 > 0;
                 self.length_enabled = value & (1 << 6) > 0;
                 self.period = (self.period & 0xff) | ((value as u16 & 7) << 8);
 
-                if self.trigger {
+                if trigger {
                     // Channel is enabled.
                     self.enabled = true;
                     // The period divider is set to the contents of NR13 and NR14.

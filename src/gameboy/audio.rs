@@ -1,5 +1,6 @@
 use channel1::Channel1;
 use channel2::Channel2;
+use channel3::Channel3;
 use channel4::Channel4;
 use log::{debug, info, trace};
 use target::{FakeSpeaker, SDL2Output};
@@ -8,6 +9,7 @@ use wave::Wave;
 use super::memory_bus::MemoryAccessor;
 mod channel1;
 mod channel2;
+mod channel3;
 mod channel4;
 mod pulse_wave;
 mod target;
@@ -24,13 +26,14 @@ pub struct Speaker {
     clock: u32,
     channel1: Channel1,
     channel2: Channel2,
+    channel3: Channel3,
     channel4: Channel4,
     /// FF26 — NR52: Audio master control
     ///
     /// 7            | 6 5 4 | 3 2 1 0
     ///
     /// Audio on/off |       | CH4 on?	CH3 on?	CH2 on?	CH1 on?
-    audio_master: u8, // TODO implement bits 0-3
+    audio_master: bool,
     /// FF25 — NR51: Sound panning
     ///
     /// 7	6	5	4	3	2	1	0
@@ -60,6 +63,7 @@ impl Speaker {
 
         self.channel1.step(steps);
         self.channel2.step(steps);
+        self.channel3.step(steps);
         self.channel4.step(steps);
 
         self.clock += steps;
@@ -72,13 +76,18 @@ impl Speaker {
 
         let ch1 = self.channel1.sample();
         let (pan_left, pan_right) = self.get_panning(1);
-        // sample[0] += ch1 * pan_left as f32;
-        // sample[1] += ch1 * pan_right as f32;
+        sample[0] += ch1 * pan_left as f32;
+        sample[1] += ch1 * pan_right as f32;
 
         let ch2 = self.channel2.sample();
         let (pan_left, pan_right) = self.get_panning(2);
-        // sample[0] += ch2 * pan_left as f32;
-        // sample[1] += ch2 * pan_right as f32;
+        sample[0] += ch2 * pan_left as f32;
+        sample[1] += ch2 * pan_right as f32;
+
+        let ch3 = self.channel3.sample();
+        let (pan_left, pan_right) = self.get_panning(3);
+        // sample[0] += ch3 * pan_left as f32;
+        // sample[1] += ch3 * pan_right as f32;
 
         let ch4 = self.channel4.sample();
         let (pan_left, pan_right) = self.get_panning(4);
@@ -105,22 +114,24 @@ impl Speaker {
         let audio_target = SDL2Output::new();
         let channel1 = channel1::Channel1::default();
         let channel2 = channel2::Channel2::default();
+        let channel3 = channel3::Channel3::default();
         let channel4 = channel4::Channel4::default();
 
         Speaker {
             output_target: Box::new(audio_target),
             channel1,
             channel2,
+            channel3,
             channel4,
             clock: 0,
             master_volume: 0x77,
             sound_panning: 0xf3,
-            audio_master: 0xf1,
+            audio_master: true,
         }
     }
 
     fn is_audio_enabled(&self) -> bool {
-        return self.audio_master & (1 << 7) > 0;
+        return self.audio_master;
     }
 
     /// Returns the scaling done for the left and right channels.
@@ -142,31 +153,29 @@ impl Speaker {
 
 impl MemoryAccessor for Speaker {
     fn get(&self, location: usize) -> u8 {
-        debug!("Read speaker memory: {:#x}", location);
+        info!("Read speaker memory: {:#x}", location);
         match location {
             0xff10..=0xff14 => self.channel1.get(location),
             0xff15..=0xff19 => self.channel2.get(location),
-            0xff20..=0xff23 => self.channel4.get(location),
-            0xff1a..=0xff23 => 0, // todo
+            0xff1a..=0xff1e => self.channel3.get(location),
+            0xff1f..=0xff23 => self.channel4.get(location),
             0xff24 => self.master_volume,
             0xff25 => self.sound_panning,
             0xff26 => {
                 let ch1 = self.channel1.is_enabled() as u8;
                 let ch2 = (self.channel2.is_enabled() as u8) << 1;
-                // TODO add channel 3
+                let ch3 = (self.channel3.is_enabled() as u8) << 1;
                 let ch4 = (self.channel4.is_enabled() as u8) << 3;
-                self.audio_master | ch1 | ch2 | ch4
+                (self.audio_master as u8) << 7 | 0x70 | ch1 | ch2 | ch3 | ch4
             }
+            0xff27..=0xff2f => 0xff, // Unused area
+            0xff30..=0xff3f => self.channel3.get(location),
             _ => panic!("speaker register location read: {:#x}", location),
         }
     }
 
     fn write(&mut self, location: usize, value: u8) {
-        trace!(
-            "Writting to speaker Register: {:#x}: {:#b}",
-            location,
-            value
-        );
+        info!("Writing to speaker Register: {:#x}: {:#b}", location, value);
 
         //
         if !self.is_audio_enabled() && (location != 0xff26 || (0xff30..=0xff3f).contains(&location))
@@ -179,24 +188,23 @@ impl MemoryAccessor for Speaker {
         match location {
             0xff10..=0xff14 => self.channel1.write(location, value),
             0xff15..=0xff19 => self.channel2.write(location, value),
-            0xff20..=0xff23 => self.channel4.write(location, value),
-            0xff1a..=0xff23 => {
-                // todo!()
-                // print!("{:#b}", value);
-                // panic!("{:#x}", location)
-            }
+            0xff1a..=0xff1e => self.channel3.write(location, value),
+            0xff1f..=0xff23 => self.channel4.write(location, value),
             0xff24 => self.master_volume = value,
             0xff25 => self.sound_panning = value,
             0xff26 => {
-                self.audio_master = value & 0xf0;
+                self.audio_master = value >> 7 > 0;
                 if !self.is_audio_enabled() {
                     self.channel1.reset();
                     self.channel2.reset();
-                    // self.channel4.reset();
+                    self.channel3.reset();
+                    self.channel4.reset();
                     // Turning the APU off, however, does not affect the DIV-APU counter.
                     // todo!("disabling should not affect div-apu counter..");
                 }
             }
+            0xff27..=0xff2f => (), // Unused area
+            0xff30..=0xff3f => self.channel3.write(location, value),
 
             _ => {
                 panic!(
