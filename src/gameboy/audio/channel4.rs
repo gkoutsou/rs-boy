@@ -169,7 +169,27 @@ impl Wave for Channel4 {
     }
 
     fn reset(&mut self) {
-        info!("reset ch4");
+        info!("TODO reset ch4 should reset internals?");
+
+        // FF20 — NR41
+        self.initial_length_timer = 0;
+
+        // FF21 — NR42
+        self.initial_volume = 0;
+        self.env_dir = false;
+        self.env_pace = 0;
+
+        // FF22 — NR43: Channel 4 frequency & randomness
+        self.clock_shift = 0;
+        self.lfsr_7_width = false;
+        self.clock_divider = 0;
+
+        // FF23 — NR44: Channel 4 control
+        //  Trigger   Length enable
+        self.length_enabled = false;
+
+        // since initial_volume & env_dir is 0, we disable the DAC, thus the channel (TODO cross check)
+        self.enabled = false;
     }
 }
 

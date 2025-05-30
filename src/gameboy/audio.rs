@@ -180,6 +180,7 @@ impl MemoryAccessor for Speaker {
         //
         if !self.is_audio_enabled() && (location != 0xff26 || (0xff30..=0xff3f).contains(&location))
         {
+            // TODO allow write to NRx1 in monochrome
             // makes them read-only until turned back on, except NR52
             // however, does not affect Wave RAM, which can always be read/written,
             // nor the DIV-APU counter.
@@ -199,6 +200,9 @@ impl MemoryAccessor for Speaker {
                     self.channel2.reset();
                     self.channel3.reset();
                     self.channel4.reset();
+
+                    self.sound_panning = 0;
+                    self.master_volume = 0;
                     // Turning the APU off, however, does not affect the DIV-APU counter.
                     // todo!("disabling should not affect div-apu counter..");
                 }

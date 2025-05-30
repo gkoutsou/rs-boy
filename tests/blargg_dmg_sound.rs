@@ -13,8 +13,6 @@ macro_rules! test {
         fn $fn_name() {
             let mut gb = GameBoy::new(Path::new(ROMPATH).join($rom).to_str().unwrap());
 
-            let mut output: Vec<u8> = Vec::new();
-
             let mut found = false;
             loop {
                 let status = gb.memory_read(STATUS_LOCATION);

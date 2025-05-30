@@ -68,7 +68,13 @@ impl MemoryAccessor for Channel3 {
 
     fn write(&mut self, location: usize, value: u8) {
         match location {
-            0xff1a => self.dac_on = value >> 7 > 0,
+            0xff1a => {
+                self.dac_on = value >> 7 > 0;
+                if !self.dac_on {
+                    // Disabling DAC disables the channel
+                    self.enabled = false;
+                }
+            }
             0xff1b => self.initial_length_timer = value,
 
             0xff1c => self.output_level = (value & 0b01100000) >> 5,
@@ -135,7 +141,23 @@ impl Wave for Channel3 {
     }
 
     fn reset(&mut self) {
-        info!("reset ch3");
+        info!("TODO reset ch3 should reset internals");
+        // Since dac_on becomes false, we disable the channel. TODO crosscheck
+        self.enabled = false;
+
+        // FF1A — NR30: Channel 3 DAC enable
+        self.dac_on = false;
+
+        // FF1B — NR31: Channel 3 length timer [write-only]
+        self.initial_length_timer = 0;
+
+        // FF1C — NR32: Channel 3 output level
+        self.output_level = 0;
+
+        // FF1D — NR33: Channel 3 period low [write-only]
+        // FF1E — NR34: Channel 3 period high & control
+        self.length_enabled = false;
+        self.period = 0;
     }
 }
 

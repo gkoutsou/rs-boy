@@ -154,6 +154,8 @@ impl Wave for Pulse {
         self.initial_volume = 0;
         self.env_dir = false;
         self.env_pace = 0;
+        // since initial_volume & env_dir is 0, we disable the DAC, thus the channel (TODO cross check)
+        self.enabled = false;
 
         // NR14
         self.length_enabled = false;
