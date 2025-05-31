@@ -83,7 +83,7 @@ impl GameBoy {
 
     fn timer_step(&mut self, ticks: u32) {
         if self.timer.step_timer(ticks) {
-            println!("enabling timer interrupt");
+            debug!("enabling timer interrupt");
             self.interrupt_flag |= interrupts::TIMER;
         }
     }
@@ -197,6 +197,7 @@ impl GameBoy {
             0xA000..=0xBFFF => self.cartridge.write(location, value),
 
             0xff46 => {
+                self.display.write(location, value);
                 let location = (value as u16) << 8;
                 debug!(
                     "Triggering DMA transfter to OAM! {:#x} --> {:#x}",

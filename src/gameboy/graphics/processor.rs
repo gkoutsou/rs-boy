@@ -62,6 +62,8 @@ pub struct Processor {
     pub ly: u8,
     /// ff45
     pub lyc: u8,
+    /// ff46 DMA
+    dma_last_value: u8,
     /// FF47
     pub bgp: u8,
     /// FF48
@@ -90,6 +92,7 @@ impl MemoryAccessor for Processor {
             0xff43 => self.scx,
             0xff44 => self.ly,
             0xff45 => self.lyc,
+            0xff46 => self.dma_last_value, // Write Only
             0xff47 => self.bgp,
             0xff48 => self.obp0,
             0xff49 => self.obp1,
@@ -121,6 +124,7 @@ impl MemoryAccessor for Processor {
                 trace!("LYC: {}", value);
                 self.lyc = value
             }
+            0xff46 => self.dma_last_value = value, // This executes more
             0xff47 => self.bgp = value,
             0xff48 => self.obp0 = value,
             0xff49 => self.obp1 = value,
@@ -222,6 +226,7 @@ impl Processor {
             bgp: 0xfc,
             obp0: 0xff,
             obp1: 0xff,
+            dma_last_value: 0,
 
             win_y_counter: 0,
         }

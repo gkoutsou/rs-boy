@@ -6,6 +6,7 @@ mod window;
 use super::memory_bus::MemoryAccessor;
 use crate::gameboy::interrupts;
 pub use engine::Buffer;
+use log::warn;
 use log::{debug, info, trace};
 pub use processor::Mode;
 pub use processor::Processor;
@@ -238,7 +239,7 @@ impl Display {
 
         if self.processor.should_trigger_mode_stat_interrupt(mode) {
             self.interrupt |= interrupts::STAT;
-            println!("todo: check and enable interrupt - mode");
+            warn!("todo: check and enable interrupt - mode");
         }
 
         if mode == Mode::Two && self.processor.wy == self.processor.ly {

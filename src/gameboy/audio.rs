@@ -104,14 +104,14 @@ impl Speaker {
     }
 
     pub fn start(&mut self, use_speakers: bool) {
-        if !use_speakers {
-            self.output_target = Box::new(FakeSpeaker {});
+        if use_speakers {
+            self.output_target = Box::new(SDL2Output::new());
         }
         self.output_target.start();
     }
 
     pub fn new() -> Self {
-        let audio_target = SDL2Output::new();
+        let audio_target = FakeSpeaker {};
         let channel1 = channel1::Channel1::default();
         let channel2 = channel2::Channel2::default();
         let channel3 = channel3::Channel3::default();
@@ -166,6 +166,10 @@ impl MemoryAccessor for Speaker {
                 let ch2 = (self.channel2.is_enabled() as u8) << 1;
                 let ch3 = (self.channel3.is_enabled() as u8) << 1;
                 let ch4 = (self.channel4.is_enabled() as u8) << 3;
+                info!(
+                    "{:#b}",
+                    (self.audio_master as u8) << 7 | 0x70 | ch1 | ch2 | ch3 | ch4
+                );
                 (self.audio_master as u8) << 7 | 0x70 | ch1 | ch2 | ch3 | ch4
             }
             0xff27..=0xff2f => 0xff, // Unused area
