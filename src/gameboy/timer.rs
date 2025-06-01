@@ -16,6 +16,8 @@ pub struct Timer {
     /// described below.
     tima: u8,
     /// FF06
+    /// When TIMA overflows, it is reset to the value in this register and an
+    /// interrupt is requested.
     tma: u8,
     /// FF07
     tac: u8,
@@ -36,21 +38,23 @@ impl Timer {
         info!("selected {}", selected);
 
         match selected {
-            0 => 1024,
-            1 => 16,
-            2 => 64,
-            3 => 256,
+            0 => 256,
+            1 => 4,
+            2 => 16,
+            3 => 64,
             _clock => panic!("unknown tima clock: {}", _clock),
         }
     }
 
-    pub fn step_timer(&mut self, ticks: u32) -> bool {
+    pub fn step_timer(&mut self, dots: u32) -> bool {
         // a dot is: 4194000 Hz
         // div step:   16384 Hz
         // so a div is stepped every 255.981445313 dots
-        self.div_counter += ticks;
-        if self.div_counter >= 256 {
-            self.div_counter -= 256;
+        // or 256/4 = 64 m_ticks
+        let m_ticks = dots / 4;
+        self.div_counter += m_ticks;
+        if self.div_counter >= 64 {
+            self.div_counter -= 64;
             self.div = self.div.wrapping_add(1);
             // debug!("div: {}", self.div)
         }
@@ -59,18 +63,16 @@ impl Timer {
             return false;
         }
 
-        self.tima_counter += ticks;
+        self.tima_counter += m_ticks;
         let clock = self.tima_clock;
 
         if self.tima_counter >= clock {
             self.tima_counter -= clock;
             self.tima = self.tima.wrapping_add(1);
-            // debug!("tima: {}", self.tima);
 
             if self.tima == 0 {
                 self.tima = self.tma;
                 return true;
-                // todo!("trigger timer interrupt");
             }
         }
         false
@@ -109,7 +111,7 @@ impl MemoryAccessor for Timer {
                 // writing any value resets it
                 self.div = 0;
                 self.div_counter = 0;
-                self.tima_counter = 0; // time uses same counter as div. So both get reset
+                self.tima_counter = 0; // tima uses same counter as div. So both get reset
             }
             0xFF05 => self.tima = value,
             0xFF06 => self.tma = value,

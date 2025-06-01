@@ -115,7 +115,7 @@ impl GameBoy {
         }
         if interrupts & interrupts::STAT > 0 {
             self.interrupt_flag &= !interrupts::STAT;
-            debug!("VBlank Interrupt Handler from: {:#x}", self.registers.pc);
+            debug!("Stat Interrupt Handler from: {:#x}", self.registers.pc);
             self.registers.set_pc(0x48);
             return true;
         }
