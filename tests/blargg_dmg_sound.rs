@@ -2,7 +2,7 @@ use log::info;
 use rs_boy::gameboy::GameBoy;
 use std::path::Path;
 
-const ROMPATH: &str = "test/blargg/dmg_sound/rom_singles";
+const ROMPATH: &str = "tests/blargg/dmg_sound/rom_singles";
 
 const STATUS_LOCATION: usize = 0xA000;
 const TEST_RUNNING_VALUE: u8 = 0x80;

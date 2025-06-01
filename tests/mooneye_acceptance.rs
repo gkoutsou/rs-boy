@@ -1,7 +1,7 @@
 use rs_boy::gameboy::GameBoy;
 use std::path::Path;
 
-const ROMPATH: &str = "test/mooneye/acceptance";
+const ROMPATH: &str = "tests/mooneye/acceptance";
 
 macro_rules! test {
     ($fn_name:ident, $rom:expr) => {

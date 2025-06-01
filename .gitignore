@@ -1,8 +1,11 @@
 /target
 /test
+/tests/blargg
+/tests/mooneye
 output
 *.gbsave
 *.gb
 *.gbc
 .vscode
 .DS_Store
+.idea

@@ -108,7 +108,8 @@ impl MemoryAccessor for Timer {
             0xFF04 => {
                 // writing any value resets it
                 self.div = 0;
-                self.tima_counter = 0;
+                self.div_counter = 0;
+                self.tima_counter = 0; // time uses same counter as div. So both get reset
             }
             0xFF05 => self.tima = value,
             0xFF06 => self.tma = value,
