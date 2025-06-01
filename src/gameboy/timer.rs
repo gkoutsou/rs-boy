@@ -34,13 +34,13 @@ impl Timer {
 
     fn tima_clock_bit(&self) -> u8 {
         let selected = self.tac & 0x3;
-        info!("selected {}", selected);
+        info!("tima clock selected {}", selected);
 
         match selected {
             0 => 9, // every 256 M-Ticks - or every 4th div
-            1 => 3, // every 4 M-Ticks
+            1 => 3, // every 4 M-Ticks   - or every 4 cpu instructions
             2 => 5, // every 16 M-Ticks
-            3 => 7, // every 64 M-Ticks - or every div
+            3 => 7, // every 64 M-Ticks  - or every div
             _clock => panic!("unknown tima clock: {}", _clock),
         }
     }
@@ -80,9 +80,23 @@ impl Timer {
     }
 
     fn has_bit_gone_low(old: u16, new: u16, bit: u8) -> bool {
-        let original_bit = (old >> bit) & 1;
-        let new_bit = (new >> bit) & 1;
-        original_bit != new_bit && new_bit == 0 // TODO this has issue when stepping too much, right? for loop instead?
+        // println!("{:#b} {:#b}", old, new);
+        let mut changed = false;
+        let mut original_bit = (old >> bit) & 1;
+        // This ensures that for ticks that happen too often (for example every 4 cpu instructions)
+        // will still be caught during longer cpu instructions
+        for next_new in (old + 1)..=new {
+            let new_bit = (next_new >> bit) & 1;
+            // println!(
+            //     "{}-{} ==> {}",
+            //     original_bit,
+            //     new_bit,
+            //     original_bit != new_bit && new_bit == 0
+            // );
+            changed |= original_bit != new_bit && new_bit == 0;
+            original_bit = new_bit;
+        }
+        changed
     }
 
     fn timer_tick(&mut self) -> bool {
@@ -92,7 +106,7 @@ impl Timer {
             self.tima = self.tma;
             return true;
         }
-        return false;
+        false
     }
 
     pub fn new() -> Self {
@@ -107,7 +121,37 @@ impl Timer {
         }
     }
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use test_case::test_case;
 
+    #[test_case(0, 8, 2; "simple test - 8 dots")]
+    #[test_case(4, 8, 2; "1 CPU step jumps")]
+    #[test_case(4, 12, 2; "2 CPU step jumps")]
+    #[test_case(4, 16, 2; "3 CPU step jumps")]
+    #[test_case(4, 20, 2; "4 CPU step jumps")]
+    #[test_case(4, 24, 2; "5 CPU step jumps")]
+    #[test_case(0, 16, 3; "tima01 - 16 dots jumps")]
+    #[test_case(12, 16, 3; "tima01 - 1 CPU step jumps")]
+    #[test_case(12, 20, 3; "tima01 - 2 CPU step jumps")]
+    #[test_case(12, 24, 3; "tima01 - 3 CPU step jumps")]
+    #[test_case(12, 28, 3; "tima01 - 4 CPU step jumps")]
+    #[test_case(12, 32, 3; "tima01 - 5 CPU step jumps")]
+    #[test_case(12, 36, 3; "tima01 - 6 CPU step jumps")]
+    fn has_bit_gone_low_steps(old: u16, new: u16, bit: u8) {
+        assert_eq!(Timer::has_bit_gone_low(old, new, bit), true);
+    }
+
+    #[test_case(0, 1, 2; "simple test - 1 dot")]
+    #[test_case(0, 2, 2; "simple test - 2 dots")]
+    #[test_case(0, 3, 2; "simple test - 3 dots")]
+    #[test_case(0, 4, 2; "simple test - 4 dots")]
+    #[test_case(0, 7, 2; "simple test - 7 dots")]
+    fn has_bit_gone_low_does_not_step(old: u16, new: u16, bit: u8) {
+        assert_eq!(Timer::has_bit_gone_low(old, new, bit), false);
+    }
+}
 impl MemoryAccessor for Timer {
     fn get(&self, location: usize) -> u8 {
         trace!("Read Timer: {:#x}", location);
