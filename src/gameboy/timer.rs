@@ -23,8 +23,10 @@ pub struct Timer {
 
     // temporary:
     system_clock: u16,
-    tima_counter: u8,
     tima_overflow_delay: bool,
+    /// Locks the tima for the round of the interrupt being triggered. In that case tima can't be
+    /// updated by directly setting it
+    lock_tima: bool,
 }
 
 impl Timer {
@@ -52,9 +54,11 @@ impl Timer {
         // or 256/4 = 64 m_ticks
         let old_clock = self.system_clock;
         self.system_clock = self.system_clock.wrapping_add(dots as u16);
+        self.lock_tima = false;
 
         if self.tima_overflow_delay {
             self.tima_overflow_delay = false;
+            self.lock_tima = true;
             self.tima = self.tma;
             return true;
         }
@@ -127,8 +131,8 @@ impl Timer {
             tac: 0xf8,
             // helpers
             system_clock: 0xab << 8,
-            tima_counter: 0,
             tima_overflow_delay: false,
+            lock_tima: false,
         }
     }
 }
@@ -194,8 +198,13 @@ impl MemoryAccessor for Timer {
                 // println!("RESET");
             }
             0xFF05 => {
-                // self.tima_overflow_delay = false;
-                self.tima = value
+                // writing to TIMA while the overflow is pending, should act as if no overflow happens
+                // but writing to TIMA right after the overflow executed (on that exact cycle), it should
+                // be ignored.
+                self.tima_overflow_delay = false;
+                if !self.lock_tima {
+                    self.tima = value
+                }
             }
             0xFF06 => self.tma = value,
             0xFF07 => self.tac = value,
