@@ -206,7 +206,14 @@ impl MemoryAccessor for Timer {
                     self.tima = value
                 }
             }
-            0xFF06 => self.tma = value,
+            0xFF06 => {
+                self.tma = value;
+                if self.lock_tima {
+                    // Writing to TMA during 'lock' will have the same value copied to TIMA as well,
+                    // on the same cycle.
+                    self.tima = value
+                }
+            }
             0xFF07 => self.tac = value,
             _ => panic!(
                 "timer register location write: {:#x} - {:#x}",
