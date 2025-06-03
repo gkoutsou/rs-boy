@@ -63,12 +63,12 @@ impl Timer {
         }
 
         if Self::has_bit_gone_low(old_clock, self.system_clock, self.tima_clock_bit()) {
-            println!(
-                "{:#b} {:#b} - {}",
-                old_clock,
-                self.system_clock,
-                self.system_clock >> 8,
-            );
+            // println!(
+            //     "{:#b} {:#b} - {}",
+            //     old_clock,
+            //     self.system_clock,
+            //     self.system_clock >> 8,
+            // );
             // self.tima_overflow_delay = self.timer_tick();
             // return false;
             return self.timer_tick();
@@ -191,7 +191,7 @@ impl MemoryAccessor for Timer {
 
                 // writing any value resets it
                 self.system_clock = 0;
-                println!("RESET");
+                // println!("RESET");
             }
             0xFF05 => self.tima = value,
             0xFF06 => self.tma = value,
