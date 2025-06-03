@@ -53,10 +53,10 @@ impl Timer {
         let old_clock = self.system_clock;
         self.system_clock = self.system_clock.wrapping_add(dots as u16);
 
-        // if self.tima_overflow_delay {
-        //     self.tima_overflow_delay = false;
-        //     return true;
-        // }
+        if self.tima_overflow_delay {
+            self.tima_overflow_delay = false;
+            return true;
+        }
 
         if !self.tima_enabled() {
             return false;
@@ -73,30 +73,41 @@ impl Timer {
             // return false;
             return self.timer_tick();
         }
-
-        // TODO: On monochrome consoles, disabling the timer if the currently selected bit is set,
-        //  will send a “Timer tick” once.
         false
     }
 
     fn has_bit_gone_low(old: u16, new: u16, bit: u8) -> bool {
-        // println!("{:#b} {:#b}", old, new);
-        let mut changed = false;
-        let mut original_bit = (old >> bit) & 1;
-        // This ensures that for ticks that happen too often (for example every 4 cpu instructions)
-        // will still be caught during longer cpu instructions
-        for next_new in (old + 1)..=new {
-            let new_bit = (next_new >> bit) & 1;
-            // println!(
-            //     "{}-{} ==> {}",
-            //     original_bit,
-            //     new_bit,
-            //     original_bit != new_bit && new_bit == 0
-            // );
-            changed |= original_bit != new_bit && new_bit == 0;
-            original_bit = new_bit;
+        let mask = 1u16 << bit;
+        let period = mask << 1;
+
+        let start = old.wrapping_add(1);
+        let end = new;
+
+        // Iterate over all x where the nth bit clears on transition from x to x+1
+        // i.e., x % (2^(n+1)) == (2^n) - 1 → binary pattern: ...0111... at position n
+        let mut x = (start.wrapping_add(period - 1)) & !(period - 1);
+        // x = x.wrapping_sub(1); // So x = ...0111 for that bit level
+
+        loop {
+            if Self::in_wrapped_range(start, end, x) {
+                return true;
+            }
+
+            x = x.wrapping_add(period);
+            // Stop if next x is out of the wrapped range
+            if !Self::in_wrapped_range(start, end, x) {
+                break;
+            }
         }
-        changed
+
+        false
+    }
+    fn in_wrapped_range(start: u16, end: u16, x: u16) -> bool {
+        if start <= end {
+            x >= start && x <= end
+        } else {
+            x >= start || x <= end
+        }
     }
 
     fn timer_tick(&mut self) -> bool {
@@ -139,6 +150,11 @@ mod tests {
     #[test_case(12, 28, 3; "tima01 - 4 CPU step jumps")]
     #[test_case(12, 32, 3; "tima01 - 5 CPU step jumps")]
     #[test_case(12, 36, 3; "tima01 - 6 CPU step jumps")]
+    #[test_case(65535, 0, 0; "overflow also triggers")]
+    #[test_case(65535, 4, 0; "overflow jump also triggers")]
+    #[test_case(65534, 0, 1; "overflow does trigger if bit was unset")]
+    #[test_case(65531, 0, 2; "overflow does trigger if bit was unset - 2")]
+    #[test_case(0b1000, 0, 3; "reset also triggers if bit was set")]
     fn has_bit_gone_low_steps(old: u16, new: u16, bit: u8) {
         assert_eq!(Timer::has_bit_gone_low(old, new, bit), true);
     }
@@ -168,6 +184,11 @@ impl MemoryAccessor for Timer {
         trace!("Writing to Timer Register: {:#x}: {:#b}", location, value);
         match location {
             0xFF04 => {
+                // If this causes the TIMA block-bit to lower, this can send a premature timer_tick
+                if self.system_clock & 1 << self.tima_clock_bit() > 0 {
+                    self.tima_overflow_delay |= self.timer_tick()
+                }
+
                 // writing any value resets it
                 self.system_clock = 0;
                 println!("RESET");
