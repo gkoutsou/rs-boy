@@ -213,7 +213,7 @@ impl GameBoy {
             0x9800..=0x9FFF => self.display.write(location, value),
 
             0xff04..=0xff07 => self.timer.write(location, value),
-            0xff0f => self.interrupt_flag = value,
+            0xff0f => self.interrupt_flag = value | 0b11100000,
 
             0xff10..=0xff3f => self.speaker.write(location, value),
 
