@@ -55,6 +55,7 @@ impl Timer {
 
         if self.tima_overflow_delay {
             self.tima_overflow_delay = false;
+            self.tima = self.tma;
             return true;
         }
 
@@ -69,9 +70,9 @@ impl Timer {
             //     self.system_clock,
             //     self.system_clock >> 8,
             // );
-            // self.tima_overflow_delay = self.timer_tick();
-            // return false;
-            return self.timer_tick();
+            self.tima_overflow_delay = self.timer_tick();
+            return false;
+            // return self.timer_tick();
         }
         false
     }
@@ -114,7 +115,6 @@ impl Timer {
         self.tima = self.tima.wrapping_add(1);
 
         if self.tima == 0 {
-            self.tima = self.tma;
             return true;
         }
         false
@@ -193,7 +193,10 @@ impl MemoryAccessor for Timer {
                 self.system_clock = 0;
                 // println!("RESET");
             }
-            0xFF05 => self.tima = value,
+            0xFF05 => {
+                // self.tima_overflow_delay = false;
+                self.tima = value
+            }
             0xFF06 => self.tma = value,
             0xFF07 => self.tac = value,
             _ => panic!(
