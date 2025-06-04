@@ -15,6 +15,7 @@ impl MemoryAccessor for IORegisters {
         match location {
             0xff01 => self.serial_transfer_data,
             0xff02 => self.serial_transfer_control,
+            0xff03 => 1,
             // ignore
             // 0xFF4D => 0,
             _ => panic!("i/o register location read: {:#x}", location),
@@ -28,6 +29,7 @@ impl MemoryAccessor for IORegisters {
             0xff02 => self.serial_transfer_control = value,
 
             // ignore
+            0xff03 => (),
             0xFF4D => (),
             0xFF56 => (),
 

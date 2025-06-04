@@ -195,10 +195,10 @@ impl MemoryAccessor for Timer {
 
                 // writing any value resets it
                 self.system_clock = 0;
-                // println!("RESET");
+                println!("RESET")
             }
             0xFF05 => {
-                // writing to TIMA while the overflow is pending, should act as if no overflow happens
+                // Writing to TIMA while the overflow is pending, should act as if no overflow happens
                 // but writing to TIMA right after the overflow executed (on that exact cycle), it should
                 // be ignored.
                 self.tima_overflow_delay = false;
