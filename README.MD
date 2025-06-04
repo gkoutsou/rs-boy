@@ -23,10 +23,14 @@ not work as expected.
 
 ### Blargg's test ROMs
 
-- [x] CPU Instructions
-- [ ] Instruction Timing
-- [ ] Interrupt Timing
-- [ ] Memory Timing
+| Name             | Passed | Failing |
+|------------------|--------|---------|
+| cpu_instructions | 11     | 0       |
+| dgm_sound        | 1      | 11      |
+| instr_timing     | 0      | 1       |
+| interrupt_time   | 0      | 1       |
+| memory_timing    | 0      | 3       |
+| memory_timing_2  | 0      | 3       |
 
 ### Mooneye Acceptance Tests
 
