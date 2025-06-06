@@ -1,16 +1,19 @@
 use log::{info, trace};
 
-use crate::gameboy::{memory_bus::MemoryAccessor, registers::set_flag};
+use crate::gameboy::memory_bus::MemoryAccessor;
 
 use super::wave::Wave;
 
-const MAX_ENVELOPE_VOL: f32 = 15.0;
-const MAX_LENGTH: u8 = 64;
+const MAX_LENGTH: u16 = 256;
 const AUDIO_STEP_FREQUENCY: u32 = 4194304 / 512;
 
 // TODO do I care about the bits I don't track?
 pub(crate) struct Channel3 {
     enabled: bool,
+
+    audio_step_counter: u32,
+    /// Frame of the audio. 1-8
+    audio_step_state: u8,
 
     // Wave Ram 0xff30-0xff3f
     wave_ram: Vec<u8>,
@@ -20,6 +23,7 @@ pub(crate) struct Channel3 {
     // DAC off/on
     dac_on: bool,
 
+    length_counter: u16,
     // FF1B — NR31: Channel 3 length timer [write-only]
     // 7	6	5	4	3	2	1	0
     // Initial length timer
@@ -30,6 +34,7 @@ pub(crate) struct Channel3 {
     //         output level
     output_level: u8,
 
+    period_divider: u16,
     // FF1D — NR33: Channel 3 period low [write-only]
     // FF1E — NR34: Channel 3 period high & control
     // 7	    | 6	         | 5 4 3 | 2	1	0
@@ -75,13 +80,17 @@ impl MemoryAccessor for Channel3 {
                     self.enabled = false;
                 }
             }
-            0xff1b => self.initial_length_timer = value,
+            0xff1b => {
+                self.initial_length_timer = value;
+                // Writing a byte to NRx1 loads the counter with 64-data (256-data for wave channel). The counter can be reloaded at any time.
+                self.length_counter = MAX_LENGTH - self.initial_length_timer as u16;
+            }
 
             0xff1c => self.output_level = (value & 0b01100000) >> 5,
 
-            0xff1e => self.period = (self.period & 0x700) | value as u16,
+            0xff1d => self.period = (self.period & 0x700) | value as u16,
 
-            0xff1d => {
+            0xff1e => {
                 // 7	    | 6	         | 5 4 3 | 2	1	0
                 // Trigger	Length enable		   Period
                 let trigger = value >> 7 > 0;
@@ -89,35 +98,20 @@ impl MemoryAccessor for Channel3 {
                 self.period = (self.period & 0xff) | ((value as u16 & 7) << 8);
 
                 if trigger {
+                    info!("Triggering channel 3");
                     // Channel is enabled.
-                    self.enabled = true;
+                    self.enabled = self.dac_on; // TODO verify this
+
                     // TODO rest
+                    // If the length timer expired it is reset.
+                    if self.length_counter == 0 {
+                        self.length_counter = MAX_LENGTH;
+                    }
+                    // The period divider is set to the contents of NR33 and NR34.
+                    self.period_divider = self.period;
+                    // TODO Volume is set to contents of NR32 initial volume.
+                    // TODO Wave RAM index is reset, but its not refilled.
                 }
-                //     // The period divider is set to the contents of NR13 and NR14.
-                //     self.period_divider = self.period;
-                //     // Volume is set to contents of NR12 initial volume.
-                //     self.volume = self.initial_volume;
-                //     // Envelope timer is reset.
-                //     self.env_pace_index = 0;
-                //     // If length timer expired it is reset.
-                //     if self.length_counter >= MAX_LENGTH {
-                //         self.length_counter = self.initial_length_timer;
-                //     }
-                //     // Sweep does several things.
-                //     if self.has_sweep {
-                //         // CH1 period value is copied to the “shadow register”.
-                //         self.sweep_shadow_period = self.period;
-                //         // The “sweep timer” is reset.
-                //         self.sweep_pace_remaining = self.sweep_pace;
-                //         // The “enabled flag” is set if either the sweep pace or individual step are non-zero, cleared otherwise.
-                //         self.sweep_enabled = self.sweep_pace != 0 || self.individual_step != 0;
-                //         // If the individual step is non-zero, frequency calculation and overflow check are performed immediately.
-                //         if self.individual_step != 0 && self.calculate_new_frequency() >= 2048 {
-                //             self.enabled = false;
-                //             warn!("I think this is how it should be.. but better check");
-                //         }
-                //     }
-                // }
             }
 
             0xff30..=0xff3f => self.wave_ram[location - 0xff30] = value,
@@ -129,7 +123,28 @@ impl MemoryAccessor for Channel3 {
 
 impl Wave for Channel3 {
     fn step(&mut self, step: u32) {
-        ()
+        for _ in 0..step {
+            self.audio_step_counter += 1; // NOTE: += step if I ever remove the loop..
+            if self.audio_step_counter == AUDIO_STEP_FREQUENCY {
+                self.audio_step_counter = 0;
+
+                // TODO should this happen once per step?
+                if self.length_enabled && self.length_counter > 0 && self.audio_step_state % 2 == 0
+                {
+                    self.length_counter -= 1;
+                    if self.length_counter == 0 {
+                        // disable channel if its length timer expiring
+                        self.enabled = false;
+                        info!("Disabling ch3 due to length");
+                        // Disable ff14
+                    }
+                }
+
+                self.audio_step_state = (self.audio_step_state + 1) % 8;
+            }
+        }
+
+        // TODO move wave-index
     }
 
     fn sample(&self) -> f32 {
@@ -158,6 +173,11 @@ impl Wave for Channel3 {
         // FF1E — NR34: Channel 3 period high & control
         self.length_enabled = false;
         self.period = 0;
+
+        // TODO verify:
+        self.audio_step_counter = 0;
+        self.length_counter = MAX_LENGTH - self.initial_length_timer as u16;
+        self.period_divider = self.period;
     }
 }
 
@@ -168,6 +188,10 @@ impl Default for Channel3 {
         let period = 0xff | (0x7 << 8);
         Self {
             enabled: false,
+            audio_step_state: 0,
+            audio_step_counter: 0,
+            length_counter: MAX_LENGTH - 0xff,
+            period_divider: period,
 
             wave_ram: vec![0; 16],
             dac_on: false, // 0x7f

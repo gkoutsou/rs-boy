@@ -1,4 +1,4 @@
-use log::{trace, warn};
+use log::{info, trace, warn};
 
 use crate::gameboy::memory_bus::MemoryAccessor;
 
@@ -13,13 +13,6 @@ const DUTIES: [[i8; 8]; 4] = [
     [1, 0, 0, 0, 0, 1, 1, 1], // 10 (0x2)
     [0, 1, 1, 1, 1, 1, 1, 0], // 11 (0x3)
 ];
-// Originally copied fron other emu
-// const DUTIES: [[u8; 8]; 4] = [
-//     [0, 0, 0, 0, 0, 0, 0, 1], // 00 (0x0)
-//     [1, 0, 0, 0, 0, 0, 0, 1], // 01 (0x1)
-//     [1, 0, 0, 0, 0, 1, 1, 1], // 10 (0x2)
-//     [0, 1, 1, 1, 1, 1, 1, 0], // 11 (0x3)
-// ];
 
 pub(crate) struct Pulse {
     enabled: bool,
@@ -84,14 +77,13 @@ impl Wave for Pulse {
                 self.audio_step_counter = 0;
 
                 // TODO should this happen once per step?
-                if self.length_enabled
-                    && self.length_counter < MAX_LENGTH
-                    && self.audio_step_state % 2 == 0
+                if self.length_enabled && self.length_counter > 0 && self.audio_step_state % 2 == 0
                 {
-                    self.length_counter += 1;
-                    if self.length_counter >= MAX_LENGTH {
+                    self.length_counter -= 1;
+                    if self.length_counter == 0 {
                         // disable channel if its length timer expiring
                         self.enabled = false;
+                        info!("Disabling due to length");
                         // Disable ff14
                     }
                 }
@@ -100,7 +92,7 @@ impl Wave for Pulse {
                     self.update_volume();
                 }
 
-                if self.has_sweep && self.audio_step_state % 4 == 3 {
+                if self.has_sweep && self.audio_step_state % 4 == 2 {
                     self.update_sweep()
                 }
                 self.audio_step_state = (self.audio_step_state + 1) % 8;
@@ -170,7 +162,7 @@ impl Wave for Pulse {
         self.sweep_pace_remaining = self.sweep_pace;
         self.env_pace_index = 0;
         self.volume = self.initial_volume;
-        self.length_counter = self.initial_length_timer;
+        self.length_counter = MAX_LENGTH - self.initial_length_timer;
     }
 }
 impl Pulse {
@@ -287,7 +279,7 @@ impl Default for Pulse {
             env_pace_index: 0,
             audio_step_state: 0,
             audio_step_counter: 0,
-            length_counter: 0x3f,
+            length_counter: MAX_LENGTH - 0x3f,
             length_enabled: false,
             period: period,
             sweep_shadow_period: period,
@@ -379,6 +371,8 @@ impl MemoryAccessor for Pulse {
                 // 7	6	    | 5	4	3	2	1	0
                 // Wave duty	Initial length timer
                 self.initial_length_timer = value & 0b00111111;
+                // Writing a byte to NRx1 loads the counter with 64-data (256-data for wave channel). The counter can be reloaded at any time.
+                self.length_counter = MAX_LENGTH - self.initial_length_timer;
                 self.wave_duty = value >> 6;
             }
 
@@ -405,8 +399,13 @@ impl MemoryAccessor for Pulse {
                 self.period = (self.period & 0xff) | ((value as u16 & 7) << 8);
 
                 if trigger {
+                    info!(
+                        "Triggering channel ch{}",
+                        if self.has_sweep { 1 } else { 2 }
+                    );
                     // Channel is enabled.
-                    self.enabled = true;
+                    // Channel x’s DAC is enabled if and only if [NRx2] & $F8 != 0.
+                    self.enabled = self.env_dir || self.initial_volume > 0;
                     // The period divider is set to the contents of NR13 and NR14.
                     self.period_divider = self.period;
                     // Volume is set to contents of NR12 initial volume.
@@ -414,8 +413,8 @@ impl MemoryAccessor for Pulse {
                     // Envelope timer is reset.
                     self.env_pace_index = 0;
                     // If length timer expired it is reset.
-                    if self.length_counter >= MAX_LENGTH {
-                        self.length_counter = self.initial_length_timer;
+                    if self.length_counter == 0 {
+                        self.length_counter = MAX_LENGTH;
                     }
                     // Sweep does several things.
                     if self.has_sweep {

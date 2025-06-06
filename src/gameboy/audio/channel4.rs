@@ -67,7 +67,11 @@ impl MemoryAccessor for Channel4 {
     fn write(&mut self, location: usize, value: u8) {
         match location {
             0xff1f => (),
-            0xff20 => self.initial_length_timer = value & 0x3F,
+            0xff20 => {
+                self.initial_length_timer = value & 0x3F;
+                // Writing a byte to NRx1 loads the counter with 64-data. The counter can be reloaded at any time.
+                self.length_counter = MAX_LENGTH - self.initial_length_timer;
+            }
             0xff21 => {
                 self.initial_volume = value >> 4;
                 self.env_dir = value & (1 << 3) > 0;
@@ -87,15 +91,17 @@ impl MemoryAccessor for Channel4 {
             }
 
             0xff23 => {
+                let trigger = value >> 7 > 0;
                 self.length_enabled = value & (1 << 6) > 0;
-                // Writing to bit 7:
 
-                if value & (1 << 7) > 0 {
+                if trigger {
+                    info!("Triggering channel 4");
                     // Ch4 is enabled.
-                    self.enabled = true;
+                    // Channel x’s DAC is enabled if and only if [NRx2] & $F8 != 0.
+                    self.enabled = self.env_dir || self.initial_volume > 0;
                     // If the length timer expired it is reset.
-                    if self.length_counter >= MAX_LENGTH {
-                        self.length_counter = self.initial_length_timer;
+                    if self.length_counter == 0 {
+                        self.length_counter = MAX_LENGTH;
                     }
                     // Envelope timer is reset.
                     self.env_pace_index = 0;
@@ -120,14 +126,14 @@ impl Wave for Channel4 {
                 self.audio_step_counter = 0;
 
                 // TODO should this happen once per step?
-                if self.length_enabled
-                    && self.length_counter < MAX_LENGTH
-                    && self.audio_step_state % 2 == 0
+                if self.length_enabled && self.length_counter > 0 && self.audio_step_state % 2 == 0
                 {
-                    self.length_counter += 1;
-                    if self.length_counter >= MAX_LENGTH {
+                    self.length_counter -= 1;
+                    if self.length_counter == 0 {
                         // disable channel if its length timer expiring
                         self.enabled = false;
+                        info!("Disabling ch4 due to length");
+                        // Disable ff14
                     }
                 }
 
@@ -190,6 +196,8 @@ impl Wave for Channel4 {
 
         // since initial_volume & env_dir is 0, we disable the DAC, thus the channel (TODO cross check)
         self.enabled = false;
+
+        self.length_counter = MAX_LENGTH - self.initial_length_timer; // Do i need this?
     }
 }
 
@@ -244,7 +252,7 @@ impl Default for Channel4 {
     fn default() -> Self {
         Self {
             enabled: false,
-            length_counter: 0,
+            length_counter: MAX_LENGTH - 0x3f,
             lfsr: 0,
 
             volume: 0xf,

@@ -112,10 +112,10 @@ impl Speaker {
 
     pub fn new() -> Self {
         let audio_target = FakeSpeaker {};
-        let channel1 = channel1::Channel1::default();
-        let channel2 = channel2::Channel2::default();
-        let channel3 = channel3::Channel3::default();
-        let channel4 = channel4::Channel4::default();
+        let channel1 = Channel1::default();
+        let channel2 = Channel2::default();
+        let channel3 = Channel3::default();
+        let channel4 = Channel4::default();
 
         Speaker {
             output_target: Box::new(audio_target),
@@ -153,7 +153,7 @@ impl Speaker {
 
 impl MemoryAccessor for Speaker {
     fn get(&self, location: usize) -> u8 {
-        info!("Read speaker memory: {:#x}", location);
+        // info!("Read speaker memory: {:#x}", location);
         match location {
             0xff10..=0xff14 => self.channel1.get(location),
             0xff15..=0xff19 => self.channel2.get(location),
@@ -164,12 +164,12 @@ impl MemoryAccessor for Speaker {
             0xff26 => {
                 let ch1 = self.channel1.is_enabled() as u8;
                 let ch2 = (self.channel2.is_enabled() as u8) << 1;
-                let ch3 = (self.channel3.is_enabled() as u8) << 1;
+                let ch3 = (self.channel3.is_enabled() as u8) << 2;
                 let ch4 = (self.channel4.is_enabled() as u8) << 3;
-                info!(
-                    "{:#b}",
-                    (self.audio_master as u8) << 7 | 0x70 | ch1 | ch2 | ch3 | ch4
-                );
+                // info!(
+                //     "{:#b}",
+                //     (self.audio_master as u8) << 7 | 0x70 | ch1 | ch2 | ch3 | ch4
+                // );
                 (self.audio_master as u8) << 7 | 0x70 | ch1 | ch2 | ch3 | ch4
             }
             0xff27..=0xff2f => 0xff, // Unused area
@@ -179,7 +179,7 @@ impl MemoryAccessor for Speaker {
     }
 
     fn write(&mut self, location: usize, value: u8) {
-        info!("Writing to speaker Register: {:#x}: {:#b}", location, value);
+        // info!("Writing to speaker Register: {:#x}: {:#b}", location, value);
 
         //
         if !self.is_audio_enabled() && (location != 0xff26 || (0xff30..=0xff3f).contains(&location))

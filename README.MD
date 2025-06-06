@@ -26,7 +26,7 @@ not work as expected.
 | Name             | Passed | Failing |
 |------------------|--------|---------|
 | cpu_instructions | 11     | 0       |
-| dgm_sound        | 1      | 11      |
+| dgm_sound        | 2      | 10      |
 | instr_timing     | 0      | 1       |
 | interrupt_time   | 0      | 1       |
 | memory_timing    | 0      | 3       |
@@ -48,6 +48,7 @@ not work as expected.
 - [Game Boy: Complete Technical Reference](https://gekkio.fi/files/gb-docs/gbctr.pdf)
 - [GameBoy Opcode Summary](http://gameboy.mongenel.com/dmg/opcodes.html)
 - [GameBoy CPU Manual](http://marc.rawer.de/Gameboy/Docs/GBCPUman.pdf)
+- [Game Boy Sound Hardware](https://gbdev.gg8.se/wiki/articles/Gameboy_sound_hardware)
 - [Blargg's test ROMs](https://gbdev.gg8.se/files/roms/blargg-gb-tests/)
 - [Mooneye Test ROMs](https://github.com/Gekkio/mooneye-test-suite/)
 - [Acid2 Test](https://github.com/mattcurrie/dmg-acid2)
