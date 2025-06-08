@@ -140,7 +140,7 @@ impl Wave for Pulse {
 
         // NR11
         self.wave_duty = 0;
-        self.individual_step = 0;
+        self.initial_length_timer = 0;
 
         // NR12
         self.initial_volume = 0;
@@ -160,6 +160,10 @@ impl Wave for Pulse {
         // Was this reset meant to be used for the APU-turning off, and another should be used for the Trigger?
         self.period_divider = self.period;
         self.sweep_pace_remaining = self.sweep_pace;
+        if self.sweep_pace_remaining == 0 {
+            self.sweep_pace_remaining = 8
+        }; // TODO prove this..
+
         self.env_pace_index = 0;
         self.volume = self.initial_volume;
         self.length_counter = MAX_LENGTH - self.initial_length_timer;
@@ -213,53 +217,49 @@ impl Pulse {
         // won’t be affected so the next time the “sweep timer” updates the channel’s frequency, this modification
         // will be lost. This can be avoided by triggering the channel.
 
-        if self.sweep_pace == 0 {
-            // Disable the channel instead of letting it overflow.
-            if self.sweep_shadow_period >= 2048 {
-                self.enabled = false;
-            }
-            return;
+        if self.sweep_pace_remaining > 0 {
+            self.sweep_pace_remaining -= 1;
         }
 
-        self.sweep_pace_remaining -= 1;
         if self.sweep_pace_remaining != 0 {
             return;
         }
-
         // Sweep Timer Clocked
         self.sweep_pace_remaining = self.sweep_pace;
-
-        if !self.sweep_enabled {
-            return;
-        }
-
-        if self.individual_step == 0 {
-            println!("how to handle step being zero?");
+        if self.sweep_pace_remaining == 0 {
+            self.sweep_pace_remaining = 8
+        };
+        if !self.sweep_enabled || self.sweep_pace == 0 {
             return;
         }
 
         let new_period = self.calculate_new_frequency();
+        if new_period >= 2048 {
+            info!("tutitu - sweep disabling stuff 1");
+            self.enabled = false;
+            return;
+        }
 
-        if new_period < 2048 {
+        if self.individual_step > 0 {
+            info!("tutitu - ticking: {}", new_period);
             self.sweep_shadow_period = new_period;
             self.period = new_period;
 
             // Perform a new overflow check, but ditch the frequency
             if self.calculate_new_frequency() >= 2048 {
+                info!("tutitu - sweep disabling stuff - 2");
                 self.enabled = false
             }
-        } else {
-            // Frequency sweep overflowing the frequency disables the channel
-            self.enabled = false;
         }
     }
 
     fn calculate_new_frequency(&self) -> u16 {
+        // false means addition
         let new_period = if self.sweep_direction {
-            self.sweep_shadow_period + (self.sweep_shadow_period >> self.individual_step)
-        } else {
             // TODO this might underflow
             self.sweep_shadow_period - (self.sweep_shadow_period >> self.individual_step)
+        } else {
+            self.sweep_shadow_period + (self.sweep_shadow_period >> self.individual_step)
         };
         new_period
     }
@@ -271,8 +271,8 @@ impl Default for Pulse {
         Self {
             enabled: false,
             has_sweep: false,
-            sweep_enabled: true,
-            volume: 0xf, // todo is this right?
+            sweep_enabled: false, // sweep-pace and individual-steps are false
+            volume: 0xf,          // todo is this right?
             period_divider: period,
             duty_index: 0,
             sweep_pace_remaining: 0,
@@ -422,12 +422,15 @@ impl MemoryAccessor for Pulse {
                         self.sweep_shadow_period = self.period;
                         // The “sweep timer” is reset.
                         self.sweep_pace_remaining = self.sweep_pace;
+                        if self.sweep_pace_remaining == 0 {
+                            self.sweep_pace_remaining = 8
+                        };
+
                         // The “enabled flag” is set if either the sweep pace or individual step are non-zero, cleared otherwise.
                         self.sweep_enabled = self.sweep_pace != 0 || self.individual_step != 0;
                         // If the individual step is non-zero, frequency calculation and overflow check are performed immediately.
                         if self.individual_step != 0 && self.calculate_new_frequency() >= 2048 {
                             self.enabled = false;
-                            warn!("I think this is how it should be.. but better check");
                         }
                     }
                 }

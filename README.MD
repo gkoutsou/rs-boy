@@ -26,7 +26,7 @@ not work as expected.
 | Name             | Passed | Failing |
 |------------------|--------|---------|
 | cpu_instructions | 11     | 0       |
-| dgm_sound        | 2      | 10      |
+| dgm_sound        | 3      | 9       |
 | instr_timing     | 0      | 1       |
 | interrupt_time   | 0      | 1       |
 | memory_timing    | 0      | 3       |

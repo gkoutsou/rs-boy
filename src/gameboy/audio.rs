@@ -166,10 +166,10 @@ impl MemoryAccessor for Speaker {
                 let ch2 = (self.channel2.is_enabled() as u8) << 1;
                 let ch3 = (self.channel3.is_enabled() as u8) << 2;
                 let ch4 = (self.channel4.is_enabled() as u8) << 3;
-                // info!(
-                //     "{:#b}",
-                //     (self.audio_master as u8) << 7 | 0x70 | ch1 | ch2 | ch3 | ch4
-                // );
+                info!(
+                    "{:#b}",
+                    (self.audio_master as u8) << 7 | 0x70 | ch1 | ch2 | ch3 | ch4
+                );
                 (self.audio_master as u8) << 7 | 0x70 | ch1 | ch2 | ch3 | ch4
             }
             0xff27..=0xff2f => 0xff, // Unused area
