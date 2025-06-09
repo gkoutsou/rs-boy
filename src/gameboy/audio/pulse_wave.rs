@@ -162,7 +162,7 @@ impl Wave for Pulse {
         self.sweep_pace_remaining = self.sweep_pace;
         if self.sweep_pace_remaining == 0 {
             self.sweep_pace_remaining = 8
-        }; // TODO prove this..
+        };
 
         self.env_pace_index = 0;
         self.volume = self.initial_volume;
@@ -275,7 +275,7 @@ impl Default for Pulse {
             volume: 0xf,          // todo is this right?
             period_divider: period,
             duty_index: 0,
-            sweep_pace_remaining: 0,
+            sweep_pace_remaining: 8, // treating sweep_pace 0 as 8
             env_pace_index: 0,
             audio_step_state: 0,
             audio_step_counter: 0,
@@ -358,13 +358,7 @@ impl MemoryAccessor for Pulse {
                 self.sweep_direction = value & (1 << 3) > 0;
                 // Note that the value written to this field is not re-read by the hardware until a
                 // sweep iteration completes, or the channel is (re)triggered.
-                // However, if 0 is written to this field, then iterations are instantly disabled (but see below),
-                // and it will be reloaded as soon as it’s set to something else.
-                let old_sweep = self.sweep_pace;
                 self.sweep_pace = (value >> 4) & 0x7;
-                if old_sweep == 0 {
-                    self.sweep_pace_remaining = self.sweep_pace; // Instantly reload
-                }
             }
 
             0x1 => {
