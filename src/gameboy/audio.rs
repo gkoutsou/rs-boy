@@ -3,7 +3,7 @@ use channel2::Channel2;
 use channel3::Channel3;
 use channel4::Channel4;
 use log::{debug, info, trace};
-use target::{FakeSpeaker, SDL2Output};
+use target::FakeSpeaker;
 use wave::Wave;
 
 use super::memory_bus::MemoryAccessor;
@@ -16,13 +16,13 @@ mod target;
 mod wave;
 
 const HW_FREQUENCY: i32 = 4194304;
-const AUDIO_SAMPLE_RATE: i32 = 44100;
+pub const AUDIO_SAMPLE_RATE: i32 = 44100;
 const SAMPLING_FREQUENCY: u32 = HW_FREQUENCY as u32 / AUDIO_SAMPLE_RATE as u32; // 95
 
 const VOL_DIVIDER: f32 = 25.0; // Used to lower the max volume
 
 pub struct Speaker {
-    output_target: Box<dyn target::AudioTarget>,
+    pub output_target: Box<dyn super::super::io::audio_output::AudioTarget>,
     clock: u32,
     channel1: Channel1,
     channel2: Channel2,
@@ -103,10 +103,7 @@ impl Speaker {
         self.output_target.play(left, right);
     }
 
-    pub fn start(&mut self, use_speakers: bool) {
-        if use_speakers {
-            self.output_target = Box::new(SDL2Output::new());
-        }
+    pub fn start(&mut self) {
         self.output_target.start();
     }
 
