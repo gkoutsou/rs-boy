@@ -2115,12 +2115,16 @@ impl GameBoy {
         }
     }
 
+    // TODO remove helper; move one up
     pub fn start(&mut self, use_speakers: bool) {
-        self.display.start_window();
         self.speaker.start(use_speakers);
         loop {
             self.step();
         }
+    }
+
+    pub fn set_screen(&mut self, screen: Box<dyn super::io::game_engine::DrawingWindow>) {
+        self.display.window = screen;
     }
 
     pub fn new(path: &str) -> GameBoy {

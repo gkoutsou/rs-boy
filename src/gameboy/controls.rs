@@ -1,5 +1,4 @@
-use log::trace;
-use minifb::Key;
+use super::super::io::game_engine::Key;
 
 pub const REGISTER_LOCATION: usize = 0xff00;
 
@@ -19,7 +18,7 @@ pub struct Joypad {
     /// 0 A / Right
     joypad: u8,
 
-    keys: Vec<minifb::Key>,
+    keys: Vec<Key>,
 }
 
 impl Joypad {
@@ -65,7 +64,6 @@ impl Joypad {
 
     pub fn write(&mut self, location: usize, value: u8) {
         let value = (value & 0x30) | (self.joypad & 0x0f);
-        trace!("updating joypad: {:#b}", value);
         match location {
             REGISTER_LOCATION => self.joypad = value,
             _ => {
@@ -83,7 +81,7 @@ impl Joypad {
         self.joypad & (1 << 4) == 0
     }
 
-    pub fn key_pressed(&mut self, pressed_keys: Option<Vec<minifb::Key>>) {
+    pub fn key_pressed(&mut self, pressed_keys: Option<Vec<Key>>) {
         if let Some(keys) = pressed_keys {
             self.keys = keys
         }

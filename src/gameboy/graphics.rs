@@ -5,17 +5,18 @@ mod window;
 
 use super::memory_bus::MemoryAccessor;
 use crate::gameboy::interrupts;
+use crate::io::game_engine::Key;
 pub use engine::Buffer;
 use log::warn;
 use log::{debug, info, trace};
 pub use processor::Mode;
 pub use processor::Processor;
 pub use tile::Tile;
-use window::{FakeScreen, Screen};
+use window::FakeScreen;
 
 pub struct Display {
     engine: Buffer,
-    window: Box<dyn window::DrawingWindow>,
+    pub window: Box<dyn super::super::io::game_engine::DrawingWindow>,
     processor: Processor,
 
     tile_data: Vec<u8>,
@@ -28,7 +29,7 @@ pub struct Display {
 }
 
 impl Display {
-    pub fn gpu_step(&mut self, dots: u32) -> (u8, Option<Vec<minifb::Key>>) {
+    pub fn gpu_step(&mut self, dots: u32) -> (u8, Option<Vec<Key>>) {
         self.interrupt = 0;
         if !self.processor.lcd_enabled() {
             trace!("LCD disabled!");
@@ -266,10 +267,6 @@ impl Display {
         let a = self.tile_data[baseline + row * 2];
         let b = self.tile_data[baseline + row * 2 + 1];
         (a, b)
-    }
-
-    pub fn start_window(&mut self) {
-        self.window = Box::new(Screen::new())
     }
 
     pub(crate) fn new() -> Self {
