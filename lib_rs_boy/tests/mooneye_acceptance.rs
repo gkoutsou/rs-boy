@@ -1,9 +1,6 @@
-use rs_boy::gameboy::GameBoy;
-use std::path::Path;
-
 #[cfg(test)]
 mod test {
-    use rs_boy::gameboy::GameBoy;
+    use lib_rs_boy::gameboy::GameBoy;
     use std::path::Path;
     use test_case::test_case;
 

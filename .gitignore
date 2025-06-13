@@ -1,7 +1,7 @@
 /target
 /test
-/tests/blargg
-/tests/mooneye
+/lib_rs_boy/tests/blargg
+/lib_rs_boy/tests/mooneye
 output
 *.gbsave
 *.gb

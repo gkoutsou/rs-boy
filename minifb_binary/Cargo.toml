@@ -1,0 +1,10 @@
+[package]
+name = "minifb_binary"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+env_logger = "0.11.8"
+minifb = "0.28"
+sdl2 = "0.35.2"
+lib_rs_boy = { path = "../lib_rs_boy" }

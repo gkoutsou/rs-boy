@@ -1,11 +1,10 @@
 use env_logger::Env;
-use rs_boy::io;
-use std::env;
-
 use io::game_engine::Key as EngineKey;
+use lib_rs_boy::gameboy::GameBoy;
+use lib_rs_boy::io;
 use minifb::{Key, Window};
-use rs_boy::gameboy::GameBoy;
 use sdl2::audio::{AudioQueue, AudioSpecDesired};
+use std::env;
 
 const WIDTH: usize = 160;
 const HEIGHT: usize = 144;
@@ -148,7 +147,7 @@ impl SDL2Output {
         let audio_subsystem = sdl_context.audio().unwrap();
 
         let desired_spec = AudioSpecDesired {
-            freq: Some(rs_boy::gameboy::audio::AUDIO_SAMPLE_RATE),
+            freq: Some(lib_rs_boy::gameboy::audio::AUDIO_SAMPLE_RATE),
             channels: Some(2), // stereo
             samples: None,
             // samples: Some(4096),
