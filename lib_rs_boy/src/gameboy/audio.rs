@@ -11,7 +11,6 @@ mod channel2;
 mod channel3;
 mod channel4;
 mod pulse_wave;
-mod target;
 mod wave;
 
 const HW_FREQUENCY: i32 = 4194304;

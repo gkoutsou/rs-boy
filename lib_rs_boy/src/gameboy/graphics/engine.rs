@@ -1,4 +1,3 @@
-use super::window::{HEIGHT, WIDTH};
 use log::trace;
 
 const WHITE: u32 = 0xffffff;
@@ -6,6 +5,8 @@ const LIGHT_GRAY: u32 = 0xa9a9a9;
 const DARK_GRAY: u32 = 0x545454;
 const BLACK: u32 = 0x000000;
 
+pub const WIDTH: usize = 160;
+pub const HEIGHT: usize = 144;
 pub struct Buffer {
     pub screen: Vec<u32>,
 }

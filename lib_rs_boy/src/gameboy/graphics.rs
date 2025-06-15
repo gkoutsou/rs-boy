@@ -1,7 +1,6 @@
 pub(crate) mod engine;
 mod processor;
 mod tile;
-mod window;
 
 use super::memory_bus::MemoryAccessor;
 use crate::gameboy::interrupts;
@@ -187,7 +186,7 @@ impl Display {
         let wx = self.processor.wx;
         let wy = self.processor.wy;
         let in_window =
-            self.processor.is_window_enabled() && line >= wy && wx <= (window::WIDTH + 7) as u8;
+            self.processor.is_window_enabled() && line >= wy && wx <= (engine::WIDTH + 7) as u8;
 
         for x in 0..160u8 {
             let in_window = in_window && x + 7 >= wx;

@@ -1,4 +1,4 @@
-use super::super::io::game_engine::Key;
+use super::super::io::keys::Key;
 
 pub const REGISTER_LOCATION: usize = 0xff00;
 

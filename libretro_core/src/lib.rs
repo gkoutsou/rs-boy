@@ -1,4 +1,4 @@
-use io::game_engine::Key;
+use io::keys::Key;
 use lib_rs_boy::gameboy::GameBoy;
 use lib_rs_boy::io;
 use rust_libretro::{
@@ -7,7 +7,6 @@ use rust_libretro::{
 use std::ffi::CString;
 use std::slice;
 
-const AUDIO_BUFFER_SIZE: usize = 512;
 const FRAMERATE: f64 = 60.0; // 59.7275;
 
 const INPUT_DESCRIPTORS: &[retro_input_descriptor] = &input_descriptors!(

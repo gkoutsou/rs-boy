@@ -1,5 +1,5 @@
 use env_logger::Env;
-use io::game_engine::Key as EngineKey;
+use io::keys::Key as EngineKey;
 use lib_rs_boy::gameboy::GameBoy;
 use lib_rs_boy::io;
 use log::info;

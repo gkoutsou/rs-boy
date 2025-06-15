@@ -12,7 +12,7 @@ mod registers;
 mod timer;
 
 use crate::io;
-use crate::io::game_engine::Key;
+use crate::io::keys::Key;
 use audio::Speaker;
 use cartridge::Cartridge;
 use controls::Joypad;
