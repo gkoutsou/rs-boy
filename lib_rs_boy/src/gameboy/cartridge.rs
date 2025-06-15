@@ -1,10 +1,10 @@
 use std::{
-    fs::File,
     io::{self, Read},
     path::{self},
     str,
 };
 
+mod empty;
 mod mbc1;
 mod mbc3;
 mod nombc;
@@ -105,4 +105,8 @@ pub fn load_rom(rom: Vec<u8>) -> Box<dyn Cartridge> {
         Type::MBC1 => Box::new(mbc1::MBC1::new(rom, external_ram, save_file)),
         Type::MBC3 => Box::new(mbc3::MBC3::new(rom, external_ram, save_file)),
     }
+}
+
+pub fn no_cartridge() -> Box<dyn Cartridge> {
+    Box::new(empty::Empty {})
 }

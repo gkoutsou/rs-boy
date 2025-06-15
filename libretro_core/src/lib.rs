@@ -52,34 +52,26 @@ const INPUT_DESCRIPTORS: &[retro_input_descriptor] = &input_descriptors!(
         { "true" },
     }
 })]
-struct ExampleCore {
-    game_boy: Option<GameBoy>,
+struct RsBoyCore {
+    game_boy: GameBoy,
     option_1: bool,
     option_2: bool,
-
-    pixels: Vec<u8>,
-    audio_buffer: [i16; AUDIO_BUFFER_SIZE],
-    audio_buffer_index: usize,
 
     timer: i64,
     even: bool,
 }
 
-retro_core!(ExampleCore {
-    game_boy: None,
+retro_core!(RsBoyCore {
+    game_boy: GameBoy::new(),
 
     option_1: false,
     option_2: true,
 
-    audio_buffer: [0; AUDIO_BUFFER_SIZE],
-    audio_buffer_index: 0,
-
-    pixels: vec![0; 800 * 600 * 4],
     timer: 5_000_001,
     even: true,
 });
 
-impl Core for ExampleCore {
+impl Core for RsBoyCore {
     fn get_info(&self) -> SystemInfo {
         SystemInfo {
             library_name: CString::new("RS-Boy").unwrap(),
@@ -132,7 +124,7 @@ impl Core for ExampleCore {
         let size = _info.unwrap().size;
         let rom_data: &[u8] =
             unsafe { slice::from_raw_parts(_info.unwrap().data as *const u8, size) };
-        self.game_boy = Some(GameBoy::new(rom_data.to_vec()));
+        self.game_boy.load_rom(rom_data.to_vec());
 
         let gctx: GenericContext = ctx.into();
         gctx.enable_audio_callback();
@@ -194,9 +186,9 @@ impl Core for ExampleCore {
         }
 
         loop {
-            let render = self.game_boy.as_mut().unwrap().step();
+            let render = self.game_boy.step();
             if render {
-                self.game_boy.as_mut().unwrap().set_pressed_keys(output);
+                self.game_boy.set_pressed_keys(output);
                 break;
             }
         }
@@ -204,29 +196,9 @@ impl Core for ExampleCore {
         self.timer = 0;
         self.even = !self.even;
 
-        // let width = 800u32;
-        // let height = 600u32;
-        //
-        // let color_a = if self.even { 0xFF } else { 0 };
-        // let color_b = !color_a;
-        //
-        // for (i, chunk) in self.pixels.chunks_exact_mut(4).enumerate() {
-        //     let x = (i % width as usize) as f64 / width as f64;
-        //     let y = (i / width as usize) as f64 / height as f64;
-        //
-        //     let total = (50.0f64 * x).floor() + (37.5f64 * y).floor();
-        //     let even = total as usize % 2 == 0;
-        //
-        //     let color = if even { color_a } else { color_b };
-        //
-        //     chunk.fill(color);
-        // }
-
         unsafe {
             let (prefix, bytes, suffix) = self
                 .game_boy
-                .as_mut()
-                .unwrap()
                 .display
                 .engine
                 .screen
@@ -238,36 +210,12 @@ impl Core for ExampleCore {
     }
 
     fn on_write_audio(&mut self, ctx: &mut AudioContext) {
-        // let (l, r) = self.game_boy.as_ref().unwrap().speaker.sample_audio();
-        // if l > 1.0 || l < -1.0 || r > 1.0 || r < -1.0 {
-        //     panic!("asdasd");
-        // }
-        // let left = (l * 32767.0).round() as i16;
-        // let right = (r * 32767.0).round() as i16;
-        //
-        // self.audio_buffer[self.audio_buffer_index] = left;
-        // self.audio_buffer[self.audio_buffer_index + 1] = right;
-        // self.audio_buffer_index += 2;
-        //
-        // // let mut min: f32 = 1000.0;
-        // // let mut max: f32 = 0.0;
-        //
-        // // If it's full queue the audio
-        // if self.audio_buffer_index >= AUDIO_BUFFER_SIZE {
-        //     // while self.queue.size() > 4096 * 4 {
-        //     //     println!("ohnoes");
-        //     // }
-        //     self.audio_buffer_index = 0;
-        //
-        //     ctx.batch_audio_samples(&self.audio_buffer)
-        // }
+        let samples = self.game_boy.speaker.get_samples();
 
-        let samples = self.game_boy.as_ref().unwrap().speaker.get_samples();
-
-        ctx.batch_audio_samples(samples);
-        self.game_boy.as_mut().unwrap().speaker.empty_buffer();
-
-        //
-        // ctx.queue_audio_sample(l, r);
+        // TODO there is a small mismatch on the number of samples
+        if self.game_boy.speaker.is_buffer_full() {
+            ctx.batch_audio_samples(samples);
+            self.game_boy.speaker.empty_buffer();
+        }
     }
 }

@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod test {
     use lib_rs_boy::gameboy::GameBoy;
+    use lib_rs_boy::io::files::load_file;
     use std::path::Path;
     use test_case::test_case;
 
@@ -21,7 +22,9 @@ mod test {
     #[test_case("10-bit ops.gb" ; "10 bit ops")]
     #[test_case("11-op a,(hl).gb" ; "11 op a,(hl)")]
     fn blargg_cpu_instrs(rom: &str) {
-        let mut gb = GameBoy::new(Path::new(ROMPATH).join(rom).to_str().unwrap());
+        let rom = load_file(Path::new(ROMPATH).join(rom).as_path()).unwrap();
+        let mut gb = GameBoy::new();
+        gb.load_rom(rom);
         let mut ongoing_transfer = false;
         let mut output = String::new();
         loop {

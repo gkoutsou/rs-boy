@@ -2118,10 +2118,14 @@ impl GameBoy {
         self.joypad.key_pressed(keys);
     }
 
-    pub fn new(rom: Vec<u8>) -> GameBoy {
+    pub fn load_rom(&mut self, rom: Vec<u8>) {
+        self.cartridge = cartridge::load_rom(rom)
+    }
+
+    pub fn new() -> GameBoy {
         GameBoy {
             speaker: Speaker::new(),
-            cartridge: cartridge::load_rom(rom),
+            cartridge: cartridge::no_cartridge(),
             registers: Registers::new(),
             memory: Memory::new(),
             joypad: Joypad::new(),

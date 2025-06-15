@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod test {
     use lib_rs_boy::gameboy::GameBoy;
+    use lib_rs_boy::io::files::load_file;
     use std::path::Path;
     use test_case::test_case;
 
@@ -81,7 +82,9 @@ mod test {
     #[test_case("timer/rapid_toggle.gb" ; "timer_rapid_toggle")]
     #[test_case("timer/tim01_div_trigger.gb" ; "timer_tim01_div_trigger")]
     fn acceptance(rom: &str) {
-        let mut gb = GameBoy::new(Path::new(ROMPATH).join(rom).to_str().unwrap());
+        let rom = load_file(Path::new(ROMPATH).join(rom).as_path()).unwrap();
+        let mut gb = GameBoy::new();
+        gb.load_rom(rom);
 
         let mut output: Vec<u8> = Vec::new();
 

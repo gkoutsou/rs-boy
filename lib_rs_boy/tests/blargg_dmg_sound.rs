@@ -1,10 +1,11 @@
 #[cfg(test)]
 mod test {
     use lib_rs_boy::gameboy::GameBoy;
+    use lib_rs_boy::io::files::load_file;
     use std::path::Path;
     use test_case::test_case;
 
-    const ROM_PATH: &str = "tests/blargg/dmg_sound/rom_singles";
+    const ROMPATH: &str = "tests/blargg/dmg_sound/rom_singles";
 
     const STATUS_LOCATION: usize = 0xA000;
     const TEST_RUNNING_VALUE: u8 = 0x80;
@@ -22,7 +23,9 @@ mod test {
     #[test_case("11-regs after power.gb" ; "11 regs_after_power")]
     #[test_case("12-wave write while on.gb" ; "12 wave_write_while_on")]
     fn acceptance(rom: &str) {
-        let mut gb = GameBoy::new(Path::new(ROM_PATH).join(rom).to_str().unwrap());
+        let rom = load_file(Path::new(ROMPATH).join(rom).as_path()).unwrap();
+        let mut gb = GameBoy::new();
+        gb.load_rom(rom);
 
         let mut found = false;
         loop {

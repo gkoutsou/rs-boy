@@ -74,7 +74,8 @@ fn main() {
 
     let rom = result.unwrap();
 
-    let mut gb = GameBoy::new(rom);
+    let mut gb = GameBoy::new();
+    gb.load_rom(rom);
     if !use_speakers {
         todo!("implement me");
     }
@@ -84,7 +85,6 @@ fn main() {
     loop {
         let render = gb.step();
         if render {
-            // println!("{:?}", render);
             if window.is_open() && !window.is_key_down(Key::Escape) {
                 window
                     .update_with_buffer(&gb.display.engine.screen, WIDTH, HEIGHT)
