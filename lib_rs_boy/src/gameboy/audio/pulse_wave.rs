@@ -235,19 +235,19 @@ impl Pulse {
 
         let new_period = self.calculate_new_frequency();
         if new_period >= 2048 {
-            info!("tutitu - sweep disabling stuff 1");
+            //info!("tutitu - sweep disabling stuff 1");
             self.enabled = false;
             return;
         }
 
         if self.individual_step > 0 {
-            info!("tutitu - ticking: {}", new_period);
+            //info!("tutitu - ticking: {}", new_period);
             self.sweep_shadow_period = new_period;
             self.period = new_period;
 
             // Perform a new overflow check, but ditch the frequency
             if self.calculate_new_frequency() >= 2048 {
-                info!("tutitu - sweep disabling stuff - 2");
+                //info!("tutitu - sweep disabling stuff - 2");
                 self.enabled = false
             }
         }

@@ -3,7 +3,6 @@ use channel2::Channel2;
 use channel3::Channel3;
 use channel4::Channel4;
 use log::{debug, info, trace};
-use target::FakeSpeaker;
 use wave::Wave;
 
 use super::memory_bus::MemoryAccessor;
@@ -17,12 +16,14 @@ mod wave;
 
 const HW_FREQUENCY: i32 = 4194304;
 pub const AUDIO_SAMPLE_RATE: i32 = 44100;
+const FRAMERATE: f64 = 60.0; // 59.7275; //TODO doesn't really fit here
+const SAMPLE_COUNT: usize = (AUDIO_SAMPLE_RATE as f64 / FRAMERATE as f64 * 2.0) as usize;
 const SAMPLING_FREQUENCY: u32 = HW_FREQUENCY as u32 / AUDIO_SAMPLE_RATE as u32; // 95
 
 const VOL_DIVIDER: f32 = 25.0; // Used to lower the max volume
 
 pub struct Speaker {
-    pub output_target: Box<dyn super::super::io::audio_output::AudioTarget>,
+    pub samples: Vec<i16>,
     clock: u32,
     channel1: Channel1,
     channel2: Channel2,
@@ -100,22 +101,33 @@ impl Speaker {
         let (vol_left, vol_right) = self.get_volume();
         let left = sample[0] * vol_left / VOL_DIVIDER;
         let right = sample[1] * vol_right / VOL_DIVIDER;
-        self.output_target.play(left, right);
+        // self.output_target.play(left, right);
+
+        self.samples.push((left * 32767.0).round() as i16); // TODO temp conversion
+        self.samples.push((right * 32767.0).round() as i16);
     }
 
-    pub fn start(&mut self) {
-        self.output_target.start();
+    pub fn get_samples(&self) -> &Vec<i16> {
+        &self.samples
+    }
+
+    pub fn empty_buffer(&mut self) {
+        // TODO ensure this is done ok
+        self.samples.clear()
+    }
+
+    pub fn is_buffer_full(&self) -> bool {
+        self.samples.len() >= SAMPLE_COUNT
     }
 
     pub fn new() -> Self {
-        let audio_target = FakeSpeaker {};
         let channel1 = Channel1::default();
         let channel2 = Channel2::default();
         let channel3 = Channel3::default();
         let channel4 = Channel4::default();
 
         Speaker {
-            output_target: Box::new(audio_target),
+            samples: Vec::with_capacity(SAMPLE_COUNT),
             channel1,
             channel2,
             channel3,

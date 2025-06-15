@@ -81,10 +81,8 @@ impl Joypad {
         self.joypad & (1 << 4) == 0
     }
 
-    pub fn key_pressed(&mut self, pressed_keys: Option<Vec<Key>>) {
-        if let Some(keys) = pressed_keys {
-            self.keys = keys
-        }
+    pub fn key_pressed(&mut self, keys: Vec<Key>) {
+        self.keys = keys
     }
 
     pub fn new() -> Self {

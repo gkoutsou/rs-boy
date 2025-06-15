@@ -11,6 +11,8 @@ mod memory_bus;
 mod registers;
 mod timer;
 
+use crate::io;
+use crate::io::game_engine::Key;
 use audio::Speaker;
 use cartridge::Cartridge;
 use controls::Joypad;
@@ -18,8 +20,8 @@ use graphics::Display;
 use log::{debug, info, trace};
 use memory::Memory;
 use memory_bus::MemoryAccessor;
-use registers::operations::Operations;
 use registers::Registers;
+use registers::operations::Operations;
 use timer::Timer;
 
 fn u16_to_u8s(input: u16) -> (u8, u8) {
@@ -33,9 +35,9 @@ fn u8s_to_u16(ls: u8, hs: u8) -> u16 {
 }
 
 pub struct GameBoy {
-    speaker: Speaker,
+    pub speaker: Speaker,
     cartridge: Box<dyn Cartridge>,
-    display: Display,
+    pub display: Display,
     joypad: Joypad,
     pub registers: Registers,
     memory: Memory,
@@ -52,10 +54,10 @@ pub struct GameBoy {
 }
 
 impl GameBoy {
-    pub fn step(&mut self) {
+    pub fn step(&mut self) -> bool {
         if self.interrupt_step() {
             self.cpu_cycles += 20; // todo 16 or 12?
-            return;
+            return false;
             // todo should an interrupt still run gpu?
         }
 
@@ -64,11 +66,11 @@ impl GameBoy {
 
         self.timer_step(ticks);
 
-        let (gpu_interrupts, keys) = self.display.gpu_step(self.cpu_cycles);
+        let (gpu_interrupts, trigger_render) = self.display.gpu_step(self.cpu_cycles);
         self.interrupt_flag |= gpu_interrupts;
-        self.joypad.key_pressed(keys);
 
         self.cpu_cycles = 0;
+        trigger_render
     }
 
     fn cpu_step(&mut self) -> u32 {
@@ -339,8 +341,7 @@ impl GameBoy {
                     let new_location = (self.registers.pc as i32 + steps) as u16;
                     trace!(
                         "Current location: {}, next: {}",
-                        self.registers.pc,
-                        new_location
+                        self.registers.pc, new_location
                     );
                     self.cpu_cycles += 4;
                     self.registers.set_pc(new_location);
@@ -353,8 +354,7 @@ impl GameBoy {
                     let new_location = (self.registers.pc as i32 + steps) as u16;
                     trace!(
                         "Current location: {:#x}, next: {:#x}",
-                        self.registers.pc,
-                        new_location
+                        self.registers.pc, new_location
                     );
                     self.cpu_cycles += 4;
                     self.registers.set_pc(new_location);
@@ -369,8 +369,7 @@ impl GameBoy {
                     let new_location = (self.registers.pc as i32 + steps) as u16;
                     trace!(
                         "Current location: {:#x}, next: {:#x}",
-                        self.registers.pc,
-                        new_location
+                        self.registers.pc, new_location
                     );
                     self.cpu_cycles += 4;
                     self.registers.set_pc(new_location);
@@ -2115,21 +2114,14 @@ impl GameBoy {
         }
     }
 
-    pub fn set_screen(&mut self, screen: Box<dyn super::io::game_engine::DrawingWindow>) {
-        self.display.window = screen;
+    pub fn set_pressed_keys(&mut self, keys: Vec<Key>) {
+        self.joypad.key_pressed(keys);
     }
 
-    pub fn set_audio(&mut self, audio_output: Box<dyn super::io::audio_output::AudioTarget>) {
-        self.speaker.output_target = audio_output;
-    }
-    pub fn start_audio_playback(&mut self) {
-        self.speaker.start()
-    }
-
-    pub fn new(path: &str) -> GameBoy {
+    pub fn new(rom: Vec<u8>) -> GameBoy {
         GameBoy {
             speaker: Speaker::new(),
-            cartridge: cartridge::load(path::PathBuf::from(path)),
+            cartridge: cartridge::load_rom(rom),
             registers: Registers::new(),
             memory: Memory::new(),
             joypad: Joypad::new(),

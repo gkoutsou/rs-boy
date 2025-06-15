@@ -5,18 +5,15 @@ mod window;
 
 use super::memory_bus::MemoryAccessor;
 use crate::gameboy::interrupts;
-use crate::io::game_engine::Key;
 pub use engine::Buffer;
 use log::warn;
 use log::{debug, info, trace};
 pub use processor::Mode;
 pub use processor::Processor;
 pub use tile::Tile;
-use window::FakeScreen;
 
 pub struct Display {
-    engine: Buffer,
-    pub window: Box<dyn super::super::io::game_engine::DrawingWindow>,
+    pub engine: Buffer,
     processor: Processor,
 
     tile_data: Vec<u8>,
@@ -29,18 +26,17 @@ pub struct Display {
 }
 
 impl Display {
-    pub fn gpu_step(&mut self, dots: u32) -> (u8, Option<Vec<Key>>) {
+    pub fn gpu_step(&mut self, dots: u32) -> (u8, bool) {
+        let mut trigger_render = false;
         self.interrupt = 0;
         if !self.processor.lcd_enabled() {
             trace!("LCD disabled!");
             self.dots = 0;
             self.processor.ly = 0;
             self.set_gpu_mode(Mode::Two);
-            return (self.interrupt, None);
+            return (self.interrupt, trigger_render);
         }
         self.dots += dots;
-
-        let mut pressed_keys = None;
 
         match self.gpu_mode {
             Mode::Two => {
@@ -84,11 +80,7 @@ impl Display {
 
                     if self.processor.ly == 144 {
                         self.interrupt |= interrupts::VBLANK;
-
-                        self.window.refresh_buffer(&self.engine.screen);
-
-                        let keys = self.window.get_pressed_keys();
-                        pressed_keys = Some(keys);
+                        trigger_render = true;
 
                         self.set_gpu_mode(Mode::One);
                     } else {
@@ -109,7 +101,7 @@ impl Display {
                 }
             }
         }
-        (self.interrupt, pressed_keys)
+        (self.interrupt, trigger_render)
     }
 
     fn draw_sprites(&mut self, line: u8) {
@@ -272,7 +264,6 @@ impl Display {
     pub(crate) fn new() -> Self {
         Display {
             engine: Buffer::new(),
-            window: Box::new(FakeScreen {}), //TODO ugly.. setting a FakeScreen for sake of tests..
             processor: Processor::new(),
 
             tile_data: vec![0; 0x97FF - 0x8000 + 1],
