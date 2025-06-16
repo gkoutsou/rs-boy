@@ -36,7 +36,7 @@ fn u8s_to_u16(ls: u8, hs: u8) -> u16 {
 
 pub struct GameBoy {
     pub speaker: Speaker,
-    cartridge: Box<dyn Cartridge>,
+    pub cartridge: Box<dyn Cartridge>,
     pub display: Display,
     joypad: Joypad,
     pub registers: Registers,

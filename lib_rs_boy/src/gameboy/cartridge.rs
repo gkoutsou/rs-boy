@@ -1,5 +1,5 @@
 use std::{
-    io::{self, Read},
+    io::Read,
     path::{self},
     str,
 };
@@ -20,7 +20,11 @@ enum Type {
     MBC3,
 }
 
-pub(crate) trait Cartridge: MemoryAccessor {}
+pub trait Cartridge: MemoryAccessor {
+    fn get_ram(&mut self) -> &mut [u8] {
+        &mut [] // Default empty slice
+    }
+}
 
 pub fn load_rom(rom: Vec<u8>) -> Box<dyn Cartridge> {
     if rom.len() < 0x150 {
@@ -48,10 +52,6 @@ pub fn load_rom(rom: Vec<u8>) -> Box<dyn Cartridge> {
         _t => todo!("unsupported mbc_type {:#x}", _t),
     };
     info!("Cartridge type: {:?} ({:#x})", mbc_type, cartridge_type);
-    // std::panic::set_hook(Box::new(|panic_info| {
-    //     let backtrace = std::backtrace::Backtrace::capture();
-    //     eprintln!("My backtrace: {:#?}", backtrace);
-    // }));
 
     if rom_size >= 5 && mbc_type == Type::MBC1 {
         todo!("handle large MBC1 cartridges.")
@@ -76,34 +76,16 @@ pub fn load_rom(rom: Vec<u8>) -> Box<dyn Cartridge> {
         _ => panic!("not handled this ram size: {:#x}", ram_size),
     };
 
-    let save_file = if external_ram_size.is_some() {
-        Some(path::PathBuf::from(title).with_extension("gbsave"))
+    let external_ram = if !external_ram_size.is_none() {
+        Some(vec![0; external_ram_size.unwrap()])
     } else {
         None
     };
-
-    let external_ram = if let Some(file_path) = &save_file {
-        if file_path.exists() {
-            Some(super::io::files::load_file(file_path).unwrap())
-        } else {
-            Some(vec![0; external_ram_size.unwrap()])
-        }
-    } else {
-        None
-    };
-
-    // let external_ram = if save_file.is_none() {
-    //     None
-    // } else if !save_file.as_ref().unwrap().exists() {
-    //     Some(vec![0; external_ram_size.unwrap()])
-    // } else {
-    //     Some(Self::load_file(save_file.as_ref().unwrap().as_path()).unwrap())
-    // };
 
     match mbc_type {
         Type::NoMBC => Box::new(nombc::NoMBC::new(rom)),
-        Type::MBC1 => Box::new(mbc1::MBC1::new(rom, external_ram, save_file)),
-        Type::MBC3 => Box::new(mbc3::MBC3::new(rom, external_ram, save_file)),
+        Type::MBC1 => Box::new(mbc1::MBC1::new(rom, external_ram)),
+        Type::MBC3 => Box::new(mbc3::MBC3::new(rom, external_ram)),
     }
 }
 

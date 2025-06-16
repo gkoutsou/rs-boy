@@ -5,6 +5,7 @@ use rust_libretro::{
     contexts::*, core::Core, env_version, input_descriptors, proc::*, retro_core, sys::*, types::*,
 };
 use std::ffi::CString;
+use std::ptr::null_mut;
 use std::slice;
 
 const FRAMERATE: f64 = 60.0; // 59.7275;
@@ -120,9 +121,9 @@ impl Core for RsBoyCore {
         ctx.set_performance_level(0);
         ctx.enable_frame_time_callback((1000000.0f64 / 60.0).round() as retro_usec_t);
 
-        let size = _info.unwrap().size;
+        let rom_size = _info.unwrap().size;
         let rom_data: &[u8] =
-            unsafe { slice::from_raw_parts(_info.unwrap().data as *const u8, size) };
+            unsafe { slice::from_raw_parts(_info.unwrap().data.cast(), rom_size) };
         self.game_boy.load_rom(rom_data.to_vec());
 
         let gctx: GenericContext = ctx.into();
@@ -216,5 +217,27 @@ impl Core for RsBoyCore {
             ctx.batch_audio_samples(samples);
             self.game_boy.speaker.empty_buffer();
         }
+    }
+
+    fn get_memory_data(
+        &mut self,
+        id: std::os::raw::c_uint,
+        ctx: &mut GetMemoryDataContext,
+    ) -> *mut std::os::raw::c_void {
+        if id == RETRO_MEMORY_SAVE_RAM {
+            return self.game_boy.cartridge.get_ram().as_ptr() as *mut std::os::raw::c_void;
+        }
+        return null_mut();
+    }
+
+    fn get_memory_size(
+        &mut self,
+        id: std::os::raw::c_uint,
+        ctx: &mut GetMemorySizeContext,
+    ) -> usize {
+        if id == RETRO_MEMORY_SAVE_RAM {
+            return self.game_boy.cartridge.get_ram().len();
+        }
+        return 0;
     }
 }

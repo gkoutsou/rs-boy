@@ -1,11 +1,7 @@
 use super::Cartridge;
 use crate::gameboy::memory_bus::MemoryAccessor;
 use log::{debug, info, warn};
-use std::{
-    fs::File,
-    io::Write,
-    path::{self},
-};
+use std::path::{self};
 
 pub struct MBC3 {
     rom: Vec<u8>,
@@ -16,14 +12,16 @@ pub struct MBC3 {
     ram: Option<Vec<u8>>,
     ram_bank: u8,
 
-    // MBC Speficit
+    // MBC Specific
     rtc_access: bool,
     rtc_latched: bool,
-
-    save_file: Option<path::PathBuf>,
 }
 
-impl Cartridge for MBC3 {}
+impl Cartridge for MBC3 {
+    fn get_ram(&mut self) -> &mut [u8] {
+        self.ram.as_deref_mut().unwrap_or(&mut [])
+    }
+}
 
 impl MemoryAccessor for MBC3 {
     fn get(&self, location: usize) -> u8 {
@@ -110,18 +108,6 @@ impl MemoryAccessor for MBC3 {
     }
 }
 
-impl Drop for MBC3 {
-    fn drop(&mut self) {
-        if let Some(filepath) = &self.save_file {
-            let mut file = File::create(filepath).unwrap();
-            let res = file.write_all(self.ram.as_ref().unwrap());
-            if res.is_err() {
-                panic!("{:?}", res);
-            }
-        }
-    }
-}
-
 impl MBC3 {
     pub fn get_rom(&self, location: usize) -> u8 {
         if location <= 0x3fff {
@@ -145,18 +131,13 @@ impl MBC3 {
         self.ram.as_ref().unwrap()[actual_loc]
     }
 
-    pub fn new(
-        buffer: Vec<u8>,
-        external_ram: Option<Vec<u8>>,
-        save_file: Option<path::PathBuf>,
-    ) -> Self {
+    pub fn new(buffer: Vec<u8>, external_ram: Option<Vec<u8>>) -> Self {
         MBC3 {
             rom: buffer,
             rom_bank: 1,
             ram: external_ram,
             ram_enabled: false,
             ram_bank: 0,
-            save_file,
             rtc_latched: false,
             rtc_access: false,
         }
