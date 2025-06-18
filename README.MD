@@ -5,18 +5,20 @@ This is a pet project in an attempt to learn Rust by doing a real life project.
 While the emulator is usable in some extent, it is not fully implementing all the hardware's features so most games will
 not work as expected.
 
+It can function either as a standalone binary, or it can be loaded as a retroarch/libretro core.
+
 ## Implemented features
 
 - [x] All CPU instructions
 - [x] Basic support for NoMBC/MBC1/MBC3 Cartridge types
 - [x] Timer/VBlank/STAT Interrupts
 - [x] Keyboard controls
-- [x] Audio Channel 1/2
+- [x] GamePad support (only via libretro)
+- [x] Audio Channel 1,2,4
 
 ## Missing features
 
-- [ ] Audio Channels 3/4
-- [ ] GamePad support
+- [ ] Audio Channels 3
 - [ ] RTC Register for MBC3 cartridges.
 
 ## Test Suites
@@ -46,8 +48,8 @@ not work as expected.
 
 - [Pandocs](https://gbdev.io/pandocs/)
 - [Game Boy: Complete Technical Reference](https://gekkio.fi/files/gb-docs/gbctr.pdf)
-- [GameBoy Opcode Summary](http://gameboy.mongenel.com/dmg/opcodes.html)
-- [GameBoy CPU Manual](http://marc.rawer.de/Gameboy/Docs/GBCPUman.pdf)
+- [Game Boy Opcode Summary](http://gameboy.mongenel.com/dmg/opcodes.html)
+- [Game Boy CPU Manual](http://marc.rawer.de/Gameboy/Docs/GBCPUman.pdf)
 - [Game Boy Sound Hardware](https://gbdev.gg8.se/wiki/articles/Gameboy_sound_hardware)
 - [Blargg's test ROMs](https://gbdev.gg8.se/files/roms/blargg-gb-tests/)
 - [Mooneye Test ROMs](https://github.com/Gekkio/mooneye-test-suite/)

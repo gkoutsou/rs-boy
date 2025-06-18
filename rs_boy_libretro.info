@@ -1,0 +1,23 @@
+# Software Information
+display_name = "Nintendo - Game Boy (RS-Boy)
+categories = "Emulator"
+authors = "gkoutsou"
+corename = "RS-Boy"
+supported_extensions = "gb"
+license = "GPLv3"
+display_version = "v0.1.0"
+
+# Hardware Information
+manufacturer = "Nintendo"
+systemname = "Nintendo Game Boy"
+systemid = "game_boy"
+
+# Libretro Features
+supports_no_game = "false"
+savestate = "false"
+#savestate_features = "deterministic"
+cheats = "false"
+input_descriptors = "true"
+memory_descriptors = "false"
+libretro_saves = "true"
+core_options = "true"

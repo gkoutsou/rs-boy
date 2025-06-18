@@ -1,0 +1,6 @@
+[target.aarch64-linux-android]
+linker = "/usr/local/share/android-ndk/toolchains/llvm/prebuilt/darwin-x86_64/bin/aarch64-linux-android29-clang"
+#ar = "/usr/local/share/android-ndk/toolchains/llvm/prebuilt/darwin-x86_64/bin/aarch64-linux-android29-clang"
+
+#[env]
+#CC_aarch64_linux_android = "/usr/local/share/android-ndk/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang"
