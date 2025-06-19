@@ -20,7 +20,6 @@ pub(crate) struct Channel4 {
     length_counter: u8,
     trigger_counter: f32,
     lfsr: u16,
-    next_sample: u8,
 
     // FF20 — NR41: Channel 4 length timer
     // 7	6	| 5	4	3	2	1	0
@@ -108,7 +107,7 @@ impl MemoryAccessor for Channel4 {
                     // Volume is set to contents of NR42 initial volume.
                     self.volume = self.initial_volume;
                     // LFSR bits are reset.
-                    self.lfsr = 0;
+                    self.lfsr = 0xff;
                     // todo!()
                 }
             }
@@ -166,8 +165,10 @@ impl Wave for Channel4 {
         if !self.enabled {
             return 0.0;
         }
+
+        let sample = ((self.lfsr & 1) == 0) as u8; // Inverted
         // info!("{}", self.volume);
-        ((0.5 - self.next_sample as f32) * 2.0) * self.volume as f32 / MAX_ENVELOPE_VOL
+        ((0.5 - sample as f32) * 2.0) * self.volume as f32 / MAX_ENVELOPE_VOL
     }
 
     fn is_enabled(&self) -> bool {
@@ -231,20 +232,22 @@ impl Channel4 {
     }
 
     fn step_lfsr(&mut self) {
-        //The result of  LFSR0 == LFSR1 is written to bit 15.
-        // If “short mode” was selected in NR43, then bit 15 is copied to bit 7 as well.
-        // Finally, the entire LFSR is shifted right, and bit 0 selects between 0 and the chosen volume.
-        let bit0 = self.lfsr & 1;
-        let bit1 = self.lfsr & 2;
+        // The linear feedback shift register (LFSR) generates a pseudo-random bit sequence. It has
+        // a 15-bit shift register with feedback. When clocked by the frequency timer, the low two
+        // bits (0 and 1) are XORed, all bits are shifted right by one, and the result of the XOR is
+        // put into the now-empty high bit. If width mode is 1 (NR43), the XOR result is ALSO put
+        // into bit 6 AFTER the shift, resulting in a 7-bit LFSR. The waveform output is bit 0 of
+        // the LFSR, INVERTED.
+        let bit0 = self.lfsr & 1 > 0;
+        let bit1 = self.lfsr & 2 > 0;
+        let xor = (bit0 != bit1) as u16;
 
-        let xnor = bit0 == bit1;
-        self.lfsr &= (xnor as u16) << 15;
-        if self.lfsr_7_width {
-            self.lfsr &= (xnor as u16) << 7;
-        }
-
-        self.next_sample = (self.lfsr & 1) as u8;
         self.lfsr = self.lfsr >> 1;
+
+        self.lfsr = (self.lfsr & !(1 << 14)) | (xor << 14);
+        if self.lfsr_7_width {
+            self.lfsr = (self.lfsr & !(1 << 6)) | (xor << 6);
+        }
     }
 }
 
@@ -253,13 +256,12 @@ impl Default for Channel4 {
         Self {
             enabled: false,
             length_counter: MAX_LENGTH - 0x3f,
-            lfsr: 0,
+            lfsr: 0xff,
 
             volume: 0xf,
             audio_step_counter: 0,
             audio_step_state: 0,
             trigger_counter: 0.0,
-            next_sample: 0,
             env_pace_index: 0,
 
             // ff20
