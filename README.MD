@@ -14,11 +14,10 @@ It can function either as a standalone binary, or it can be loaded as a retroarc
 - [x] Timer/VBlank/STAT Interrupts
 - [x] Keyboard controls
 - [x] GamePad support (only via libretro)
-- [x] Audio Channel 1,2,4
+- [x] Audio Channel 1,2,34
 
 ## Missing features
 
-- [ ] Audio Channels 3
 - [ ] RTC Register for MBC3 cartridges.
 
 ## Test Suites

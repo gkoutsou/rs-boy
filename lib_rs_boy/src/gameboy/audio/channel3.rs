@@ -4,8 +4,10 @@ use crate::gameboy::memory_bus::MemoryAccessor;
 
 use super::wave::Wave;
 
+const MAX_ENVELOPE_VOL: f32 = 15.0;
 const MAX_LENGTH: u16 = 256;
 const AUDIO_STEP_FREQUENCY: u32 = 4194304 / 512;
+const NUM_WAVE_SAMPLES: usize = 16 * 2;
 
 // TODO do I care about the bits I don't track?
 pub(crate) struct Channel3 {
@@ -14,6 +16,8 @@ pub(crate) struct Channel3 {
     audio_step_counter: u32,
     /// Frame of the audio. 1-8
     audio_step_state: u8,
+    wave_index: u8,
+    next_sample: u8,
 
     // Wave Ram 0xff30-0xff3f
     wave_ram: Vec<u8>,
@@ -111,6 +115,7 @@ impl MemoryAccessor for Channel3 {
                     self.period_divider = self.period;
                     // TODO Volume is set to contents of NR32 initial volume.
                     // TODO Wave RAM index is reset, but its not refilled.
+                    self.wave_index = 0;
                 }
             }
 
@@ -144,11 +149,31 @@ impl Wave for Channel3 {
             }
         }
 
-        // TODO move wave-index
+        // Double frequency than the square ch
+        for _ in 0..(step / 2) {
+            self.period_divider += 1;
+            // todo!("cross-check this");
+            if self.period_divider == 2048 {
+                trace!("Changing wave_index: {}", self.wave_index);
+                self.period_divider = self.period;
+
+                self.wave_index = (self.wave_index + 1) % NUM_WAVE_SAMPLES as u8;
+                let byte_pos = self.wave_index / 2;
+                let upper_nimble = self.wave_index % 2 == 0;
+                let byte = self.wave_ram[byte_pos as usize];
+
+                self.next_sample = if upper_nimble { byte >> 4 } else { byte & 0xF }
+            }
+        }
     }
 
     fn sample(&self) -> f32 {
-        0.0
+        if !self.enabled {
+            return 0.0;
+        }
+
+        let sample = self.next_sample << self.get_volume_shift();
+        (0.5 - (sample as f32) / MAX_ENVELOPE_VOL) * 2.0
     }
 
     fn is_enabled(&self) -> bool {
@@ -181,7 +206,19 @@ impl Wave for Channel3 {
     }
 }
 
-impl Channel3 {}
+impl Channel3 {
+    fn get_volume_shift(&self) -> u8 {
+        match self.output_level {
+            0 => 4,
+            1 => 0,
+            2 => 1,
+            3 => 2,
+            _ => {
+                panic!("unknown output level: {}", self.output_level)
+            }
+        }
+    }
+}
 
 impl Default for Channel3 {
     fn default() -> Self {
@@ -190,6 +227,8 @@ impl Default for Channel3 {
             enabled: false,
             audio_step_state: 0,
             audio_step_counter: 0,
+            wave_index: 0,
+            next_sample: 0,
             length_counter: MAX_LENGTH - 0xff,
             period_divider: period,
 

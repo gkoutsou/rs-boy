@@ -86,14 +86,11 @@ impl Speaker {
 
         let ch3 = self.channel3.sample();
         let (pan_left, pan_right) = self.get_panning(3);
-        // sample[0] += ch3 * pan_left as f32;
-        // sample[1] += ch3 * pan_right as f32;
+        sample[0] += ch3 * pan_left as f32;
+        sample[1] += ch3 * pan_right as f32;
 
         let ch4 = self.channel4.sample();
         let (pan_left, pan_right) = self.get_panning(4);
-        // if ch4 != 0.0 {
-        //     info!("############## {} ({},{})", ch4, pan_left, pan_right);
-        // }
         sample[0] += ch4 * pan_left as f32;
         sample[1] += ch4 * pan_right as f32;
 

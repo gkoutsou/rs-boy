@@ -77,7 +77,7 @@ retro_core!(RsBoyCore {
 impl Core for RsBoyCore {
     fn get_info(&self) -> SystemInfo {
         SystemInfo {
-            library_name: CString::new("RS-Boy").unwrap(),
+            library_name: CString::new("rs_boy").unwrap(),
             library_version: CString::new(env_version!("CARGO_PKG_VERSION").to_string()).unwrap(),
             valid_extensions: CString::new("gb").unwrap(),
 
