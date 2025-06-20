@@ -1,6 +1,6 @@
 use super::Cartridge;
 use crate::gameboy::memory_bus::MemoryAccessor;
-use log::{debug, info, warn};
+use log::{debug, info, trace, warn};
 use std::path::{self};
 
 pub struct MBC3 {
@@ -35,7 +35,7 @@ impl MemoryAccessor for MBC3 {
     fn write(&mut self, location: usize, value: u8) {
         match location {
             0x0000..=0x1fff => {
-                info!(
+                trace!(
                     "Setting external ram: {:#b} => {}",
                     value,
                     value & 0x0f == 0x0a

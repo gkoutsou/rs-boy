@@ -168,7 +168,7 @@ impl Wave for Channel3 {
             return 0.0;
         }
 
-        let sample = self.next_sample << self.get_volume_shift();
+        let sample = self.next_sample >> self.get_volume_shift();
         (0.5 - (sample as f32) / MAX_ENVELOPE_VOL) * 2.0
     }
 
