@@ -200,6 +200,10 @@ impl Wave for Channel3 {
         self.length_counter = MAX_LENGTH - self.initial_length_timer as u16;
         self.period_divider = self.period;
     }
+
+    fn reset_frame(&mut self) {
+        self.audio_step_state = 0;
+    }
 }
 
 impl Channel3 {

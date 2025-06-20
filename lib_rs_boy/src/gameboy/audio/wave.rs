@@ -3,4 +3,6 @@ pub trait Wave {
     fn sample(&self) -> f32;
     fn is_enabled(&self) -> bool;
     fn reset(&mut self);
+
+    fn reset_frame(&mut self);
 }

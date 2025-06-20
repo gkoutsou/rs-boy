@@ -192,6 +192,10 @@ impl Wave for Channel4 {
 
         self.length_counter = MAX_LENGTH - self.initial_length_timer; // Do i need this?
     }
+
+    fn reset_frame(&mut self) {
+        self.audio_step_state = 0;
+    }
 }
 
 impl Channel4 {

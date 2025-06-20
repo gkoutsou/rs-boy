@@ -33,6 +33,10 @@ impl Wave for Channel1 {
     fn reset(&mut self) {
         self.pulse.reset();
     }
+
+    fn reset_frame(&mut self) {
+        self.pulse.reset_frame();
+    }
 }
 
 impl Default for Channel1 {

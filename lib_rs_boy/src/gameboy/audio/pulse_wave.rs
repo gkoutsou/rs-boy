@@ -162,6 +162,10 @@ impl Wave for Pulse {
         self.volume = self.initial_volume;
         self.length_counter = MAX_LENGTH - self.initial_length_timer;
     }
+
+    fn reset_frame(&mut self) {
+        self.audio_step_state = 0;
+    }
 }
 impl Pulse {
     /// The envelope ticks at 64 Hz, and the channel’s envelope will be increased / decreased

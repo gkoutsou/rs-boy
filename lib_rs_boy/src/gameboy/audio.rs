@@ -170,10 +170,10 @@ impl MemoryAccessor for Speaker {
                 let ch2 = (self.channel2.is_enabled() as u8) << 1;
                 let ch3 = (self.channel3.is_enabled() as u8) << 2;
                 let ch4 = (self.channel4.is_enabled() as u8) << 3;
-                info!(
-                    "{:#b}",
-                    (self.audio_master as u8) << 7 | 0x70 | ch1 | ch2 | ch3 | ch4
-                );
+                // info!(
+                //     "{:#b}",
+                //     (self.audio_master as u8) << 7 | 0x70 | ch1 | ch2 | ch3 | ch4
+                // );
                 (self.audio_master as u8) << 7 | 0x70 | ch1 | ch2 | ch3 | ch4
             }
             0xff27..=0xff2f => 0xff, // Unused area
@@ -202,7 +202,11 @@ impl MemoryAccessor for Speaker {
             0xff24 => self.master_volume = value,
             0xff25 => self.sound_panning = value,
             0xff26 => {
+                let old_state = self.audio_master;
                 self.audio_master = value >> 7 > 0;
+                let enabling_sound = !old_state && self.is_audio_enabled();
+
+                info!("PowerOff {}", self.audio_master);
                 if !self.is_audio_enabled() {
                     self.channel1.reset();
                     self.channel2.reset();
@@ -213,6 +217,14 @@ impl MemoryAccessor for Speaker {
                     self.master_volume = 0;
                     // Turning the APU off, however, does not affect the DIV-APU counter.
                     // todo!("disabling should not affect div-apu counter..");
+                }
+
+                if enabling_sound {
+                    info!("Enabling_sound");
+                    self.channel1.reset_frame();
+                    self.channel2.reset_frame();
+                    self.channel3.reset_frame();
+                    self.channel4.reset_frame();
                 }
             }
             0xff27..=0xff2f => (), // Unused area
