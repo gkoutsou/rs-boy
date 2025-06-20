@@ -8,7 +8,6 @@ const MAX_ENVELOPE_VOL: f32 = 15.0;
 const MAX_LENGTH: u8 = 64;
 const AUDIO_STEP_FREQUENCY: u32 = 4194304 / 512;
 
-// TODO do I care about the bits I don't track?
 pub(crate) struct Channel4 {
     enabled: bool,
 
@@ -94,7 +93,6 @@ impl MemoryAccessor for Channel4 {
                 self.length_enabled = value & (1 << 6) > 0;
 
                 if trigger {
-                    info!("Triggering channel 4");
                     // Ch4 is enabled.
                     // Channel x’s DAC is enabled if and only if [NRx2] & $F8 != 0.
                     self.enabled = self.env_dir || self.initial_volume > 0;
@@ -108,7 +106,6 @@ impl MemoryAccessor for Channel4 {
                     self.volume = self.initial_volume;
                     // LFSR bits are reset.
                     self.lfsr = 0xff;
-                    // todo!()
                 }
             }
 
@@ -124,15 +121,12 @@ impl Wave for Channel4 {
             if self.audio_step_counter == AUDIO_STEP_FREQUENCY {
                 self.audio_step_counter = 0;
 
-                // TODO should this happen once per step?
                 if self.length_enabled && self.length_counter > 0 && self.audio_step_state % 2 == 0
                 {
                     self.length_counter -= 1;
                     if self.length_counter == 0 {
                         // disable channel if its length timer expiring
                         self.enabled = false;
-                        info!("Disabling ch4 due to length");
-                        // Disable ff14
                     }
                 }
 
@@ -167,7 +161,7 @@ impl Wave for Channel4 {
         }
 
         let sample = ((self.lfsr & 1) == 0) as u8; // Inverted
-        // info!("{}", self.volume);
+
         ((0.5 - sample as f32) * 2.0) * self.volume as f32 / MAX_ENVELOPE_VOL
     }
 
@@ -176,8 +170,6 @@ impl Wave for Channel4 {
     }
 
     fn reset(&mut self) {
-        info!("TODO reset ch4 should reset internals?");
-
         // FF20 — NR41
         self.initial_length_timer = 0;
 
@@ -195,7 +187,7 @@ impl Wave for Channel4 {
         //  Trigger   Length enable
         self.length_enabled = false;
 
-        // since initial_volume & env_dir is 0, we disable the DAC, thus the channel (TODO cross check)
+        // since initial_volume & env_dir is 0, we disable the DAC, thus the channel
         self.enabled = false;
 
         self.length_counter = MAX_LENGTH - self.initial_length_timer; // Do i need this?

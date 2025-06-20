@@ -9,7 +9,6 @@ const MAX_LENGTH: u16 = 256;
 const AUDIO_STEP_FREQUENCY: u32 = 4194304 / 512;
 const NUM_WAVE_SAMPLES: usize = 16 * 2;
 
-// TODO do I care about the bits I don't track?
 pub(crate) struct Channel3 {
     enabled: bool,
 
@@ -133,15 +132,12 @@ impl Wave for Channel3 {
             if self.audio_step_counter == AUDIO_STEP_FREQUENCY {
                 self.audio_step_counter = 0;
 
-                // TODO should this happen once per step?
                 if self.length_enabled && self.length_counter > 0 && self.audio_step_state % 2 == 0
                 {
                     self.length_counter -= 1;
                     if self.length_counter == 0 {
                         // disable channel if its length timer expiring
                         self.enabled = false;
-                        info!("Disabling ch3 due to length");
-                        // Disable ff14
                     }
                 }
 
@@ -182,7 +178,7 @@ impl Wave for Channel3 {
 
     fn reset(&mut self) {
         info!("TODO reset ch3 should reset internals");
-        // Since dac_on becomes false, we disable the channel. TODO crosscheck
+        // Since dac_on becomes false, we disable the channel.
         self.enabled = false;
 
         // FF1A — NR30: Channel 3 DAC enable

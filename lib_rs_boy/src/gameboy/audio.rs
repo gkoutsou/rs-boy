@@ -97,7 +97,6 @@ impl Speaker {
         let (vol_left, vol_right) = self.get_volume();
         let left = sample[0] * vol_left / VOL_DIVIDER;
         let right = sample[1] * vol_right / VOL_DIVIDER;
-        // self.output_target.play(left, right);
 
         self.samples.push((left * 32767.0).round() as i16); // TODO temp conversion
         self.samples.push((right * 32767.0).round() as i16);

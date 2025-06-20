@@ -14,7 +14,7 @@ It can function either as a standalone binary, or it can be loaded as a retroarc
 - [x] Timer/VBlank/STAT Interrupts
 - [x] Keyboard controls
 - [x] GamePad support (only via libretro)
-- [x] Audio Channel 1,2,34
+- [x] Audio Channel 1,2,3,4
 
 ## Missing features
 
@@ -50,6 +50,7 @@ It can function either as a standalone binary, or it can be loaded as a retroarc
 - [Game Boy Opcode Summary](http://gameboy.mongenel.com/dmg/opcodes.html)
 - [Game Boy CPU Manual](http://marc.rawer.de/Gameboy/Docs/GBCPUman.pdf)
 - [Game Boy Sound Hardware](https://gbdev.gg8.se/wiki/articles/Gameboy_sound_hardware)
+- [Nightshade's GB Sound Emulation](https://nightshade256.github.io/2021/03/27/gb-sound-emulation.html)
 - [Blargg's test ROMs](https://gbdev.gg8.se/files/roms/blargg-gb-tests/)
 - [Mooneye Test ROMs](https://github.com/Gekkio/mooneye-test-suite/)
 - [Acid2 Test](https://github.com/mattcurrie/dmg-acid2)

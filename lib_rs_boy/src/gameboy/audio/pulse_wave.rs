@@ -76,15 +76,12 @@ impl Wave for Pulse {
             if self.audio_step_counter == AUDIO_STEP_FREQUENCY {
                 self.audio_step_counter = 0;
 
-                // TODO should this happen once per step?
                 if self.length_enabled && self.length_counter > 0 && self.audio_step_state % 2 == 0
                 {
                     self.length_counter -= 1;
                     if self.length_counter == 0 {
                         // disable channel if its length timer expiring
                         self.enabled = false;
-                        info!("Disabling due to length");
-                        // Disable ff14
                     }
                 }
 
@@ -105,7 +102,6 @@ impl Wave for Pulse {
         // value is set from the contents of NR13 and NR14.
         for _ in 0..(step / 4) {
             self.period_divider += 1;
-            // todo!("cross-check this");
             if self.period_divider == 2048 {
                 trace!("Changing duty_index: {}", self.duty_index);
                 self.period_divider = self.period;
@@ -146,18 +142,16 @@ impl Wave for Pulse {
         self.initial_volume = 0;
         self.env_dir = false;
         self.env_pace = 0;
-        // since initial_volume & env_dir is 0, we disable the DAC, thus the channel (TODO cross check)
+        // since initial_volume & env_dir is 0, we disable the DAC, thus the channel
         self.enabled = false;
 
         // NR14
         self.length_enabled = false;
         self.period = 0;
 
-        // todo!("check reset all over again");
         self.audio_step_counter = 0;
         self.duty_index = 0;
-        // TODO "The “duty step” counter cannot be reset, except by turning the APU off, which sets both back to 0.
-        // Was this reset meant to be used for the APU-turning off, and another should be used for the Trigger?
+
         self.period_divider = self.period;
         self.sweep_pace_remaining = self.sweep_pace;
         if self.sweep_pace_remaining == 0 {
@@ -235,19 +229,16 @@ impl Pulse {
 
         let new_period = self.calculate_new_frequency();
         if new_period >= 2048 {
-            //info!("tutitu - sweep disabling stuff 1");
             self.enabled = false;
             return;
         }
 
         if self.individual_step > 0 {
-            //info!("tutitu - ticking: {}", new_period);
             self.sweep_shadow_period = new_period;
             self.period = new_period;
 
             // Perform a new overflow check, but ditch the frequency
             if self.calculate_new_frequency() >= 2048 {
-                //info!("tutitu - sweep disabling stuff - 2");
                 self.enabled = false
             }
         }
@@ -256,7 +247,6 @@ impl Pulse {
     fn calculate_new_frequency(&self) -> u16 {
         // false means addition
         let new_period = if self.sweep_direction {
-            // TODO this might underflow
             self.sweep_shadow_period - (self.sweep_shadow_period >> self.individual_step)
         } else {
             self.sweep_shadow_period + (self.sweep_shadow_period >> self.individual_step)
@@ -272,7 +262,7 @@ impl Default for Pulse {
             enabled: false,
             has_sweep: false,
             sweep_enabled: false, // sweep-pace and individual-steps are false
-            volume: 0xf,          // todo is this right?
+            volume: 0xf,
             period_divider: period,
             duty_index: 0,
             sweep_pace_remaining: 8, // treating sweep_pace 0 as 8
@@ -393,10 +383,6 @@ impl MemoryAccessor for Pulse {
                 self.period = (self.period & 0xff) | ((value as u16 & 7) << 8);
 
                 if trigger {
-                    info!(
-                        "Triggering channel ch{}",
-                        if self.has_sweep { 1 } else { 2 }
-                    );
                     // Channel is enabled.
                     // Channel x’s DAC is enabled if and only if [NRx2] & $F8 != 0.
                     self.enabled = self.env_dir || self.initial_volume > 0;
