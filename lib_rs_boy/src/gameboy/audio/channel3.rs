@@ -97,23 +97,42 @@ impl MemoryAccessor for Channel3 {
                 // 7	    | 6	         | 5 4 3 | 2	1	0
                 // Trigger	Length enable		   Period
                 let trigger = value >> 7 > 0;
+                let old_length_enabled = self.length_enabled;
                 self.length_enabled = value & (1 << 6) > 0;
+                let enabling_length = !old_length_enabled && self.length_enabled;
                 self.period = (self.period & 0xff) | ((value as u16 & 7) << 8);
 
+                // Extra length clocking occurs when writing to NRx4 when the frame sequencer's next
+                // step is one that doesn't clock the length counter. In this case, if the length
+                // counter was PREVIOUSLY disabled and now enabled and the length counter is not zero,
+                // it is decremented. If this decrement makes it zero and trigger is clear, the
+                // channel is disabled.
+                if enabling_length && self.length_counter != 0 && self.audio_step_state % 2 == 1 {
+                    self.length_counter -= 1;
+                    if self.length_counter == 0 && !trigger {
+                        self.enabled = false
+                    }
+                }
+
                 if trigger {
-                    info!("Triggering channel 3");
                     // Channel is enabled.
                     self.enabled = self.dac_on; // TODO verify this
 
-                    // TODO rest
                     // If the length timer expired it is reset.
                     if self.length_counter == 0 {
                         self.length_counter = MAX_LENGTH;
+                        // If a channel is triggered when the frame sequencer's next step is one
+                        // that doesn't clock the length counter and the length counter is now enabled
+                        // and length is being set to 64 (256 for wave channel) because it was
+                        // previously zero, it is set to 63 instead (255 for wave channel)
+                        if self.length_enabled && self.audio_step_state % 2 == 1 {
+                            self.length_counter -= 1;
+                        }
                     }
                     // The period divider is set to the contents of NR33 and NR34.
                     self.period_divider = self.period;
                     // TODO Volume is set to contents of NR32 initial volume.
-                    // TODO Wave RAM index is reset, but its not refilled.
+                    // Wave RAM index is reset, but its not refilled.
                     self.wave_index = 0;
                 }
             }
@@ -196,13 +215,12 @@ impl Wave for Channel3 {
         self.period = 0;
 
         // TODO verify:
-        self.audio_step_counter = 0;
-        self.length_counter = MAX_LENGTH - self.initial_length_timer as u16;
         self.period_divider = self.period;
     }
 
     fn reset_frame(&mut self) {
         self.audio_step_state = 0;
+        self.next_sample = 0;
     }
 }
 

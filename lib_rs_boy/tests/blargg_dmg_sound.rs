@@ -17,7 +17,7 @@ mod test {
     #[test_case("05-sweep details.gb" ; "5 sweep_details")]
     #[test_case("06-overflow on trigger.gb" ; "6 overflow_on_trigger")]
     #[test_case("07-len sweep period sync.gb" ; "7 len_sweep_period_sync")]
-    #[test_case("08-len ctr during power.gb" ; "8 leb_ctr_during_power")]
+    #[test_case("08-len ctr during power.gb" ; "8 len_ctr_during_power")]
     #[test_case("09-wave read while on.gb" ; "9 wave_read_while_on")]
     #[test_case("10-wave trigger while on.gb" ; "10 wave_trigger_while_on")]
     #[test_case("11-regs after power.gb" ; "11 regs_after_power")]
