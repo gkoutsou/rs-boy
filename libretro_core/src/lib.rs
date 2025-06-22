@@ -23,33 +23,17 @@ const INPUT_DESCRIPTORS: &[retro_input_descriptor] = &input_descriptors!(
 
 #[derive(CoreOptions)]
 #[categories({
-    "advanced_settings",
-    "Advanced",
-    "Options affecting low-level emulation performance and accuracy."
-},{
-    "not_so_advanced_settings",
-    "Not So Advanced",
-    "Options not affecting low-level emulation performance and accuracy."
+    "sound_settings",
+    "Sound",
+    "Options affecting the audio channels."
 })]
 #[options({
-    "foo_option_1",
-    "Advanced > Speed hack coprocessor X",
-    "Speed hack coprocessor X",
-    "Setting 'Advanced > Speed hack coprocessor X' to 'true' or 'Turbo' provides increased performance at the expense of reduced accuracy",
-    "Setting 'Speed hack coprocessor X' to 'true' or 'Turbo' provides increased performance at the expense of reduced accuracy",
-    "advanced_settings",
-    {
-        { "false" },
-        { "true" },
-        { "unstable", "Turbo (Unstable)" },
-    }
-}, {
-    "foo_option_2",
-    "Simple > Toggle Something",
-    "Toggle Something",
-    "Setting 'Simple > Toggle Something' to 'true' does something.",
-    "Setting 'Toggle Something' to 'true' does something.",
-    "not_so_advanced_settings",
+    "disable_channel_1",
+    "Audio > Disable Channel 1",
+    "Disable audio channel 1",
+    "Setting 'Audio > Disable Channel 1' disables the first audio channel",
+    "Setting 'Disable Channel 1' disables the first audio channel",
+    "sound_settings",
     {
         { "false" },
         { "true" },
@@ -57,18 +41,21 @@ const INPUT_DESCRIPTORS: &[retro_input_descriptor] = &input_descriptors!(
 })]
 struct RsBoyCore {
     game_boy: GameBoy,
-    option_1: bool,
-    option_2: bool,
+    audio_options: AudioOptions,
 
     timer: i64,
     even: bool,
 }
 
+struct AudioOptions {
+    disable_channel_1: bool,
+}
+
 retro_core!(RsBoyCore {
     game_boy: GameBoy::new(),
-
-    option_1: false,
-    option_2: true,
+    audio_options: AudioOptions {
+        disable_channel_1: false
+    },
 
     timer: 5_000_001,
     even: true,
@@ -136,15 +123,9 @@ impl Core for RsBoyCore {
     }
 
     fn on_options_changed(&mut self, ctx: &mut OptionsChangedContext) {
-        match ctx.get_variable("foo_option_1") {
-            Some("true") => self.option_1 = true,
-            Some("false") => self.option_1 = false,
-            _ => (),
-        }
-
-        match ctx.get_variable("foo_option_2") {
-            Some("true") => self.option_2 = true,
-            Some("false") => self.option_2 = false,
+        match ctx.get_variable("disable_channel_1") {
+            Some("true") => self.audio_options.disable_channel_1 = true,
+            Some("false") => self.audio_options.disable_channel_1 = false,
             _ => (),
         }
     }
@@ -155,7 +136,7 @@ impl Core for RsBoyCore {
 
         self.timer += delta_us.unwrap_or(16_666);
 
-        let input = unsafe { ctx.get_joypad_state(0, 0) };
+        let input = ctx.get_joypad_state(0, 0);
 
         if input.contains(JoypadState::START) && input.contains(JoypadState::SELECT) {
             return gctx.shutdown();
@@ -225,7 +206,7 @@ impl Core for RsBoyCore {
     fn get_memory_data(
         &mut self,
         id: std::os::raw::c_uint,
-        ctx: &mut GetMemoryDataContext,
+        _ctx: &mut GetMemoryDataContext,
     ) -> *mut std::os::raw::c_void {
         if id == RETRO_MEMORY_SAVE_RAM {
             return self.game_boy.cartridge.get_ram().as_ptr() as *mut std::os::raw::c_void;
@@ -236,7 +217,7 @@ impl Core for RsBoyCore {
     fn get_memory_size(
         &mut self,
         id: std::os::raw::c_uint,
-        ctx: &mut GetMemorySizeContext,
+        _ctx: &mut GetMemorySizeContext,
     ) -> usize {
         if id == RETRO_MEMORY_SAVE_RAM {
             return self.game_boy.cartridge.get_ram().len();
