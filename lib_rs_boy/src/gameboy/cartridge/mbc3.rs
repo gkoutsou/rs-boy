@@ -58,13 +58,14 @@ impl MemoryAccessor for MBC3 {
                 );
             }
             0x4000..=0x5fff => {
+                let value = value & 0xf;
                 if value <= 0x3 {
                     info!("Changing to memory bank: {}", self.ram_bank);
                     self.ram_bank = value;
                     self.rtc_access = false;
                 } else {
                     self.rtc_access = true;
-                    todo!("support RTC registers");
+                    warn!("TODO: Support RTC registers {:#b}", value);
                 }
             }
             0x6000..=0x7fff => {
@@ -72,14 +73,15 @@ impl MemoryAccessor for MBC3 {
                 info!("Latch-change {} => {}", self.rtc_latched, set_one);
                 if !self.rtc_latched && set_one {
                     // todo here we should actually set some internal variables so that we can read
-                    // todo!("Latching!")
+                    warn!("Latching is not implemented yet!")
                 } else if self.rtc_latched && set_one {
                     panic!("from latched to latched!")
                 } else if self.rtc_latched && !set_one {
-                    todo!("latch => 0!")
+                    warn!("latch => 0!")
                 } else if !self.rtc_latched && !set_one {
-                    warn!("from not-latched to not-latched!")
+                    panic!("from not-latched to not-latched!")
                 }
+                self.rtc_latched = set_one;
                 // todo!("Latch RTC")
             }
             0xa000..=0xbfff => {
