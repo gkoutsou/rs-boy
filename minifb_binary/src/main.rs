@@ -7,7 +7,8 @@ use minifb::{Key, Window};
 use sdl2::audio::{AudioQueue, AudioSpecDesired};
 use std::fs::File;
 use std::io::Write;
-use std::{env, path};
+use std::path::PathBuf;
+use std::{env, panic, path};
 
 const WIDTH: usize = 160;
 const HEIGHT: usize = 144;
@@ -26,12 +27,30 @@ fn get_pressed_keys(keys: Vec<Key>) -> Vec<EngineKey> {
             Key::Right => EngineKey::Right,
             Key::X => EngineKey::X,
             Key::Z => EngineKey::Z,
-            _ => panic!("unknown key: {:?}", key),
+            _ => EngineKey::Enter, // Random key, go!
         };
 
         output.push(new_key);
     }
     output
+}
+
+struct SaveOnDrop {
+    gameboy: GameBoy,
+    save_file: Option<PathBuf>,
+}
+
+impl Drop for SaveOnDrop {
+    fn drop(&mut self) {
+        if let Some(filepath) = &self.save_file {
+            info!("Saving save file to {:?}", filepath);
+            let mut file = File::create(filepath).unwrap();
+            let res = file.write_all(self.gameboy.cartridge.get_ram());
+            if res.is_err() {
+                panic!("{:?}", res);
+            }
+        }
+    }
 }
 
 fn main() {
@@ -107,37 +126,37 @@ fn main() {
     let audio: AudioQueue<i16> = audio_subsystem.open_queue(None, &desired_spec).unwrap();
     audio.resume();
 
+    let mut gb_with_save_on_drop = SaveOnDrop {
+        gameboy: gb,
+        save_file,
+    };
+
     loop {
-        let render = gb.step();
+        let render = gb_with_save_on_drop.gameboy.step();
         if render {
             if window.is_open() && !window.is_key_down(Key::Escape) {
                 window
-                    .update_with_buffer(&gb.display.engine.screen, WIDTH, HEIGHT)
+                    .update_with_buffer(
+                        &gb_with_save_on_drop.gameboy.display.engine.screen,
+                        WIDTH,
+                        HEIGHT,
+                    )
                     .unwrap();
             } else {
                 break;
             }
 
             let keys = window.get_keys();
-            gb.set_pressed_keys(get_pressed_keys(keys));
+            gb_with_save_on_drop
+                .gameboy
+                .set_pressed_keys(get_pressed_keys(keys));
 
-            if gb.speaker.is_buffer_full() {
-                // info!(
-                //     "buffer full {}, {}",
-                //     gb.speaker.samples.len(),
-                //     gb.speaker.samples.capacity()
-                // );
-                audio.queue_audio(&gb.speaker.samples).unwrap();
-                gb.speaker.empty_buffer();
+            if gb_with_save_on_drop.gameboy.speaker.is_buffer_full() {
+                audio
+                    .queue_audio(&gb_with_save_on_drop.gameboy.speaker.samples)
+                    .unwrap();
+                gb_with_save_on_drop.gameboy.speaker.empty_buffer();
             }
-        }
-    }
-
-    if let Some(filepath) = &save_file {
-        let mut file = File::create(filepath).unwrap();
-        let res = file.write_all(gb.cartridge.get_ram());
-        if res.is_err() {
-            panic!("{:?}", res);
         }
     }
 }
