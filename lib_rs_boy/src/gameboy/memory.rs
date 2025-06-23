@@ -2,7 +2,7 @@ mod io_registers;
 
 use super::memory_bus::MemoryAccessor;
 pub use io_registers::IORegisters;
-use log::{debug, trace};
+use log::{debug, trace, warn};
 
 pub struct Memory {
     high_ram: Vec<u8>,
@@ -67,6 +67,11 @@ impl MemoryAccessor for Memory {
         match location {
             0xff80..=0xfffe => self.high_ram[location - 0xff80],
             0xc000..=0xdfff => self.work_ram[location - 0xc000],
+            0xe000..=0xfdff => {
+                // Echo Ram
+                trace!("Reading from echo ram: {:#x}", location);
+                self.work_ram[location - 0xe000]
+            }
             0xff00..=0xff77 => self.io_registers.get(location),
             0xffff => {
                 trace!("IME");
@@ -83,6 +88,10 @@ impl MemoryAccessor for Memory {
                 trace!("Writing to WRAM: {:#x}", location);
                 self.work_ram[location - 0xc000] = value;
             }
+            0xe000..=0xfdff => {
+                trace!("Writing to echo ram: {:#x}", location);
+                self.work_ram[location - 0xe000] = value;
+            } // Echo Ram
 
             0xff00..=0xff7f => self.io_registers.write(location, value),
 

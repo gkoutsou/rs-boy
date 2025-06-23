@@ -4,6 +4,7 @@
 /lib_rs_boy/tests/mooneye
 output
 *.gbsave
+*.srm
 *.gb
 *.gbc
 .vscode
