@@ -231,7 +231,7 @@ impl Display {
 
         if self.processor.should_trigger_mode_stat_interrupt(mode) {
             self.interrupt |= interrupts::STAT;
-            warn!("todo: check and enable interrupt - mode");
+            debug!("todo: check and enable interrupt - mode");
         }
 
         if mode == Mode::Two && self.processor.wy == self.processor.ly {

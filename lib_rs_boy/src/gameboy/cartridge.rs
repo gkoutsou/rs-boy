@@ -36,7 +36,7 @@ pub fn load_rom(rom: Vec<u8>) -> Box<dyn Cartridge> {
 
     info!("Title = {}", title);
 
-    info!("Type = {:#x}", rom[0x143]);
+    info!("CGB flag = {:#x}", rom[0x143]);
     info!("GB/SGB Indicator = {:#x}", rom[0x146]);
     let rom_size = rom[0x148];
     info!("ROM size = {:#x}", rom_size);

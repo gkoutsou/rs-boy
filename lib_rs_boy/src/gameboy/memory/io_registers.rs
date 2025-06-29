@@ -18,6 +18,7 @@ impl MemoryAccessor for IORegisters {
             0xff03 => 1,
             // ignore
             // 0xFF4D => 0,
+            0xff4f => 0xff,
             _ => panic!("i/o register location read: {:#x}", location),
         }
     }
@@ -31,6 +32,7 @@ impl MemoryAccessor for IORegisters {
             // ignore
             0xff03 => (),
             0xFF4D => (),
+            0xff4f => (),
             0xFF56 => (),
 
             _ => {

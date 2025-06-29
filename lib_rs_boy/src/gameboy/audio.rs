@@ -206,7 +206,7 @@ impl MemoryAccessor for Speaker {
                 self.audio_master = value >> 7 > 0;
                 let enabling_sound = !old_state && self.is_audio_enabled();
 
-                info!("PowerOff {}", self.audio_master);
+                debug!("PowerOff {}", self.audio_master);
                 if !self.is_audio_enabled() {
                     self.channel1.reset();
                     self.channel2.reset();

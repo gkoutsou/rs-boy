@@ -1,4 +1,4 @@
-use log::{info, trace};
+use log::{debug, info, trace};
 
 use super::memory_bus::MemoryAccessor;
 
@@ -36,7 +36,7 @@ impl Timer {
 
     fn tima_clock_bit(&self) -> u8 {
         let selected = self.tac & 0x3;
-        info!("tima clock selected {}", selected);
+        debug!("tima clock selected {}", selected);
 
         match selected {
             0 => 9, // every 256 M-Ticks - or every 4th div
