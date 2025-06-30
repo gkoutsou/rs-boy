@@ -139,25 +139,26 @@ impl Display {
 
                 let index = if double_size {
                     if line + 16 - tile.y < 8 {
-                        tile.tile_index & 0xfe
+                        if !tile.is_y_flipped() {
+                            tile.tile_index & 0xfe
+                        } else {
+                            tile.tile_index | 0x01
+                        }
                     } else {
-                        tile.tile_index | 0x01
+                        if !tile.is_y_flipped() {
+                            tile.tile_index | 0x01
+                        } else {
+                            tile.tile_index & 0xfe
+                        }
                     }
                 } else {
                     tile.tile_index
                 };
 
-                // if not double size or the top tile for double
-                // let y_pos = if !double_size || line + 16 - tile.y < 8 {
-                //     16 + line as usize - tile.y as usize
-                // } else {
-                //     16 + line as usize - (tile.y + 8) as usize
-                // };
                 let y_pos = 16 + line as usize - tile.y as usize;
                 let final_y_pos = if !tile.is_y_flipped() {
                     y_pos % 8
                 } else {
-                    // TODO flipped - double is probably broken
                     7 - (y_pos % 8)
                 };
 
@@ -234,7 +235,7 @@ impl Display {
             debug!("todo: check and enable interrupt - mode");
         }
 
-        if mode == Mode::Two && self.processor.wy == self.processor.ly {
+        if self.processor.wy == self.processor.ly{
             // reset window counter
             self.processor.win_y_counter = 0
         }

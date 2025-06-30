@@ -134,7 +134,7 @@ fn main() {
     loop {
         let render = gb_with_save_on_drop.gameboy.step();
         if render {
-            if window.is_open() && !window.is_key_down(Key::Escape) {
+            if window.is_open() /*&& !window.is_key_down(Key::Escape)*/ {
                 window
                     .update_with_buffer(
                         &gb_with_save_on_drop.gameboy.display.engine.screen,
