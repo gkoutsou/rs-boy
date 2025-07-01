@@ -31,7 +31,9 @@ impl Display {
             trace!("LCD disabled!");
             self.dots = 0;
             self.processor.ly = 0;
-            self.set_gpu_mode(Mode::Two);
+            // When re-enabling the LCD, the PPU will immediately start drawing again, but the screen
+            // will stay blank during the first frame. This is done by setting Mode::One, probably..
+            self.processor.gpu_mode = Mode::One;
             return (self.interrupt, trigger_render);
         }
         self.dots += dots;

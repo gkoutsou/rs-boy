@@ -120,9 +120,9 @@ impl MemoryAccessor for Processor {
             0xff42 => self.scy = value,
             0xff43 => self.scx = value,
             0xff45 => {
-                if value == self.ly {
-                    todo!("Do I need to trigger STAT interrupt?");
-                }
+                // if value == self.ly {
+                //     todo!("Do I need to trigger STAT interrupt?");
+                // }
                 trace!("LYC: {}", value);
                 self.lyc = value
             }
@@ -218,7 +218,7 @@ impl Processor {
         Processor {
             // scanline: 0,
             lcd_control: 0x91,
-            lcd_status: 0x80,
+            lcd_status: 0x80, // Becomes 85 due to ly=lyc & gpu_mode = One
             scy: 0,
             scx: 0,
             ly: 0,
@@ -228,10 +228,10 @@ impl Processor {
             bgp: 0xfc,
             obp0: 0xff,
             obp1: 0xff,
-            dma_last_value: 0,
+            dma_last_value: 0xff,
 
             win_y_counter: 0,
-            gpu_mode: Mode::Two,
+            gpu_mode: Mode::One, // First frame is empty
         }
     }
 }
