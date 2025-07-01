@@ -20,7 +20,6 @@ pub struct Display {
     pub oam: Vec<u8>,
 
     dots: u32,
-    gpu_mode: Mode,
     interrupt: u8,
 }
 
@@ -37,7 +36,7 @@ impl Display {
         }
         self.dots += dots;
 
-        match self.gpu_mode {
+        match self.processor.gpu_mode {
             Mode::Two => {
                 let _line = self.processor.ly;
                 if self.dots >= 80 {
@@ -226,11 +225,11 @@ impl Display {
     }
 
     fn set_gpu_mode(&mut self, mode: Mode) {
-        self.gpu_mode = mode;
+        self.processor.gpu_mode = mode;
         self.processor.lcd_status &= !3; // wipe 2 first digits
         self.processor.lcd_status |= mode as u8;
 
-        if self.processor.should_trigger_mode_stat_interrupt(mode) {
+        if self.processor.should_trigger_mode_stat_interrupt() {
             self.interrupt |= interrupts::STAT;
             debug!("todo: check and enable interrupt - mode");
         }
@@ -271,7 +270,6 @@ impl Display {
             oam: vec![0; 0xFE9F - 0xFE00 + 1],
 
             dots: 0,
-            gpu_mode: Mode::Two,
             interrupt: 0,
         }
     }

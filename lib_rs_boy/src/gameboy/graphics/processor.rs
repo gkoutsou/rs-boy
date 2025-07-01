@@ -77,6 +77,7 @@ pub struct Processor {
 
     //Helpers
     pub win_y_counter: u8,
+    pub gpu_mode: Mode,
 }
 
 impl MemoryAccessor for Processor {
@@ -198,14 +199,14 @@ impl Processor {
         self.lcd_status & (1 << 6) > 0 && self.ly == self.lyc
     }
 
-    pub fn should_trigger_mode_stat_interrupt(&self, mode: Mode) -> bool {
-        if self.lcd_status & (1 << 5) > 0 && mode == Mode::Two {
+    pub fn should_trigger_mode_stat_interrupt(&self) -> bool {
+        if self.lcd_status & (1 << 5) > 0 && self.gpu_mode == Mode::Two {
             return true;
         }
-        if self.lcd_status & (1 << 4) > 0 && mode == Mode::One {
+        if self.lcd_status & (1 << 4) > 0 && self.gpu_mode == Mode::One {
             return true;
         }
-        if self.lcd_status & (1 << 3) > 0 && mode == Mode::Zero {
+        if self.lcd_status & (1 << 3) > 0 && self.gpu_mode == Mode::Zero {
             return true;
         }
 
@@ -229,6 +230,7 @@ impl Processor {
             dma_last_value: 0,
 
             win_y_counter: 0,
+            gpu_mode: Mode::Two,
         }
     }
 }
