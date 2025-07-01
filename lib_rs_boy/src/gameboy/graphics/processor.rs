@@ -87,7 +87,8 @@ impl MemoryAccessor for Processor {
             0xff40 => self.lcd_control,
             0xff41 => {
                 let compare = (self.ly == self.lyc) as u8;
-                self.lcd_status | (compare << 2)
+                let ppu_mode = self.gpu_mode as u8;
+                self.lcd_status | (compare << 2) | ppu_mode
             }
             0xff42 => self.scy,
             0xff43 => self.scx,
@@ -115,7 +116,7 @@ impl MemoryAccessor for Processor {
                 }
                 self.lcd_control = value;
             }
-            0xff41 => self.lcd_status = value,
+            0xff41 => self.lcd_status = value & !0b111,
             0xff42 => self.scy = value,
             0xff43 => self.scx = value,
             0xff45 => {
@@ -217,7 +218,7 @@ impl Processor {
         Processor {
             // scanline: 0,
             lcd_control: 0x91,
-            lcd_status: 0x86, // I start with mode 2 instead of 1 (since ly = 0)
+            lcd_status: 0x80,
             scy: 0,
             scx: 0,
             ly: 0,

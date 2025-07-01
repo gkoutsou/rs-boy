@@ -226,8 +226,6 @@ impl Display {
 
     fn set_gpu_mode(&mut self, mode: Mode) {
         self.processor.gpu_mode = mode;
-        self.processor.lcd_status &= !3; // wipe 2 first digits
-        self.processor.lcd_status |= mode as u8;
 
         if self.processor.should_trigger_mode_stat_interrupt() {
             self.interrupt |= interrupts::STAT;
