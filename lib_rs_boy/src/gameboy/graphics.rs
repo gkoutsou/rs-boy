@@ -3,7 +3,7 @@ mod processor;
 mod tile;
 
 use std::cmp::min;
-use std::ops::Deref;
+use std::ops::{Deref, Index};
 use super::memory_bus::MemoryAccessor;
 use crate::gameboy::interrupts;
 pub use engine::Buffer;
@@ -73,9 +73,6 @@ impl Display {
                     }
 
                     self.oam_collected_sprites.push(tile);
-                    if line == 0 {
-                        println!("{}", self.oam_collected_sprites.len());
-                    }
                 }
 
                 if self.dots >= 80 {
@@ -155,7 +152,13 @@ impl Display {
         let double_size = self.processor.is_object_double_size();
 
         let mut previous_x_coordinate = 255;
-        for tile in self.oam_collected_sprites.iter() {
+
+        let mut indexed_sprites: Vec<(usize, &Tile)> = self.oam_collected_sprites.iter().enumerate().collect();
+        indexed_sprites.sort_by(|a, b| {
+            b.1.x.cmp(&a.1.x).then_with(|| b.0.cmp(&a.0))
+        });
+
+        for tile in indexed_sprites.iter().map(|&(_i, tile)| tile) {
             // If same X coordinate, the previous has priority
             if tile.x == previous_x_coordinate {
                 debug!("same x, previous has priority");
@@ -202,7 +205,7 @@ impl Display {
             } else {
                 self.processor.obp0
             };
-            self.engine.draw_tile(tile, line, tile_data, palette);
+            self.engine.draw_tile(&tile, line, tile_data, palette);
         }
     }
 
@@ -210,7 +213,7 @@ impl Display {
         let line = self.processor.ly;
         if !self.processor.is_bg_window_enabled() {
             trace!("bg/window is disabled. must draw white :sadge:");
-            // todo we also wipe_line one up. probably uneccessary
+            // todo we also wipe_line one up. probably unnecessary
             self.engine.wipe_line(line);
             return;
         }

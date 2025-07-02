@@ -41,7 +41,7 @@ It can function either as a standalone binary, or it can be loaded as a retroarc
 
 ### Acid2:
 
-- Failed `Object Priority Same X Coordinate`
+- Passed
 
 ## References:
 
