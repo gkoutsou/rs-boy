@@ -63,23 +63,22 @@ impl Display {
                     //     continue
                     // }
 
-                    // LY + 16 must be greater than or equal to Sprite Y-Position
-                    // LY + 16 must be less than Sprite Y-Position + Sprite Height (8 in Normal Mode, 16 in Tall-Sprite-Mode)
                     if !tile.object_in_scanline(line, double_size) {
                         continue
                     }
 
                     // The amount of sprites already stored in the OAM Buffer must be less than 10
-                    if self.oam_collected_sprites.len() > 10 {
+                    if self.oam_collected_sprites.len() == 10 {
                         continue;
                     }
 
                     self.oam_collected_sprites.push(tile);
-                    println!("{}", self.oam_collected_sprites.len());
+                    if line == 0 {
+                        println!("{}", self.oam_collected_sprites.len());
+                    }
                 }
 
                 if self.dots >= 80 {
-                    // scan pixels TODO ideally I should follow the ticks, not do it at once
                     self.dots -= 80;
                     self.set_gpu_mode(Mode::Three);
                 }
@@ -133,6 +132,8 @@ impl Display {
                 let line = self.processor.ly;
 
                 if self.dots >= 172 {
+                    // TODO: A bit lazy way for now, but let's iterate all the sprites and print them out at once.
+                    //  Correct behaviour is to print a pixel/dot, and to mix pixels instead of drawing over BG
                     self.engine.wipe_line(line);
                     self.draw_background();
                     self.draw_sprites(line);

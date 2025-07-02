@@ -12,12 +12,12 @@ pub struct Tile {
 
 impl Tile {
     pub fn object_in_scanline(&self, scanline: u8, double_size: bool) -> bool {
+        // LY + 16 must be greater than or equal to Sprite Y-Position
+        // LY + 16 must be less than Sprite Y-Position + Sprite Height (8 in Normal Mode, 16 in Tall-Sprite-Mode)
         let size = if !double_size { 8 } else { 16 };
+        let y = self.y;
 
-        let y = self.y as i16;
-        let scan = scanline as i16;
-        // todo this probably should return false if double_size but scanline is outside
-        if scan < y - 16 + size && scan >= y - 16 {
+        if scanline + 16 < y + size && scanline + 16 >= y {
             return true;
         }
         false
