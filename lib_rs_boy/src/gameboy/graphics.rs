@@ -2,6 +2,8 @@ pub(crate) mod engine;
 mod processor;
 mod tile;
 
+use std::cmp::min;
+use std::ops::Deref;
 use super::memory_bus::MemoryAccessor;
 use crate::gameboy::interrupts;
 pub use engine::Buffer;
@@ -20,6 +22,9 @@ pub struct Display {
     pub oam: Vec<u8>,
 
     dots: u32,
+    /// when in ModeTwo we are iterating the oam memory, this is the index of the next to check
+    oam_memory_check_index: u8,
+    oam_collected_sprites: Vec<Tile>,
     interrupt: u8,
 }
 
@@ -40,7 +45,39 @@ impl Display {
 
         match self.processor.gpu_mode {
             Mode::Two => {
-                let _line = self.processor.ly;
+                let line = self.processor.ly;
+                let double_size = self.processor.is_object_double_size();
+
+                // Find objects in OAM memory (1 object every 2 dots)
+                let start = self.oam_memory_check_index as usize;
+                let end = (min(self.dots, 80) / 2 )as usize;
+
+                for i in start..end {
+                    self.oam_memory_check_index += 1;
+                    let tile = self.get_oam_object(i);
+
+                    // Sprite X-Position must be greater than 0
+                    // TODO this sound wrong. Tiles with pos 0 should count towards the 10 objects
+                    // if tile.x<=0 {
+                    //     // TODO is this a thing?
+                    //     continue
+                    // }
+
+                    // LY + 16 must be greater than or equal to Sprite Y-Position
+                    // LY + 16 must be less than Sprite Y-Position + Sprite Height (8 in Normal Mode, 16 in Tall-Sprite-Mode)
+                    if !tile.object_in_scanline(line, double_size) {
+                        continue
+                    }
+
+                    // The amount of sprites already stored in the OAM Buffer must be less than 10
+                    if self.oam_collected_sprites.len() > 10 {
+                        continue;
+                    }
+
+                    self.oam_collected_sprites.push(tile);
+                    println!("{}", self.oam_collected_sprites.len());
+                }
+
                 if self.dots >= 80 {
                     // scan pixels TODO ideally I should follow the ticks, not do it at once
                     self.dots -= 80;
@@ -61,6 +98,8 @@ impl Display {
 
                     if self.processor.ly > 153 {
                         self.processor.ly = 0;
+                        self.oam_memory_check_index = 0;
+                        self.oam_collected_sprites.clear();
                         self.set_gpu_mode(Mode::Two);
                     }
                 }
@@ -84,6 +123,8 @@ impl Display {
 
                         self.set_gpu_mode(Mode::One);
                     } else {
+                        self.oam_memory_check_index = 0;
+                        self.oam_collected_sprites.clear();
                         self.set_gpu_mode(Mode::Two);
                     }
                 }
@@ -112,67 +153,55 @@ impl Display {
 
         let double_size = self.processor.is_object_double_size();
 
-        let mut object_counter = 0;
         let mut previous_x_coordinate = 255;
-        for i in 0..40 {
-            let tile = self.get_oam_object(i);
+        for tile in self.oam_collected_sprites.iter() {
+            // If same X coordinate, the previous has priority
+            if tile.x == previous_x_coordinate {
+                debug!("same x, previous has priority");
+                // todo!("this is wrong.. only if opaque!")
+                // continue;
+            }
+            previous_x_coordinate = tile.x;
 
-            if tile.object_in_scanline(line, double_size) {
-                object_counter += 1;
-                debug!("{}: found object {:?}", line, tile);
-                if object_counter > 10 {
-                    trace!("too many sprites on the line. Is it a bug?");
-                    break;
-                }
+            if tile.x == 0 || tile.x >= 168 {
+                debug!("sprite's x is outside of bounds. ignoring");
+                continue;
+            }
 
-                // If same X coordinate, the previous has priority
-                if tile.x == previous_x_coordinate {
-                    debug!("same x, previous has priority");
-                    // todo!("this is wrong.. only if opaque!")
-                    // continue;
-                }
-                previous_x_coordinate = tile.x;
-
-                if tile.x == 0 || tile.x >= 168 {
-                    debug!("sprite's x is outside of bounds. ignoring");
-                    continue;
-                }
-
-                let index = if double_size {
-                    if line + 16 - tile.y < 8 {
-                        if !tile.is_y_flipped() {
-                            tile.tile_index & 0xfe
-                        } else {
-                            tile.tile_index | 0x01
-                        }
+            let index = if double_size {
+                if line + 16 - tile.y < 8 {
+                    if !tile.is_y_flipped() {
+                        tile.tile_index & 0xfe
                     } else {
-                        if !tile.is_y_flipped() {
-                            tile.tile_index | 0x01
-                        } else {
-                            tile.tile_index & 0xfe
-                        }
+                        tile.tile_index | 0x01
                     }
                 } else {
-                    tile.tile_index
-                };
+                    if !tile.is_y_flipped() {
+                        tile.tile_index | 0x01
+                    } else {
+                        tile.tile_index & 0xfe
+                    }
+                }
+            } else {
+                tile.tile_index
+            };
 
-                let y_pos = 16 + line as usize - tile.y as usize;
-                let final_y_pos = if !tile.is_y_flipped() {
-                    y_pos % 8
-                } else {
-                    7 - (y_pos % 8)
-                };
+            let y_pos = 16 + line as usize - tile.y as usize;
+            let final_y_pos = if !tile.is_y_flipped() {
+                y_pos % 8
+            } else {
+                7 - (y_pos % 8)
+            };
 
-                debug!("line: {} tile.y: {}", line, tile.y);
-                let tile_data = self.get_tile_data(0x8000, index, final_y_pos);
+            debug!("line: {} tile.y: {}", line, tile.y);
+            let tile_data = self.get_tile_data(0x8000, index, final_y_pos);
 
-                let palette = if (tile.flags & (1 << 4)) > 0 {
-                    self.processor.obp1
-                } else {
-                    self.processor.obp0
-                };
-                self.engine.draw_tile(tile, line, tile_data, palette);
-            }
+            let palette = if (tile.flags & (1 << 4)) > 0 {
+                self.processor.obp1
+            } else {
+                self.processor.obp0
+            };
+            self.engine.draw_tile(tile, line, tile_data, palette);
         }
     }
 
@@ -271,6 +300,8 @@ impl Display {
 
             dots: 0,
             interrupt: 0,
+            oam_memory_check_index: 0,
+            oam_collected_sprites: Vec::with_capacity(10),
         }
     }
 }
