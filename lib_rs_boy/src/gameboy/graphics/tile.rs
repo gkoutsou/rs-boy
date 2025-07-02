@@ -1,3 +1,5 @@
+use crate::gameboy::graphics::engine::HEIGHT;
+
 #[derive(Debug)]
 pub struct Tile {
     pub y: u8,
@@ -17,10 +19,11 @@ impl Tile {
         let size = if !double_size { 8 } else { 16 };
         let y = self.y;
 
-        if scanline + 16 < y + size && scanline + 16 >= y {
-            return true;
+        if y > (HEIGHT + 16) as u8 {
+            return false
         }
-        false
+
+        scanline + 16 < y + size && scanline + 16 >= y
     }
 
     pub fn is_x_flipped(&self) -> bool {
@@ -69,6 +72,9 @@ mod tests {
             );
         }
         assert!(!t.object_in_scanline(144 - 16 + 8, false));
+
+        let t = Tile::new(255, 7, 1, 1);
+        assert!(!t.object_in_scanline(10, false));
     }
 
     #[test]
@@ -93,6 +99,9 @@ mod tests {
                 144 + i
             );
         }
-        assert!(!t.object_in_scanline(144 - 16 + 16, false));
+        assert!(!t.object_in_scanline(144 - 16 + 16, true));
+
+        let t = Tile::new(255, 7, 1, 1);
+        assert!(!t.object_in_scanline(0, true));
     }
 }
