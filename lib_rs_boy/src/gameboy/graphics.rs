@@ -234,7 +234,7 @@ impl Display {
             debug!("todo: check and enable interrupt - mode");
         }
 
-        if self.processor.wy == self.processor.ly{
+        if self.processor.wy == self.processor.ly && (mode == Mode::Two || mode == Mode::One){
             // reset window counter
             self.processor.win_y_counter = 0
         }
