@@ -3,15 +3,16 @@ mod processor;
 mod tile;
 
 use std::cmp::min;
-use std::ops::{Deref, Index};
 use super::memory_bus::MemoryAccessor;
 use crate::gameboy::interrupts;
 pub use engine::Buffer;
-use log::warn;
 use log::{debug, info, trace};
 pub use processor::Mode;
 pub use processor::Processor;
 pub use tile::Tile;
+
+const TILE_MAP_START_LOCATION: usize = 0x9800;
+const TILE_MAP_END_LOCATION: usize = 0x9FFF;
 
 pub struct Display {
     pub engine: Buffer,
@@ -55,13 +56,6 @@ impl Display {
                 for i in start..end {
                     self.oam_memory_check_index += 1;
                     let tile = self.get_oam_object(i);
-
-                    // Sprite X-Position must be greater than 0
-                    // TODO this sound wrong. Tiles with pos 0 should count towards the 10 objects
-                    // if tile.x<=0 {
-                    //     // TODO is this a thing?
-                    //     continue
-                    // }
 
                     if !tile.object_in_scanline(line, double_size) {
                         continue
@@ -115,6 +109,8 @@ impl Display {
 
                     if self.processor.ly == 144 {
                         self.interrupt |= interrupts::VBLANK;
+                        // The window_y_counter should only reset on v-blank
+                        self.processor.win_y_counter = 0;
                         trigger_render = true;
 
                         self.set_gpu_mode(Mode::One);
@@ -213,8 +209,6 @@ impl Display {
         let line = self.processor.ly;
         if !self.processor.is_bg_window_enabled() {
             trace!("bg/window is disabled. must draw white :sadge:");
-            // todo we also wipe_line one up. probably unnecessary
-            self.engine.wipe_line(line);
             return;
         }
 
@@ -232,8 +226,7 @@ impl Display {
                 self.processor.scy.wrapping_add(line)
             };
 
-            // which of the 8 vertical pixels of the current
-            // tile is the scanline on?
+            // which of the 8 vertical pixels of the current tile is the scanline on?
             let tile_row = y_pos / 8;
 
             let tile_map = self.processor.get_tile_map(in_window);
@@ -242,12 +235,12 @@ impl Display {
             let x_pos = if in_window {
                 x + 7 - wx
             } else {
-                x.wrapping_add(self.processor.scx)
+                self.processor.scx.wrapping_add(x)
             };
 
             let tile_col = x_pos / 8;
 
-            let tile_id = self.get(tile_map + tile_row as usize * 32 + tile_col as usize);
+            let tile_id = self.get_tile_map_id(tile_map, tile_row , tile_col);
             let tile_data_baseline = self.processor.get_tile_data_baseline();
             let tile_data = self.get_tile_data(tile_data_baseline, tile_id, y_pos as usize % 8);
 
@@ -265,11 +258,6 @@ impl Display {
         if self.processor.should_trigger_mode_stat_interrupt() {
             self.interrupt |= interrupts::STAT;
             debug!("todo: check and enable interrupt - mode");
-        }
-
-        if self.processor.wy == self.processor.ly && (mode == Mode::Two || mode == Mode::One){
-            // reset window counter
-            self.processor.win_y_counter = 0
         }
     }
 
@@ -293,13 +281,17 @@ impl Display {
         (a, b)
     }
 
+    fn get_tile_map_id(&self, tile_map: usize, tile_row: u8, tile_col: u8) -> u8 {
+        self.tile_maps[tile_map + tile_row as usize * 32 + tile_col as usize - TILE_MAP_START_LOCATION]
+    }
+
     pub(crate) fn new() -> Self {
         Display {
             engine: Buffer::new(),
             processor: Processor::new(),
 
             tile_data: vec![0; 0x97FF - 0x8000 + 1],
-            tile_maps: vec![0; 0x9FFF - 0x9800 + 1],
+            tile_maps: vec![0; TILE_MAP_END_LOCATION - TILE_MAP_START_LOCATION + 1],
             oam: vec![0; 0xFE9F - 0xFE00 + 1],
 
             dots: 0,
@@ -313,10 +305,25 @@ impl Display {
 impl MemoryAccessor for Display {
     fn get(&self, location: usize) -> u8 {
         match location {
-            0x8000..=0x97FF => self.tile_data[location - 0x8000],
-            0x9800..=0x9FFF => self.tile_maps[location - 0x9800],
+            0x8000..=0x97FF => {
+                if self.processor.gpu_mode == Mode::Three{
+                    return 0xFF;
+                }
+                self.tile_data[location - 0x8000]
+            },
+            TILE_MAP_START_LOCATION..=TILE_MAP_END_LOCATION => {
+                if self.processor.gpu_mode == Mode::Three{
+                    return 0xFF;
+                }
+                self.tile_maps[location - TILE_MAP_START_LOCATION]
+            },
             0xff40..=0xff4b => self.processor.get(location),
-            0xFE00..=0xFE9F => self.oam[location - 0xFE00],
+            0xFE00..=0xFE9F => {
+                if self.processor.gpu_mode != Mode::One && self.processor.gpu_mode != Mode::Zero {
+                    return 0xFF;
+                }
+                self.oam[location - 0xFE00]
+            },
 
             _ => panic!("Unknown location: {:#x}", location),
         }
@@ -325,24 +332,27 @@ impl MemoryAccessor for Display {
     fn write(&mut self, location: usize, value: u8) {
         match location {
             0xfe00..=0xfe9f => {
+                if self.processor.gpu_mode != Mode::One && self.processor.gpu_mode != Mode::Zero {
+                    return;
+                }
                 self.oam[location - 0xfe00] = value;
             }
 
             0xff40..=0xff4b => self.processor.write(location, value),
 
             0x8000..=0x97FF => {
-                if value != 0 {
-                    debug!(
-                        "finally! non empty in Tile Data: {:#x} - {:#b} = {:#x}",
-                        location, value, value
-                    );
+                if self.processor.gpu_mode == Mode::Three{
+                    return
                 }
                 self.tile_data[location - 0x8000] = value
             }
 
-            0x9800..=0x9FFF => {
+            TILE_MAP_START_LOCATION..=TILE_MAP_END_LOCATION => {
                 debug!("Writing to Tile Map");
-                self.tile_maps[location - 0x9800] = value
+                if self.processor.gpu_mode == Mode::Three{
+                    return
+                }
+                self.tile_maps[location - TILE_MAP_START_LOCATION] = value
             }
             _ => {
                 panic!(

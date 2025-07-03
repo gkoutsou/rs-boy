@@ -1,5 +1,4 @@
 use log::{info, trace};
-
 use crate::gameboy::memory_bus::MemoryAccessor;
 
 pub enum LcdStatusFlag {
@@ -10,7 +9,7 @@ pub enum LcdStatusFlag {
     BGTileMapArea = 1 << 3,
     ObjectSize = 1 << 2,
     ObjectEnabled = 1 << 1,
-    BgWindowEnabled = 1 << 0,
+    BgWindowEnabled = 1 << 0, // This is in DMG or CGB-compat
 }
 
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -114,7 +113,13 @@ impl MemoryAccessor for Processor {
                 } else if value & (1 << 7) != 0 && self.lcd_control & (1 << 7) == 0 {
                     info!("Enabling LCD {:#b}", value)
                 }
+                // TODO is this needed?
+                // if !self.has_lcd_flag(WindowEnabled) && (self.lcd_control & WindowEnabled as u8) == 0 {
+                //     self.win_y_counter = 0;
+                // }
+
                 self.lcd_control = value;
+
             }
             0xff41 => self.lcd_status = value & !0b111,
             0xff42 => self.scy = value,

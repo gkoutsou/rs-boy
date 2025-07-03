@@ -24,8 +24,12 @@ impl Buffer {
     }
 
     pub fn draw_bg_tile(&mut self, x_pos: u8, x: u8, y: u8, tile_data: (u8, u8), palette: u8) {
+        if y as usize >= HEIGHT || x as usize >= WIDTH {
+            return;
+        }
+
         let pixel = 7 - (x_pos % 8);
-        // let x = x + 7 - pixel;
+
         let lsb = tile_data.0 & (1 << pixel) > 0;
         let msb = tile_data.1 & (1 << pixel) > 0;
 
@@ -33,9 +37,6 @@ impl Buffer {
 
         let color_code = use_palette(palette, color_code);
         let color = get_color(color_code);
-        if y as usize >= HEIGHT || x as usize >= WIDTH {
-            return;
-        }
 
         self.screen[y as usize * WIDTH + x as usize] = color
     }
