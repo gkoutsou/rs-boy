@@ -37,7 +37,7 @@ It can function either as a standalone binary, or it can be loaded as a retroarc
 
 | Passed | Failing | Skipped |
 |--------|---------|---------|
-| 29     | 37      | 9       |
+| 31     | 35      | 9       |
 
 ### Acid2:
 

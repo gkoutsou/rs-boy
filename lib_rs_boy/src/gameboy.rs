@@ -55,13 +55,14 @@ pub struct GameBoy {
 
 impl GameBoy {
     pub fn step(&mut self) -> bool {
-        if self.interrupt_step() {
-            self.cpu_cycles += 20; // todo 16 or 12?
-            return false;
-            // todo should an interrupt still run gpu?
-        }
+         if self.interrupt_step() {
+            self.cpu_cycles += 20;
+        } else {
+             self.cpu_step();
+        };
 
-        let ticks = self.cpu_step();
+        let ticks = self.cpu_cycles;
+
         self.speaker.step(ticks);
 
         self.timer_step(ticks);
@@ -1378,9 +1379,7 @@ impl GameBoy {
 
             // Interrupts
             0xf3 => {
-                // This instruction disables interrupts but not
-                // immediately. Interrupts are disabled after
-                // instruction after DI is executed.
+                // This instruction disables interrupts immediately.
                 info!("Warning: DI");
                 self.ime = false;
                 self.set_ei = false;

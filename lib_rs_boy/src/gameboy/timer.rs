@@ -195,7 +195,7 @@ impl MemoryAccessor for Timer {
 
                 // writing any value resets it
                 self.system_clock = 0;
-                println!("RESET")
+                println!("RESET Div")
             }
             0xFF05 => {
                 // Writing to TIMA while the overflow is pending, should act as if no overflow happens
