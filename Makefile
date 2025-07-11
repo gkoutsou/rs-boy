@@ -7,6 +7,8 @@ build-libretro:
 	@TARGET=""
 	@if [ "$(target)" = "android" ]; then \
 		TARGET="--target aarch64-linux-android"; \
+	elif [ "$(target)" = "ios" ]; then\
+		TARGET="--target aarch64-apple-ios"; \
 	fi; \
 	cargo build -p libretro_core --lib --release $$TARGET
 
