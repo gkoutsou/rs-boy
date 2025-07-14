@@ -1,5 +1,6 @@
-use log::{info, trace};
+use crate::gameboy::graphics::processor::LcdStatusFlag::LcdEnabled;
 use crate::gameboy::memory_bus::MemoryAccessor;
+use log::{info, trace};
 
 pub enum LcdStatusFlag {
     LcdEnabled = 1 << 7,
@@ -10,6 +11,12 @@ pub enum LcdStatusFlag {
     ObjectSize = 1 << 2,
     ObjectEnabled = 1 << 1,
     BgWindowEnabled = 1 << 0, // This is in DMG or CGB-compat
+}
+
+impl LcdStatusFlag {
+    fn to_byte(self) -> u8 {
+        self as u8
+    }
 }
 
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -77,6 +84,9 @@ pub struct Processor {
     //Helpers
     pub win_y_counter: u8,
     pub gpu_mode: Mode,
+    /// used when the LCD is disabled as a cache of the last known state of ly==lyc. This allows us
+    /// to 'freeze' that value until the ppu is enabled again
+    frozen_compare_bit: bool
 }
 
 impl MemoryAccessor for Processor {
@@ -85,9 +95,14 @@ impl MemoryAccessor for Processor {
         match location {
             0xff40 => self.lcd_control,
             0xff41 => {
-                let compare = (self.ly == self.lyc) as u8;
-                let ppu_mode = self.gpu_mode as u8;
-                self.lcd_status | (compare << 2) | ppu_mode
+                let compare_bit = if self.lcd_enabled() {
+                    ((self.ly == self.lyc) as u8) << 2
+                } else {
+                    (self.frozen_compare_bit as u8) << 2
+                };
+                let ppu_mode = if self.lcd_enabled() { self.gpu_mode as u8 } else { 0 };
+                info!("Read: {:#x}", 1<<7 | self.lcd_status | compare_bit | ppu_mode);
+                1 << 7 | self.lcd_status | compare_bit | ppu_mode
             }
             0xff42 => self.scy,
             0xff43 => self.scx,
@@ -108,10 +123,20 @@ impl MemoryAccessor for Processor {
         trace!("Writing to gpu registers: {:#x}: {:#b}", location, value);
         match location {
             0xff40 => {
-                if value & (1 << 7) == 0 && self.lcd_control & (1 << 7) != 0 {
-                    info!("Disabling LCD {:#b}", value)
-                } else if value & (1 << 7) != 0 && self.lcd_control & (1 << 7) == 0 {
-                    info!("Enabling LCD {:#b}", value)
+                if (value & LcdEnabled.to_byte() == 0) && (self.lcd_control & LcdEnabled.to_byte() != 0) {
+                    info!("Disabling LCD {:#b}", value);
+                    // the comparison bit is frozen when the LCD is disabled since the comparator is
+                    // not running.
+                    self.frozen_compare_bit = self.ly == self.lyc;
+                    // TODO stat_lyc_onoff.gb (r1 step 3) requires this to be zero. But that feels
+                    //  strange. Need to check more
+                    // self.gpu_mode = Mode::Zero;
+                    self.ly = 0;
+                } else if (value & LcdEnabled.to_byte() != 0) && (self.lcd_control & LcdEnabled.to_byte() == 0) {
+                    info!("Enabling LCD {:#b}", value);
+                    // TODO When re-enabling the LCD, the PPU will immediately start drawing again,
+                    //  but the screen will stay blank during the first frame
+                    self.gpu_mode = Mode::Two;
                 }
                 // TODO is this needed?
                 // if !self.has_lcd_flag(WindowEnabled) && (self.lcd_control & WindowEnabled as u8) == 0 {
@@ -223,7 +248,7 @@ impl Processor {
         Processor {
             // scanline: 0,
             lcd_control: 0x91,
-            lcd_status: 0x80, // Becomes 85 due to ly=lyc & gpu_mode = One
+            lcd_status: 0x80, // Becomes 86 due to ly=lyc & gpu_mode = Two
             scy: 0,
             scx: 0,
             ly: 0,
@@ -236,7 +261,8 @@ impl Processor {
             dma_last_value: 0xff,
 
             win_y_counter: 0,
-            gpu_mode: Mode::One, // First frame is empty
+            gpu_mode: Mode::Two, // First frame is empty
+            frozen_compare_bit: true
         }
     }
 }

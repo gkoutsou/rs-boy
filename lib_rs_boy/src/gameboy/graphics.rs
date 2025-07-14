@@ -2,13 +2,13 @@ pub(crate) mod engine;
 mod processor;
 mod tile;
 
-use std::cmp::min;
 use super::memory_bus::MemoryAccessor;
 use crate::gameboy::interrupts;
 pub use engine::Buffer;
 use log::{debug, info, trace};
 pub use processor::Mode;
 pub use processor::Processor;
+use std::cmp::min;
 pub use tile::Tile;
 
 const TILE_MAP_START_LOCATION: usize = 0x9800;
@@ -36,10 +36,6 @@ impl Display {
         if !self.processor.lcd_enabled() {
             trace!("LCD disabled!");
             self.dots = 0;
-            self.processor.ly = 0;
-            // When re-enabling the LCD, the PPU will immediately start drawing again, but the screen
-            // will stay blank during the first frame. This is done by setting Mode::One, probably..
-            self.processor.gpu_mode = Mode::One;
             return (self.interrupt, trigger_render);
         }
         self.dots += dots;
@@ -101,7 +97,7 @@ impl Display {
                     self.processor.ly += 1;
                     if self.processor.should_trigger_lyc_stat_interrupt() {
                         self.interrupt |= interrupts::STAT;
-                        println!(
+                        debug!(
                             "todo: check and enable interrupt - lyc - Zero {}-{}",
                             self.processor.lyc, self.processor.ly
                         );
@@ -306,20 +302,20 @@ impl MemoryAccessor for Display {
     fn get(&self, location: usize) -> u8 {
         match location {
             0x8000..=0x97FF => {
-                if self.processor.gpu_mode == Mode::Three{
+                if self.processor.gpu_mode == Mode::Three && self.processor.lcd_enabled() {
                     return 0xFF;
                 }
                 self.tile_data[location - 0x8000]
             },
             TILE_MAP_START_LOCATION..=TILE_MAP_END_LOCATION => {
-                if self.processor.gpu_mode == Mode::Three{
+                if (self.processor.gpu_mode == Mode::Three) && self.processor.lcd_enabled() {
                     return 0xFF;
                 }
                 self.tile_maps[location - TILE_MAP_START_LOCATION]
             },
             0xff40..=0xff4b => self.processor.get(location),
             0xFE00..=0xFE9F => {
-                if self.processor.gpu_mode != Mode::One && self.processor.gpu_mode != Mode::Zero {
+                if (self.processor.gpu_mode != Mode::One && self.processor.gpu_mode != Mode::Zero) && self.processor.lcd_enabled() {
                     return 0xFF;
                 }
                 self.oam[location - 0xFE00]
@@ -332,7 +328,7 @@ impl MemoryAccessor for Display {
     fn write(&mut self, location: usize, value: u8) {
         match location {
             0xfe00..=0xfe9f => {
-                if self.processor.gpu_mode != Mode::One && self.processor.gpu_mode != Mode::Zero {
+                if (self.processor.gpu_mode != Mode::One && self.processor.gpu_mode != Mode::Zero) && self.processor.lcd_enabled() {
                     return;
                 }
                 self.oam[location - 0xfe00] = value;
@@ -341,7 +337,7 @@ impl MemoryAccessor for Display {
             0xff40..=0xff4b => self.processor.write(location, value),
 
             0x8000..=0x97FF => {
-                if self.processor.gpu_mode == Mode::Three{
+                if (self.processor.gpu_mode == Mode::Three) && self.processor.lcd_enabled() {
                     return
                 }
                 self.tile_data[location - 0x8000] = value
@@ -349,7 +345,7 @@ impl MemoryAccessor for Display {
 
             TILE_MAP_START_LOCATION..=TILE_MAP_END_LOCATION => {
                 debug!("Writing to Tile Map");
-                if self.processor.gpu_mode == Mode::Three{
+                if (self.processor.gpu_mode == Mode::Three) && self.processor.lcd_enabled() {
                     return
                 }
                 self.tile_maps[location - TILE_MAP_START_LOCATION] = value

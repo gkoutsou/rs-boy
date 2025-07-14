@@ -1,4 +1,4 @@
-# Yet another GameBoy emulator
+# RS Boy
 
 This is a pet project in an attempt to learn Rust by doing a real life project.
 
