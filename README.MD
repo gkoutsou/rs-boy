@@ -22,7 +22,7 @@ It can function either as a standalone binary, or it can be loaded as a retroarc
 
 ## Test Suites
 
-### Blargg's test ROMs
+### [Blargg's test ROMs](https://gbdev.gg8.se/files/roms/blargg-gb-tests/)
 
 | Name             | Passed | Failing |
 |------------------|--------|---------|
@@ -33,15 +33,27 @@ It can function either as a standalone binary, or it can be loaded as a retroarc
 | memory_timing    | 0      | 3       |
 | memory_timing_2  | 0      | 3       |
 
-### Mooneye Acceptance Tests
+### [Mooneye Acceptance Test ROMs](https://github.com/Gekkio/mooneye-test-suite/)
 
 | Passed | Failing | Skipped |
 |--------|---------|---------|
 | 31     | 35      | 9       |
 
-### Acid2:
+### [Acid2 Test:](https://github.com/mattcurrie/dmg-acid2)
 
 - Passed
+
+### [Scribbltests:](https://github.com/Hacktix/scribbltests/tree/master)
+
+| Name      | Passed |
+|-----------|--------|
+| fairylake | ❌      |
+| lycscx    | ✅      |
+| lycscy    | ✅      |
+| palettely | ✅      |
+| scxly     | ✅      |
+| statcount | ❌      |
+| winpos    | ✅      |
 
 ## References:
 
@@ -51,6 +63,3 @@ It can function either as a standalone binary, or it can be loaded as a retroarc
 - [Game Boy CPU Manual](http://marc.rawer.de/Gameboy/Docs/GBCPUman.pdf)
 - [Game Boy Sound Hardware](https://gbdev.gg8.se/wiki/articles/Gameboy_sound_hardware)
 - [Nightshade's GB Sound Emulation](https://nightshade256.github.io/2021/03/27/gb-sound-emulation.html)
-- [Blargg's test ROMs](https://gbdev.gg8.se/files/roms/blargg-gb-tests/)
-- [Mooneye Test ROMs](https://github.com/Gekkio/mooneye-test-suite/)
-- [Acid2 Test](https://github.com/mattcurrie/dmg-acid2)
