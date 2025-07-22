@@ -5,7 +5,7 @@ mod test {
     use std::path::Path;
     use test_case::test_case;
 
-    const ROMPATH: &str = "tests/mooneye/acceptance";
+    const ROMPATH: &str = "tests/game-boy-test-roms-v7.0/mooneye-test-suite/acceptance";
     #[test_case("rapid_di_ei.gb" ; "rapid_di_ei")]
     #[test_case("oam_dma_start.gb" ; "oam_dma_start")]
     // #[test_case("boot_div-dmg0.gb" ; "boot_div_dmg0")]

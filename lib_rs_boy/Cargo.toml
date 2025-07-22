@@ -8,3 +8,4 @@ log = "0.4.27"
 
 [dev-dependencies]
 test-case = "*"
+image = "0.25.6"

@@ -2,6 +2,7 @@
 /test
 /lib_rs_boy/tests/blargg
 /lib_rs_boy/tests/mooneye
+/lib_rs_boy/tests/game-boy-test-roms*
 output
 *.gbsave
 *.srm

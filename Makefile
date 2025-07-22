@@ -12,3 +12,5 @@ build-libretro:
 	fi; \
 	cargo build -p libretro_core --lib --release $$TARGET
 
+test:
+	cargo test --no-fail-fast

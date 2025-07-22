@@ -5,7 +5,7 @@ mod test {
     use std::path::Path;
     use test_case::test_case;
 
-    const ROMPATH: &str = "tests/blargg/dmg_sound/rom_singles";
+    const ROMPATH: &str = "tests/game-boy-test-roms-v7.0/blargg/dmg_sound/rom_singles";
 
     const STATUS_LOCATION: usize = 0xA000;
     const TEST_RUNNING_VALUE: u8 = 0x80;

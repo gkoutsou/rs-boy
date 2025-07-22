@@ -1,8 +1,8 @@
 use log::trace;
 
-const WHITE: u32 = 0xffffff;
-const LIGHT_GRAY: u32 = 0xa9a9a9;
-const DARK_GRAY: u32 = 0x545454;
+const WHITE: u32 = 0xFFFFFF;
+const LIGHT_GRAY: u32 = 0xAAAAAA;
+const DARK_GRAY: u32 = 0x555555;
 const BLACK: u32 = 0x000000;
 
 pub const WIDTH: usize = 160;

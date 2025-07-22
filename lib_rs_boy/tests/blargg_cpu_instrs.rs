@@ -5,7 +5,7 @@ mod test {
     use std::path::Path;
     use test_case::test_case;
 
-    const ROMPATH: &str = "tests/blargg/cpu_instrs/individual";
+    const ROMPATH: &str = "tests/game-boy-test-roms-v7.0/blargg/cpu_instrs/individual";
 
     const SERIAL_DATA_LOCATION: usize = 0xff01;
     const SERIAL_TRANSFER_LOCATION: usize = 0xff02;
