@@ -3,7 +3,7 @@ display_name = "Nintendo - Game Boy (RS-Boy)
 categories = "Emulator"
 authors = "gkoutsou"
 corename = "rs_boy"
-supported_extensions = "gb"
+supported_extensions = "gb|gbc"
 license = "GPLv3"
 display_version = "v0.1.0"
 
@@ -22,3 +22,4 @@ memory_descriptors = "false"
 libretro_saves = "true"
 core_options = "true"
 core_options_version = "2.0"
+database = "Nintendo - Game Boy|Nintendo - Game Boy Color"

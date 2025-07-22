@@ -34,6 +34,7 @@ impl MemoryAccessor for IORegisters {
             0xFF4D => (),
             0xff4f => (),
             0xFF56 => (),
+            0xFF68..=0xFF6B => (),
 
             _ => {
                 // let ten_millis = time::Duration::from_secs(10);
