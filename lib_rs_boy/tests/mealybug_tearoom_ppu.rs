@@ -72,7 +72,10 @@ mod test {
         // save_rgb_as_png(gb.display.engine.screen.as_slice(), 160, 144, &*output_png_path).unwrap();
 
         assert_eq!(gb.display.engine.screen.len(), rgb_vec.len());
-        assert_eq!(gb.display.engine.screen, rgb_vec);
+
+        let equals = gb.display.engine.screen.eq(&rgb_vec);
+        assert!(equals, "output was not equal");
+        // assert_eq!(gb.display.engine.screen, rgb_vec);
     }
 
     fn save_rgb_as_png(rgb_vec: &[u32], width: u32, height: u32, filename: &str) -> Result<(), Box<dyn std::error::Error>> {

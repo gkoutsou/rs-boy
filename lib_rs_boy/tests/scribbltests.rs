@@ -47,11 +47,11 @@ mod test {
                 break
             }
         }
-        // println!("Pixels: {:?}", &rgb_vec[..20]); // Show the first 10 as example
-        // println!("Screen: {:?}", &gb.display.engine.screen[..20]); // Show the first 10 as example
-
         assert_eq!(gb.display.engine.screen.len(), rgb_vec.len());
-        assert_eq!(gb.display.engine.screen, rgb_vec)
+
+        let equals = gb.display.engine.screen.eq(&rgb_vec);
+        assert!(equals, "output was not equal");
+        // assert_eq!(gb.display.engine.screen, rgb_vec);
     }
 
 }

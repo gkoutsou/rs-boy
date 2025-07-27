@@ -39,6 +39,12 @@ It can function either as a standalone binary, or it can be loaded as a retroarc
 |--------|---------|---------|
 | 31     | 35      | 9       |
 
+### [Mealybug Tearoom PPU Test ROMs](https://github.com/mattcurrie/mealybug-tearoom-tests/)
+
+| Passed | Failing | Skipped |
+|--------|---------|---------|
+| 0      | 32      | 0       |
+
 ### [Acid2 Test:](https://github.com/mattcurrie/dmg-acid2)
 
 - Passed

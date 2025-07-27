@@ -62,7 +62,7 @@ pub fn load_rom(rom: Vec<u8>) -> Box<dyn Cartridge> {
             rom.len()
         );
     } else {
-        println!("ROM size Bytes = {}", expected_rom_size);
+        info!("ROM size Bytes = {}", expected_rom_size);
     }
 
     let external_ram_size = match ram_size {
