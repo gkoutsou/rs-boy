@@ -68,8 +68,8 @@ mod test {
             gb.step();
         }
 
-        let output_png_path = rom_name.to_owned() + "_output.png";
-        save_rgb_as_png(gb.display.engine.screen.as_slice(), 160, 144, &*output_png_path).unwrap();
+        // let output_png_path = rom_name.to_owned() + "_output.png";
+        // save_rgb_as_png(gb.display.engine.screen.as_slice(), 160, 144, &*output_png_path).unwrap();
 
         assert_eq!(gb.display.engine.screen.len(), rgb_vec.len());
         assert_eq!(gb.display.engine.screen, rgb_vec);
