@@ -1,7 +1,6 @@
 use super::Cartridge;
 use crate::gameboy::memory_bus::MemoryAccessor;
 use log::{debug, info, trace, warn};
-use std::path::{self};
 
 pub struct MBC3 {
     rom: Vec<u8>,

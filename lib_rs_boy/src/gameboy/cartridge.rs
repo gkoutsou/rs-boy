@@ -1,8 +1,4 @@
-use std::{
-    io::Read,
-    path::{self},
-    str,
-};
+use std::str;
 
 mod empty;
 mod mbc1;

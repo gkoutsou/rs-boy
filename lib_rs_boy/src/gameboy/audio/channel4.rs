@@ -1,8 +1,6 @@
-use log::{info, trace};
-
-use crate::gameboy::memory_bus::MemoryAccessor;
-
 use super::wave::Wave;
+use crate::gameboy::memory_bus::MemoryAccessor;
+use log::trace;
 
 const MAX_ENVELOPE_VOL: f32 = 15.0;
 const MAX_LENGTH: u8 = 64;

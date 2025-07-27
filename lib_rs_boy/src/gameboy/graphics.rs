@@ -5,7 +5,7 @@ mod tile;
 use super::memory_bus::MemoryAccessor;
 use crate::gameboy::interrupts;
 pub use engine::Buffer;
-use log::{debug, info, trace};
+use log::{debug, trace};
 pub use processor::Mode;
 pub use processor::Processor;
 use std::cmp::min;

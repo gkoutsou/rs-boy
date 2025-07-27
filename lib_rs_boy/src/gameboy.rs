@@ -1,4 +1,4 @@
-use std::{path, thread, time};
+use std::{thread, time};
 
 pub mod audio;
 mod cartridge;
@@ -11,7 +11,6 @@ mod memory_bus;
 mod registers;
 mod timer;
 
-use crate::io;
 use crate::io::keys::Key;
 use audio::Speaker;
 use cartridge::Cartridge;
@@ -20,8 +19,8 @@ use graphics::Display;
 use log::{debug, info, trace};
 use memory::Memory;
 use memory_bus::MemoryAccessor;
-use registers::Registers;
 use registers::operations::Operations;
+use registers::Registers;
 use timer::Timer;
 
 fn u16_to_u8s(input: u16) -> (u8, u8) {

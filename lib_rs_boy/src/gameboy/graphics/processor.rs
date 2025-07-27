@@ -1,7 +1,6 @@
 use crate::gameboy::graphics::processor::LcdStatusFlag::LcdEnabled;
 use crate::gameboy::memory_bus::MemoryAccessor;
 use log::{info, trace};
-use std::ptr::eq;
 
 pub enum LcdStatusFlag {
     LcdEnabled = 1 << 7,

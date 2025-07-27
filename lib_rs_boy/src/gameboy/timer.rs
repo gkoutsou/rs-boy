@@ -1,4 +1,4 @@
-use log::{debug, info, trace};
+use log::{debug, trace};
 
 use super::memory_bus::MemoryAccessor;
 

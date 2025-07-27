@@ -2,7 +2,7 @@ mod io_registers;
 
 use super::memory_bus::MemoryAccessor;
 pub use io_registers::IORegisters;
-use log::{debug, trace, warn};
+use log::{debug, trace};
 
 pub struct Memory {
     high_ram: Vec<u8>,

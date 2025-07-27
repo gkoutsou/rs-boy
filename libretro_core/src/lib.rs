@@ -181,7 +181,7 @@ impl Core for RsBoyCore {
         self.even = !self.even;
 
         unsafe {
-            let (prefix, bytes, suffix) = self
+            let (_prefix, bytes, _suffix) = self
                 .game_boy
                 .display
                 .engine

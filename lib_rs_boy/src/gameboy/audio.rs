@@ -2,7 +2,7 @@ use channel1::Channel1;
 use channel2::Channel2;
 use channel3::Channel3;
 use channel4::Channel4;
-use log::{debug, info, trace};
+use log::{debug, info};
 use wave::Wave;
 
 use super::memory_bus::MemoryAccessor;
