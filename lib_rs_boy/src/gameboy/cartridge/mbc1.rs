@@ -68,6 +68,7 @@ impl MemoryAccessor for MBC1 {
             0xa000..=0xbfff => {
                 if !self.ram_enabled {
                     panic!("writing on cartridge when ram is disabled");
+                    return;
                 }
                 if self.ram.is_none() {
                     panic!("no external memory defined");
@@ -102,6 +103,10 @@ impl MBC1 {
     }
 
     fn get_external_ram(&self, location: usize) -> u8 {
+        if !self.ram_enabled {
+            return 0xFF;
+        }
+
         let relative_loc = location - 0xA000;
         let actual_loc = relative_loc + (self.ram_bank as usize) * 0x2000;
         self.ram.as_ref().unwrap()[actual_loc]

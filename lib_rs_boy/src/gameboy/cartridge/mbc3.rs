@@ -125,6 +125,7 @@ impl MemoryAccessor for MBC3 {
 
                 if !self.ram_enabled {
                     panic!("writing on cartridge when ram is disabled");
+                    return;
                 }
                 if self.ram.is_none() {
                     panic!("no external memory defined");
@@ -172,6 +173,11 @@ impl MBC3 {
                 _ => panic!("not a rtc location! {:#x}", self.accessed_rtc_field),
             }
         }
+
+        if !self.ram_enabled {
+            return 0xFF;
+        }
+
         let relative_loc = location - 0xA000;
         let actual_loc = relative_loc + (self.ram_bank as usize) * 0x2000;
         self.ram.as_ref().unwrap()[actual_loc]
