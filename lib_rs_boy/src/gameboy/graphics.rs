@@ -110,6 +110,8 @@ impl Display {
                     //         self.processor.lyc, self.processor.ly
                     //     );
                     // }
+                    self.oam_memory_check_index = 0;
+                    self.oam_collected_sprites.clear();
 
                     if self.processor.ly == 144 {
                         self.interrupt |= interrupts::VBLANK;
@@ -119,8 +121,6 @@ impl Display {
 
                         self.set_gpu_mode(Mode::One);
                     } else {
-                        self.oam_memory_check_index = 0;
-                        self.oam_collected_sprites.clear();
                         self.set_gpu_mode(Mode::Two);
                     }
                 }
@@ -160,6 +160,7 @@ impl Display {
 
         for tile in indexed_sprites.iter().map(|&(_i, tile)| tile) {
             // If same X coordinate, the previous has priority
+            // TODO is this relevant still?
             if tile.x == previous_x_coordinate {
                 debug!("same x, previous has priority");
                 // todo!("this is wrong.. only if opaque!")
@@ -173,7 +174,7 @@ impl Display {
             }
 
             let index = if double_size {
-                if line + 16 - tile.y < 8 {
+                if line + 16 < 8 + tile.y {
                     if !tile.is_y_flipped() {
                         tile.tile_index & 0xfe
                     } else {
@@ -190,7 +191,6 @@ impl Display {
                 tile.tile_index
             };
 
-            // TODO caused to go negative on HarvestMoon
             let y_pos = 16 + line as usize - tile.y as usize;
             let final_y_pos = if !tile.is_y_flipped() {
                 y_pos % 8
