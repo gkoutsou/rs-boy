@@ -138,7 +138,6 @@ impl GameBoy {
 
         println!("Interrupt enable: {:#8b}", self.memory.interrupt_enable);
         println!("Interrupt flag: {:#8b}", self.interrupt_flag);
-        self.memory.dump_tile_data();
         panic!("found interrupt")
     }
 
@@ -1669,7 +1668,6 @@ impl GameBoy {
 
             _ => {
                 debug!("Info for debugging");
-                self.memory.dump_tile_data();
 
                 let time = time::Duration::from_secs(5);
                 thread::sleep(time);

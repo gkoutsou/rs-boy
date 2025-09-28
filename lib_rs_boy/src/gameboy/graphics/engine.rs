@@ -1,4 +1,4 @@
-use log::trace;
+use log::{info, trace};
 
 const WHITE: u32 = 0xFFFFFF;
 const LIGHT_GRAY: u32 = 0xAAAAAA;

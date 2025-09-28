@@ -132,7 +132,7 @@ impl MemoryAccessor for MBC3 {
 
                 let relative_loc = location - 0xa000;
                 let actual_loc = relative_loc + (self.ram_bank as usize) * 0x2000;
-                info!("Cartridge RAM location: \nrelative: {:#x}\n actual: {:#x}\n bank: {:#x}", relative_loc, actual_loc, self.ram_bank);
+                // info!("Cartridge RAM location: \nrelative: {:#x}\n actual: {:#x}\n bank: {:#x}", relative_loc, actual_loc, self.ram_bank);
                 self.ram
                     .as_mut()
                     .expect("there should be some cartridge memory now..")[actual_loc] = value;

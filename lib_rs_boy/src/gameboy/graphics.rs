@@ -5,7 +5,7 @@ mod tile;
 use super::memory_bus::MemoryAccessor;
 use crate::gameboy::interrupts;
 pub use engine::Buffer;
-use log::{debug, trace};
+use log::{debug, info, trace};
 pub use processor::Mode;
 pub use processor::Processor;
 use std::cmp::min;
@@ -303,6 +303,47 @@ impl Display {
             oam_memory_check_index: 0,
             oam_collected_sprites: Vec::with_capacity(10),
         }
+    }
+
+    pub fn dump_tile_data(&self) {
+        // println!("DUMPING TILE DATA");
+        // for tile in 0..384 {
+        //     let mut sum = 0i32;
+        //     for i in 0..16 {
+        //         sum += self.tile_data[tile * 16 + i] as i32;
+        //     }
+        //     if sum > 0 {
+        //         for i in 0..16 {
+        //             print!("{:#04x} ", self.tile_data[tile * 16 + i]);
+        //         }
+        //         println!()
+        //     }
+        // }
+        // println!("DUMPING TILE DATA COMPLETED");
+    }
+
+    pub fn _dump_tile(&self, baseline: usize, tile_id: u8) {
+        println!("DUMPING TILE DATA");
+        let baseline = if baseline == 0x8800 {
+            baseline - 0x8000 + (tile_id as i8 as i16 + 128) as usize * 16
+        } else {
+            baseline - 0x8000 + tile_id as usize * 16
+        };
+        println!("baseline: {:#x}", baseline); //2432 - 2448
+        for i in 0..16 {
+            print!("{:#04x} ", self.tile_data[baseline + i]);
+        }
+        println!();
+        println!("DUMPING TILE DATA COMPLETED");
+    }
+
+    pub fn _dump_oam(&self) {
+        // println!("DUMPING OAM DATA");
+        // for object in 0..40 {
+        //     let tile = self.get_oam_object(object);
+        //     println!("{:?}", tile)
+        // }
+        // println!("DUMPING OAM DATA COMPLETED");
     }
 }
 
