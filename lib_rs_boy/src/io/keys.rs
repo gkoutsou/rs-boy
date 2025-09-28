@@ -1,13 +1,13 @@
 #[derive(PartialEq)]
 pub enum Key {
-    X,
-    Z,
+    A,
+    B,
 
     Down,
     Left,
     Right,
     Up,
 
-    Enter,
-    Backspace,
+    Start,
+    Select,
 }

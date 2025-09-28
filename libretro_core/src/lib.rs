@@ -144,10 +144,10 @@ impl Core for RsBoyCore {
 
         let mut output: Vec<Key> = Vec::new();
         if input.contains(JoypadState::START) {
-            output.push(Key::Enter);
+            output.push(Key::Start);
         }
         if input.contains(JoypadState::SELECT) {
-            output.push(Key::Backspace);
+            output.push(Key::Select);
         }
         if input.contains(JoypadState::UP) {
             output.push(Key::Up);
@@ -163,10 +163,10 @@ impl Core for RsBoyCore {
         }
 
         if input.contains(JoypadState::A) {
-            output.push(Key::X);
+            output.push(Key::A);
         }
         if input.contains(JoypadState::B) {
-            output.push(Key::Z);
+            output.push(Key::B);
         }
 
         loop {

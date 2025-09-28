@@ -19,15 +19,15 @@ fn get_pressed_keys(keys: Vec<Key>) -> Vec<EngineKey> {
     let mut output: Vec<EngineKey> = Vec::with_capacity(keys.len());
     for key in keys {
         let new_key: EngineKey = match key {
-            Key::Enter => EngineKey::Enter,
-            Key::Backspace => EngineKey::Backspace,
+            Key::Enter => EngineKey::Start,
+            Key::Backspace => EngineKey::Select,
             Key::Down => EngineKey::Down,
             Key::Up => EngineKey::Up,
             Key::Left => EngineKey::Left,
             Key::Right => EngineKey::Right,
-            Key::X => EngineKey::X,
-            Key::Z => EngineKey::Z,
-            _ => EngineKey::Enter, // Random key, go!
+            Key::X => EngineKey::A,
+            Key::Z => EngineKey::B,
+            _ => EngineKey::Start, // Random key, go!
         };
 
         output.push(new_key);

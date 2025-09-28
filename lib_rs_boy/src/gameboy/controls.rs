@@ -35,22 +35,22 @@ impl Joypad {
                 let buttons = self.buttons_selected();
                 let dpad = self.dpad_selected();
 
-                if (buttons && self.keys.contains(&Key::Enter))
+                if (buttons && self.keys.contains(&Key::Start))
                     || (dpad && self.keys.contains(&Key::Down))
                 {
                     keys &= 0xf7; // 11110111
                 }
-                if (buttons && self.keys.contains(&Key::Backspace))
+                if (buttons && self.keys.contains(&Key::Select))
                     || (dpad && self.keys.contains(&Key::Up))
                 {
                     keys &= 0xfb; // 11111011
                 }
-                if (buttons && self.keys.contains(&Key::X))
+                if (buttons && self.keys.contains(&Key::B))
                     || (dpad && self.keys.contains(&Key::Left))
                 {
                     keys &= 0xfd; // 11111101
                 }
-                if (buttons && self.keys.contains(&Key::Z))
+                if (buttons && self.keys.contains(&Key::A))
                     || (dpad && self.keys.contains(&Key::Right))
                 {
                     keys &= 0xfe; // 11111110
