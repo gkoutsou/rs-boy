@@ -3,6 +3,7 @@ use std::str;
 mod empty;
 mod mbc1;
 mod mbc3;
+mod mbc5;
 mod nombc;
 
 use log::info;
@@ -14,6 +15,7 @@ enum Type {
     NoMBC,
     MBC1,
     MBC3,
+    MBC5,
 }
 
 pub trait Cartridge: MemoryAccessor {
@@ -43,7 +45,8 @@ pub fn load_rom(rom: Vec<u8>) -> Box<dyn Cartridge> {
     let mbc_type = match cartridge_type {
         0x0 => Type::NoMBC,
         0x1..=0x3 => Type::MBC1,
-        0x0f..=0x13 => Type::MBC3,
+        0x0F..=0x13 => Type::MBC3,
+        0x19..=0x1E => Type::MBC5,
 
         _t => todo!("unsupported mbc_type {:#x}", _t),
     };
@@ -78,10 +81,12 @@ pub fn load_rom(rom: Vec<u8>) -> Box<dyn Cartridge> {
         None
     };
 
+    // TODO pass the specific cartridge time to the constructor instead
     match mbc_type {
         Type::NoMBC => Box::new(nombc::NoMBC::new(rom)),
         Type::MBC1 => Box::new(mbc1::MBC1::new(rom, external_ram)),
         Type::MBC3 => Box::new(mbc3::MBC3::new(rom, external_ram)),
+        Type::MBC5 => Box::new(mbc5::MBC5::new(rom, external_ram)),
     }
 }
 

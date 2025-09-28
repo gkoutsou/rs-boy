@@ -95,7 +95,7 @@ pub struct Processor {
 
 impl MemoryAccessor for Processor {
     fn get(&self, location: usize) -> u8 {
-        trace!("Read: {:#x}", location);
+        // trace!("Read: {:#x}", location);
         match location {
             0xff40 => self.lcd_control,
             0xff41 => {
@@ -105,7 +105,7 @@ impl MemoryAccessor for Processor {
                     (self.frozen_compare_bit as u8) << 2
                 };
                 let ppu_mode = if self.lcd_enabled() { self.gpu_mode as u8 } else { 0 };
-                info!("Read: {:#x}", 1<<7 | self.lcd_status | compare_bit | ppu_mode);
+                // info!("Read: {:#x}", 1<<7 | self.lcd_status | compare_bit | ppu_mode);
                 1 << 7 | self.lcd_status | compare_bit | ppu_mode
             }
             0xff42 => self.scy,

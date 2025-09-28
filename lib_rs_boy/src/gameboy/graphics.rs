@@ -190,6 +190,7 @@ impl Display {
                 tile.tile_index
             };
 
+            // TODO caused to go negative on HarvestMoon
             let y_pos = 16 + line as usize - tile.y as usize;
             let final_y_pos = if !tile.is_y_flipped() {
                 y_pos % 8

@@ -1378,7 +1378,7 @@ impl GameBoy {
             // Interrupts
             0xf3 => {
                 // This instruction disables interrupts immediately.
-                info!("Warning: DI");
+                trace!("Warning: DI");
                 self.ime = false;
                 self.set_ei = false;
             }
@@ -1387,7 +1387,7 @@ impl GameBoy {
                 // This instruction enables interrupts but not
                 // immediately. Interrupts are enabled after
                 // instruction after EI is executed.
-                info!("Warning: EI");
+                trace!("Warning: EI");
                 self.set_ei = true;
             }
 
