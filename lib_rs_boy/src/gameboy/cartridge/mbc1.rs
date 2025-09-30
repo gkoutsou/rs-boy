@@ -54,7 +54,7 @@ impl MemoryAccessor for MBC1 {
             }
             0x4000..=0x5fff => {
                 if value <= 0x3 {
-                    info!("Changing to memory bank: {}", self.ram_bank);
+                    info!("Changing to memory bank: {}", value);
                     self.ram_bank = value;
                 } else {
                     todo!("MBC1: not handled write to {:#x}", location)

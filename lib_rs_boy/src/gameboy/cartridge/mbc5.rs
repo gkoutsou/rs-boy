@@ -1,6 +1,6 @@
 use super::Cartridge;
 use crate::gameboy::memory_bus::MemoryAccessor;
-use log::{debug, info, trace};
+use log::{debug, info, trace, warn};
 
 pub struct MBC5 {
     rom: Vec<u8>,
@@ -17,6 +17,9 @@ pub struct MBC5 {
     //  to the Rumble circuitry instead of the RAM chip. Setting the bit to 1 enables the rumble
     //  motor and keeps it enabled until the bit is reset again.
 
+    rumble_support: bool,
+    rumbling: bool,
+    total_ram_banks: u8,
 }
 
 impl Cartridge for MBC5 {
@@ -61,12 +64,20 @@ impl MemoryAccessor for MBC5 {
                 debug!("Changing to ROM bank: {}",self.rom_bank);
             }
             0x4000..=0x5FFF => {
-                if value <= 0xF {
-                    info!("Changing to memory bank: {}", self.ram_bank);
-                    self.ram_bank = value;
-                } else {
-                    todo!("MBC5: not handled write to {:#x}", location)
+                let value = value & 0xF;
+                if self.rumble_support {
+                    self.rumbling = (value >> 3) > 0;
+                    if self.rumbling {
+                        todo!("Rumble support");
+                    }
                 }
+
+                self.ram_bank = value % self.total_ram_banks;
+                debug!("Changing to memory bank: {}", self.ram_bank);
+            }
+
+            0x6000..=0x7FFF => {
+                warn!("Writing to memory location: {:#x}", location);
             }
 
             0xA000..=0xBFFF => {
@@ -114,13 +125,48 @@ impl MBC5 {
         self.ram.as_ref().unwrap()[actual_loc]
     }
 
-    pub fn new(buffer: Vec<u8>, external_ram: Option<Vec<u8>>) -> Self {
+    pub fn new(buffer: Vec<u8>, external_ram: Option<Vec<u8>>, cartridge_type: u8) -> Self {
+        let mut rumble_support = false;
+        let mut ram = None;
+        match cartridge_type {
+            // $19	MBC5
+            0x19 => {},
+            // $1A	MBC5+RAM
+            0x1A => {
+                ram = external_ram;
+            },
+            // $1B	MBC5+RAM+BATTERY
+            0x1B => {
+                ram = external_ram;
+            },
+            // $1C	MBC5+RUMBLE
+            0x1C => rumble_support = true,
+            // $1D	MBC5+RUMBLE+RAM
+            0x1D => {
+                rumble_support = true;
+                ram = external_ram;
+            },
+            // $1E	MBC5+RUMBLE+RAM+BATTERY
+            0x1E => {
+                rumble_support = true;
+                ram = external_ram;
+            }
+            _ => {
+                panic!("Unknown cartridge type! {:#x}", cartridge_type);
+            }
+        }
+
+        let total_ram_banks = if ram.as_ref().is_some() { ram.as_ref().unwrap().len() / 8096 } else { 0 };
+
         MBC5 {
             rom: buffer,
             rom_bank: 1,
-            ram: external_ram,
+            ram,
             ram_enabled: false,
             ram_bank: 0,
+            total_ram_banks: total_ram_banks as u8,
+            rumble_support,
+            rumbling: false,
         }
     }
 }

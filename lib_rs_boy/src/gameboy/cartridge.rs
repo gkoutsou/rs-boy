@@ -86,7 +86,7 @@ pub fn load_rom(rom: Vec<u8>) -> Box<dyn Cartridge> {
         Type::NoMBC => Box::new(nombc::NoMBC::new(rom)),
         Type::MBC1 => Box::new(mbc1::MBC1::new(rom, external_ram)),
         Type::MBC3 => Box::new(mbc3::MBC3::new(rom, external_ram)),
-        Type::MBC5 => Box::new(mbc5::MBC5::new(rom, external_ram)),
+        Type::MBC5 => Box::new(mbc5::MBC5::new(rom, external_ram, cartridge_type)),
     }
 }
 
