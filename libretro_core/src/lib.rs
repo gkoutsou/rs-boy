@@ -116,6 +116,10 @@ impl Core for RsBoyCore {
             unsafe { slice::from_raw_parts(_info.unwrap().data.cast(), rom_size) };
         self.game_boy.load_rom(rom_data.to_vec());
 
+        if let Some(_) = self.game_boy.cartridge.get_rumble_state() {
+            ctx.enable_rumble_interface()?;
+        }
+
         let gctx: GenericContext = ctx.into();
         gctx.enable_audio_callback();
 
@@ -173,6 +177,9 @@ impl Core for RsBoyCore {
             let render = self.game_boy.step();
             if render {
                 self.game_boy.set_pressed_keys(output);
+                if let Some(rumbling) = self.game_boy.cartridge.get_rumble_state() {
+                    gctx.set_rumble_state(0, retro_rumble_effect::RETRO_RUMBLE_STRONG, rumbling as u16 * 65535);
+                }
                 break;
             }
         }

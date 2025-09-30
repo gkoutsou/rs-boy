@@ -26,6 +26,14 @@ impl Cartridge for MBC5 {
     fn get_ram(&mut self) -> &mut [u8] {
         self.ram.as_deref_mut().unwrap_or(&mut [])
     }
+
+    fn get_rumble_state(&self) -> Option<bool> {
+        if self.rumble_support {
+            return Some(self.rumbling)
+        }
+
+        None
+    }
 }
 
 impl MemoryAccessor for MBC5 {
@@ -67,9 +75,6 @@ impl MemoryAccessor for MBC5 {
                 let value = value & 0xF;
                 if self.rumble_support {
                     self.rumbling = (value >> 3) > 0;
-                    if self.rumbling {
-                        todo!("Rumble support");
-                    }
                 }
 
                 self.ram_bank = value % self.total_ram_banks;

@@ -22,6 +22,8 @@ pub trait Cartridge: MemoryAccessor {
     fn get_ram(&mut self) -> &mut [u8] {
         &mut [] // Default empty slice
     }
+
+    fn get_rumble_state(&self) -> Option<bool> { None }
 }
 
 pub fn load_rom(rom: Vec<u8>) -> Box<dyn Cartridge> {

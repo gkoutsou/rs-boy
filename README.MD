@@ -10,10 +10,11 @@ It can function either as a standalone binary, or it can be loaded as a retroarc
 ## Implemented features
 
 - [x] All CPU instructions
-- [x] Basic support for NoMBC/MBC1/MBC3 Cartridge types
+- [x] Basic support for NoMBC/MBC1/MBC3/MBC5 Cartridge types
 - [x] Timer/VBlank/STAT Interrupts
 - [x] Keyboard controls
 - [x] GamePad support (only via libretro)
+- [x] Rumble support
 - [x] Audio Channel 1,2,3,4
 
 ## Missing features
