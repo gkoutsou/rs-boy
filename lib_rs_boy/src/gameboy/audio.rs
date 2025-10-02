@@ -46,6 +46,12 @@ pub struct Speaker {
     ///
     /// VIN left     | Left volume | VIN right | Right volume
     master_volume: u8,
+
+    // Only for debugging purposes
+    debug_channel_1_enabled: bool,
+    debug_channel_2_enabled: bool,
+    debug_channel_3_enabled: bool,
+    debug_channel_4_enabled: bool,
 }
 
 impl Speaker {
@@ -74,25 +80,33 @@ impl Speaker {
         self.clock -= SAMPLING_FREQUENCY;
         let mut sample = [0.0, 0.0];
 
-        let ch1 = self.channel1.sample();
-        let (pan_left, pan_right) = self.get_panning(1);
-        sample[0] += ch1 * pan_left as f32;
-        sample[1] += ch1 * pan_right as f32;
+        if self.debug_channel_1_enabled {
+            let ch1 = self.channel1.sample();
+            let (pan_left, pan_right) = self.get_panning(1);
+            sample[0] += ch1 * pan_left as f32;
+            sample[1] += ch1 * pan_right as f32;
+        }
 
-        let ch2 = self.channel2.sample();
-        let (pan_left, pan_right) = self.get_panning(2);
-        sample[0] += ch2 * pan_left as f32;
-        sample[1] += ch2 * pan_right as f32;
+        if self.debug_channel_2_enabled {
+            let ch2 = self.channel2.sample();
+            let (pan_left, pan_right) = self.get_panning(2);
+            sample[0] += ch2 * pan_left as f32;
+            sample[1] += ch2 * pan_right as f32;
+        }
 
-        let ch3 = self.channel3.sample();
-        let (pan_left, pan_right) = self.get_panning(3);
-        sample[0] += ch3 * pan_left as f32;
-        sample[1] += ch3 * pan_right as f32;
+        if self.debug_channel_3_enabled {
+            let ch3 = self.channel3.sample();
+            let (pan_left, pan_right) = self.get_panning(3);
+            sample[0] += ch3 * pan_left as f32;
+            sample[1] += ch3 * pan_right as f32;
+        }
 
-        let ch4 = self.channel4.sample();
-        let (pan_left, pan_right) = self.get_panning(4);
-        sample[0] += ch4 * pan_left as f32;
-        sample[1] += ch4 * pan_right as f32;
+        if self.debug_channel_4_enabled {
+            let ch4 = self.channel4.sample();
+            let (pan_left, pan_right) = self.get_panning(4);
+            sample[0] += ch4 * pan_left as f32;
+            sample[1] += ch4 * pan_right as f32;
+        }
 
         let (vol_left, vol_right) = self.get_volume();
         let left = sample[0] * vol_left / VOL_DIVIDER;
@@ -100,6 +114,16 @@ impl Speaker {
 
         self.samples.push((left * 32767.0).round() as i16); // TODO temp conversion
         self.samples.push((right * 32767.0).round() as i16);
+    }
+
+    pub fn set_channel_state(&mut self, channel: usize, enabled: bool) {
+        match channel {
+            1 => self.debug_channel_1_enabled = enabled,
+            2 => self.debug_channel_2_enabled = enabled,
+            3 => self.debug_channel_3_enabled = enabled,
+            4 => self.debug_channel_4_enabled = enabled,
+            _ => panic!("Unsupported channel {}", channel),
+        }
     }
 
     pub fn get_samples(&self) -> &Vec<i16> {
@@ -131,6 +155,11 @@ impl Speaker {
             master_volume: 0x77,
             sound_panning: 0xf3,
             audio_master: true,
+
+            debug_channel_1_enabled: true,
+            debug_channel_2_enabled: true,
+            debug_channel_3_enabled: true,
+            debug_channel_4_enabled: true,
         }
     }
 

@@ -1,6 +1,7 @@
 use io::keys::Key;
 use lib_rs_boy::gameboy::GameBoy;
 use lib_rs_boy::io;
+use rust_libretro::core::CoreOptions;
 use rust_libretro::{
     contexts::*, core::Core, env_version, input_descriptors, proc::*, retro_core, sys::*, types::*,
 };
@@ -37,25 +38,54 @@ const INPUT_DESCRIPTORS: &[retro_input_descriptor] = &input_descriptors!(
     {
         { "false" },
         { "true" },
-    }
+    },
+    "false"
+},{
+    "disable_channel_2",
+    "Audio > Disable Channel 2",
+    "Disable audio channel 2",
+    "Setting 'Audio > Disable Channel 2' disables the second audio channel",
+    "Setting 'Disable Channel 2' disables the first second channel",
+    "sound_settings",
+    {
+        { "false" },
+        { "true" },
+    },
+    "false"
+},{
+    "disable_channel_3",
+    "Audio > Disable Channel 3",
+    "Disable audio channel 3",
+    "Setting 'Audio > Disable Channel 3' disables the third audio channel",
+    "Setting 'Disable Channel 3' disables the third audio channel",
+    "sound_settings",
+    {
+        { "false" },
+        { "true" },
+    },
+    "false"
+},{
+    "disable_channel_4",
+    "Audio > Disable Channel 4",
+    "Disable audio channel 4",
+    "Setting 'Audio > Disable Channel 4' disables the fourth audio channel",
+    "Setting 'Disable Channel 4' disables the fourth audio channel",
+    "sound_settings",
+    {
+        { "false" },
+        { "true" },
+    },
+    "false"
 })]
 struct RsBoyCore {
     game_boy: GameBoy,
-    audio_options: AudioOptions,
 
     timer: i64,
     even: bool,
 }
 
-struct AudioOptions {
-    disable_channel_1: bool,
-}
-
 retro_core!(RsBoyCore {
     game_boy: GameBoy::new(),
-    audio_options: AudioOptions {
-        disable_channel_1: false
-    },
 
     timer: 5_000_001,
     even: true,
@@ -78,6 +108,7 @@ impl Core for RsBoyCore {
             return;
         }
 
+        self.set_core_options(ctx);
         ctx.set_support_no_game(false);
     }
 
@@ -128,8 +159,23 @@ impl Core for RsBoyCore {
 
     fn on_options_changed(&mut self, ctx: &mut OptionsChangedContext) {
         match ctx.get_variable("disable_channel_1") {
-            Some("true") => self.audio_options.disable_channel_1 = true,
-            Some("false") => self.audio_options.disable_channel_1 = false,
+            Some("true") => self.game_boy.speaker.set_channel_state(1, false),
+            Some("false") => self.game_boy.speaker.set_channel_state(1, true),
+            _ => (),
+        }
+        match ctx.get_variable("disable_channel_2") {
+            Some("true") => self.game_boy.speaker.set_channel_state(2, false),
+            Some("false") => self.game_boy.speaker.set_channel_state(2, true),
+            _ => (),
+        }
+        match ctx.get_variable("disable_channel_3") {
+            Some("true") => self.game_boy.speaker.set_channel_state(3, false),
+            Some("false") => self.game_boy.speaker.set_channel_state(3, true),
+            _ => (),
+        }
+        match ctx.get_variable("disable_channel_4") {
+            Some("true") => self.game_boy.speaker.set_channel_state(4, false),
+            Some("false") => self.game_boy.speaker.set_channel_state(4, true),
             _ => (),
         }
     }
