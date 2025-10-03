@@ -96,7 +96,7 @@ impl Core for RsBoyCore {
         SystemInfo {
             library_name: CString::new("rs_boy").unwrap(),
             library_version: CString::new(env_version!("CARGO_PKG_VERSION").to_string()).unwrap(),
-            valid_extensions: CString::new("gb").unwrap(),
+            valid_extensions: CString::new("gb|gbc").unwrap(),
 
             need_fullpath: false,
             block_extract: false,

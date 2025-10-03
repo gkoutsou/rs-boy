@@ -10,16 +10,10 @@ pub struct MBC5 {
     ram_enabled: bool,
     ram: Option<Vec<u8>>,
     ram_bank: u8,
-
-    // MBC Specific
-    // Rumble - not supported
-    // TODO On cartridges which feature a rumble motor, bit 3 of the RAM Bank register is connected
-    //  to the Rumble circuitry instead of the RAM chip. Setting the bit to 1 enables the rumble
-    //  motor and keeps it enabled until the bit is reset again.
-
-    rumble_support: bool,
-    rumbling: bool,
     total_ram_banks: u8,
+
+    // MBC5 Specific
+    rumble: Option<bool>,
 }
 
 impl Cartridge for MBC5 {
@@ -28,11 +22,7 @@ impl Cartridge for MBC5 {
     }
 
     fn get_rumble_state(&self) -> Option<bool> {
-        if self.rumble_support {
-            return Some(self.rumbling)
-        }
-
-        None
+        self.rumble
     }
 }
 
@@ -73,8 +63,8 @@ impl MemoryAccessor for MBC5 {
             }
             0x4000..=0x5FFF => {
                 let value = value & 0xF;
-                if self.rumble_support {
-                    self.rumbling = (value >> 3) > 0;
+                if self.rumble.is_some() {
+                    self.rumble = Some((value >> 3) > 0);
                 }
 
                 self.ram_bank = value % self.total_ram_banks;
@@ -131,7 +121,7 @@ impl MBC5 {
     }
 
     pub fn new(buffer: Vec<u8>, external_ram: Option<Vec<u8>>, cartridge_type: u8) -> Self {
-        let mut rumble_support = false;
+        let mut rumble_support = None;
         let mut ram = None;
         match cartridge_type {
             // $19	MBC5
@@ -145,15 +135,15 @@ impl MBC5 {
                 ram = external_ram;
             },
             // $1C	MBC5+RUMBLE
-            0x1C => rumble_support = true,
+            0x1C => rumble_support = Some(false),
             // $1D	MBC5+RUMBLE+RAM
             0x1D => {
-                rumble_support = true;
+                rumble_support = Some(false);
                 ram = external_ram;
             },
             // $1E	MBC5+RUMBLE+RAM+BATTERY
             0x1E => {
-                rumble_support = true;
+                rumble_support = Some(false);
                 ram = external_ram;
             }
             _ => {
@@ -170,8 +160,7 @@ impl MBC5 {
             ram_enabled: false,
             ram_bank: 0,
             total_ram_banks: total_ram_banks as u8,
-            rumble_support,
-            rumbling: false,
+            rumble: rumble_support,
         }
     }
 }
