@@ -10,6 +10,10 @@ use std::ptr::null_mut;
 use std::slice;
 
 const FRAMERATE: f64 = 60.0; // 59.7275;
+const RUMBLE_OFF: u16 = 0;
+const RUMBLE_LOW: u16 = 65535 / 3;
+const RUMBLE_MEDIUM: u16 = RUMBLE_LOW * 2;
+const RUMBLE_HIGH: u16 = 65535;
 
 const INPUT_DESCRIPTORS: &[retro_input_descriptor] = &input_descriptors!(
     { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP, "Up" },
@@ -27,6 +31,10 @@ const INPUT_DESCRIPTORS: &[retro_input_descriptor] = &input_descriptors!(
     "sound_settings",
     "Sound",
     "Options affecting the audio channels."
+},{
+    "gamepad_settings",
+    "Gamepad",
+    "Options affecting the controller."
 })]
 #[options({
     "disable_channel_1",
@@ -76,9 +84,25 @@ const INPUT_DESCRIPTORS: &[retro_input_descriptor] = &input_descriptors!(
         { "true" },
     },
     "false"
+},
+{
+    "rumble_intensity",
+    "Gamepad > Rumble Intensity",
+    "Rumble intensity",
+    "Setting 'Gamepad > Rumble Intensity' controls the rumble intensity for supported games",
+    "Setting 'Rumble Intensity' controls the rumble intensity for supported games",
+    "gamepad_settings",
+    {
+        { "OFF" },
+        { "LOW" },
+        { "MEDIUM" },
+        { "HIGH" },
+    },
+    "HIGH"
 })]
 struct RsBoyCore {
     game_boy: GameBoy,
+    options: RsBoyCoreOptions,
 
     timer: i64,
     even: bool,
@@ -86,10 +110,17 @@ struct RsBoyCore {
 
 retro_core!(RsBoyCore {
     game_boy: GameBoy::new(),
+    options: RsBoyCoreOptions{
+        rumble_intensity_level: 65535,
+    },
 
     timer: 5_000_001,
     even: true,
 });
+
+struct RsBoyCoreOptions {
+    rumble_intensity_level: u16,
+}
 
 impl Core for RsBoyCore {
     fn get_info(&self) -> SystemInfo {
@@ -104,11 +135,12 @@ impl Core for RsBoyCore {
     }
 
     fn on_set_environment(&mut self, initial: bool, ctx: &mut SetEnvironmentContext) {
+        // Strange but if I move this after the !initial check, the settings are not effective
+        self.set_core_options(ctx);
         if !initial {
             return;
         }
 
-        self.set_core_options(ctx);
         ctx.set_support_no_game(false);
     }
 
@@ -178,6 +210,13 @@ impl Core for RsBoyCore {
             Some("false") => self.game_boy.speaker.set_channel_state(4, true),
             _ => (),
         }
+        match ctx.get_variable("rumble_intensity") {
+            Some("OFF") => self.options.rumble_intensity_level = RUMBLE_OFF,
+            Some("LOW") => self.options.rumble_intensity_level = RUMBLE_LOW,
+            Some("MEDIUM") => self.options.rumble_intensity_level = RUMBLE_MEDIUM,
+            Some("HIGH") => self.options.rumble_intensity_level = RUMBLE_HIGH,
+            _ => (),
+        }
     }
 
     #[inline]
@@ -224,7 +263,8 @@ impl Core for RsBoyCore {
             if render {
                 self.game_boy.set_pressed_keys(output);
                 if let Some(rumbling) = self.game_boy.cartridge.get_rumble_state() {
-                    gctx.set_rumble_state(0, retro_rumble_effect::RETRO_RUMBLE_STRONG, rumbling as u16 * 65535);
+                    let strength = (rumbling as u16) * self.options.rumble_intensity_level;
+                    gctx.set_rumble_state(0, retro_rumble_effect::RETRO_RUMBLE_STRONG, strength);
                 }
                 break;
             }

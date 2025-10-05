@@ -807,7 +807,7 @@ dependencies = [
 
 [[package]]
 name = "libretro_core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "lib_rs_boy",
  "libc",
@@ -897,7 +897,7 @@ dependencies = [
 
 [[package]]
 name = "minifb_binary"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "env_logger",
  "lib_rs_boy",
