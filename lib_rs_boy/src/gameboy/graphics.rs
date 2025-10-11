@@ -145,6 +145,7 @@ impl Display {
             self.processor.should_trigger_mode_stat_interrupt() {
             self.interrupt |= interrupts::STAT;
         }
+        // TODO this breaks silver :'(
         let interrupt = if !previous_interrupt_state { self.interrupt } else { 0 };
         (interrupt, trigger_render)
     }
