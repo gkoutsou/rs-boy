@@ -27,6 +27,8 @@ pub struct Display {
     oam_memory_check_index: u8,
     oam_collected_sprites: Vec<Tile>,
     interrupt: u8,
+
+    pub win_y_counter: u8,
 }
 
 impl Display {
@@ -116,7 +118,7 @@ impl Display {
                     if self.processor.ly == 144 {
                         self.interrupt |= interrupts::VBLANK;
                         // The window_y_counter should only reset on v-blank
-                        self.processor.win_y_counter = 0;
+                        self.win_y_counter = 0;
                         trigger_render = true;
 
                         self.set_gpu_mode(Mode::One);
@@ -226,7 +228,7 @@ impl Display {
             let in_window = in_window && x + 7 >= wx;
 
             let y_pos = if in_window {
-                self.processor.win_y_counter
+                self.win_y_counter
             } else {
                 self.processor.scy.wrapping_add(line)
             };
@@ -253,7 +255,7 @@ impl Display {
             self.engine.draw_bg_tile(x_pos, x, line, tile_data, palette);
         }
         if in_window {
-            self.processor.win_y_counter += 1;
+            self.win_y_counter += 1;
         }
     }
 
@@ -303,6 +305,7 @@ impl Display {
             interrupt: 0,
             oam_memory_check_index: 0,
             oam_collected_sprites: Vec::with_capacity(10),
+            win_y_counter: 0,
         }
     }
 

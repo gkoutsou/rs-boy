@@ -82,7 +82,6 @@ pub struct Processor {
     pub wx: u8,
 
     //Helpers
-    pub win_y_counter: u8,
     pub gpu_mode: Mode,
     /// used when the LCD is disabled as a cache of the last known state of ly==lyc. This allows us
     /// to 'freeze' that value until the ppu is enabled again
@@ -268,7 +267,6 @@ impl Processor {
             obp1: 0xff,
             dma_last_value: 0xff,
 
-            win_y_counter: 0,
             gpu_mode: Mode::Two, // First frame is empty
             frozen_compare_bit: true,
             lyc_or_ly_recently_changed: false,
