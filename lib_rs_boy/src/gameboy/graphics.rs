@@ -5,7 +5,7 @@ mod tile;
 use super::memory_bus::MemoryAccessor;
 use crate::gameboy::interrupts;
 pub use engine::Buffer;
-use log::{debug, info, trace};
+use log::{debug, info, trace, warn};
 pub use processor::Mode;
 pub use processor::Processor;
 use std::cmp::min;
@@ -34,6 +34,7 @@ pub struct Display {
 impl Display {
     pub fn gpu_step(&mut self, dots: u32) -> (u8, bool) {
         let mut trigger_render = false;
+        let previous_interrupt_state = self.interrupt > 0;
         self.interrupt = 0;
         if !self.processor.lcd_enabled() {
             trace!("LCD disabled!");
@@ -42,10 +43,10 @@ impl Display {
         }
         self.dots += dots;
 
-        if self.processor.should_trigger_lyc_stat_interrupt() {
-            self.interrupt |= interrupts::STAT;
-        }
-        self.processor.lyc_or_ly_recently_changed = false;
+        // if self.processor.should_trigger_lyc_stat_interrupt() ||
+        //     self.processor.should_trigger_mode_stat_interrupt() {
+        //     self.interrupt |= interrupts::STAT;
+        // }
 
         match self.processor.gpu_mode {
             Mode::Two => {
@@ -80,7 +81,6 @@ impl Display {
             Mode::One => {
                 if self.dots >= 456 {
                     self.processor.ly += 1;
-                    self.processor.lyc_or_ly_recently_changed = true;
                     self.dots -= 456;
                     // if self.processor.should_trigger_lyc_stat_interrupt() {
                     //     self.interrupt |= interrupts::STAT;
@@ -92,7 +92,6 @@ impl Display {
 
                     if self.processor.ly > 153 {
                         self.processor.ly = 0;
-                        self.processor.lyc_or_ly_recently_changed = true;
                         self.oam_memory_check_index = 0;
                         self.oam_collected_sprites.clear();
                         self.set_gpu_mode(Mode::Two);
@@ -104,7 +103,6 @@ impl Display {
                     self.dots -= 204;
 
                     self.processor.ly += 1;
-                    self.processor.lyc_or_ly_recently_changed = true;
                     // if self.processor.should_trigger_lyc_stat_interrupt() {
                     //     self.interrupt |= interrupts::STAT;
                     //     debug!(
@@ -142,7 +140,13 @@ impl Display {
                 }
             }
         }
-        (self.interrupt, trigger_render)
+        // TODO moving this to the top passes more tests. But acid2 is broken / a ppu test never ends
+        if self.processor.should_trigger_lyc_stat_interrupt() ||
+            self.processor.should_trigger_mode_stat_interrupt() {
+            self.interrupt |= interrupts::STAT;
+        }
+        let interrupt = if !previous_interrupt_state { self.interrupt } else { 0 };
+        (interrupt, trigger_render)
     }
 
     fn draw_sprites(&mut self, line: u8) {
@@ -262,10 +266,11 @@ impl Display {
     fn set_gpu_mode(&mut self, mode: Mode) {
         self.processor.gpu_mode = mode;
 
-        if self.processor.should_trigger_mode_stat_interrupt() {
-            self.interrupt |= interrupts::STAT;
-            debug!("todo: check and enable interrupt - mode");
-        }
+        // TODO delete..
+        // if self.processor.should_trigger_mode_stat_interrupt() {
+        //     self.interrupt |= interrupts::STAT;
+        //     debug!("todo: check and enable interrupt - mode");
+        // }
     }
 
     pub fn get_oam_object(&self, object: usize) -> Tile {

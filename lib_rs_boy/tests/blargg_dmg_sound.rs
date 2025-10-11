@@ -22,7 +22,7 @@ mod test {
     #[test_case("10-wave trigger while on.gb" ; "10 wave_trigger_while_on")]
     #[test_case("11-regs after power.gb" ; "11 regs_after_power")]
     #[test_case("12-wave write while on.gb" ; "12 wave_write_while_on")]
-    fn acceptance(rom: &str) {
+    fn blargg_dgm_sound(rom: &str) {
         let rom = load_file(Path::new(ROMPATH).join(rom).as_path()).unwrap();
         let mut gb = GameBoy::new();
         gb.load_rom(rom);

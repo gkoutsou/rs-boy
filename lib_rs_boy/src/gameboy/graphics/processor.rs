@@ -86,10 +86,6 @@ pub struct Processor {
     /// used when the LCD is disabled as a cache of the last known state of ly==lyc. This allows us
     /// to 'freeze' that value until the ppu is enabled again
     frozen_compare_bit: bool,
-    /// used so that we only trigger the lyc==ly STAT interrupt right after one of the two changed
-    /// state. It is set to true right after we update either value, then resets after we (potentially)
-    /// raise the interrupt
-    pub lyc_or_ly_recently_changed: bool,
 }
 
 impl MemoryAccessor for Processor {
@@ -157,7 +153,6 @@ impl MemoryAccessor for Processor {
                 //     todo!("Do I need to trigger STAT interrupt?");
                 // }
                 trace!("LYC: {}", value);
-                self.lyc_or_ly_recently_changed = self.lyc != value;
                 self.lyc = value
             }
             0xff46 => self.dma_last_value = value, // This executes more
@@ -231,10 +226,7 @@ impl Processor {
     }
 
     pub fn should_trigger_lyc_stat_interrupt(&self) -> bool {
-        let equals = self.lcd_status & (1 << 6) > 0 && self.ly == self.lyc;
-
-        // This should only trigger when the state changed, not every time the condition matches
-        equals && self.lyc_or_ly_recently_changed
+        self.lcd_status & (1 << 6) > 0 && self.ly == self.lyc
     }
 
     pub fn should_trigger_mode_stat_interrupt(&self) -> bool {
@@ -269,7 +261,6 @@ impl Processor {
 
             gpu_mode: Mode::Two, // First frame is empty
             frozen_compare_bit: true,
-            lyc_or_ly_recently_changed: false,
         }
     }
 }
