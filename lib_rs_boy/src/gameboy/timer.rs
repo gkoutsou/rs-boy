@@ -1,6 +1,6 @@
-use log::{debug, trace};
-
 use super::memory_bus::MemoryAccessor;
+use crate::gameboy::interrupts;
+use log::{debug, trace};
 
 pub struct Timer {
     // FF04
@@ -47,7 +47,7 @@ impl Timer {
         }
     }
 
-    pub fn step_timer(&mut self, dots: u32) -> bool {
+    pub fn step_timer(&mut self, dots: u32) -> u8 {
         // a dot is: 4194000 Hz
         // div step:   16384 Hz
         // so a div is stepped every 255.981445313 dots
@@ -60,11 +60,11 @@ impl Timer {
             self.tima_overflow_delay = false;
             self.lock_tima = true;
             self.tima = self.tma;
-            return true;
+            return interrupts::TIMER;
         }
 
         if !self.tima_enabled() {
-            return false;
+            return 0;
         }
 
         if Self::has_bit_gone_low(old_clock, self.system_clock, self.tima_clock_bit()) {
@@ -75,10 +75,10 @@ impl Timer {
             //     self.system_clock >> 8,
             // );
             self.tima_overflow_delay = self.timer_tick();
-            return false;
+            return 0;
             // return self.timer_tick();
         }
-        false
+        0
     }
 
     fn has_bit_gone_low(old: u16, new: u16, bit: u8) -> bool {

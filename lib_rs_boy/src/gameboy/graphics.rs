@@ -82,13 +82,6 @@ impl Display {
                 if self.dots >= 456 {
                     self.processor.ly += 1;
                     self.dots -= 456;
-                    // if self.processor.should_trigger_lyc_stat_interrupt() {
-                    //     self.interrupt |= interrupts::STAT;
-                    //     println!(
-                    //         "todo: check and enable interrupt - lyc - One {}-{}",
-                    //         self.processor.lyc, self.processor.ly
-                    //     )
-                    // }
 
                     if self.processor.ly > 153 {
                         self.processor.ly = 0;
@@ -101,15 +94,7 @@ impl Display {
             Mode::Zero => {
                 if self.dots >= 204 {
                     self.dots -= 204;
-
                     self.processor.ly += 1;
-                    // if self.processor.should_trigger_lyc_stat_interrupt() {
-                    //     self.interrupt |= interrupts::STAT;
-                    //     debug!(
-                    //         "todo: check and enable interrupt - lyc - Zero {}-{}",
-                    //         self.processor.lyc, self.processor.ly
-                    //     );
-                    // }
                     self.oam_memory_check_index = 0;
                     self.oam_collected_sprites.clear();
 

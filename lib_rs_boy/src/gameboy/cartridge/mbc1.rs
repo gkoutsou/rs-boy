@@ -1,6 +1,6 @@
 use super::Cartridge;
 use crate::gameboy::memory_bus::MemoryAccessor;
-use log::{debug, info, trace};
+use log::{debug, error, info, trace, warn};
 
 pub struct MBC1 {
     rom: Vec<u8>,
@@ -71,7 +71,8 @@ impl MemoryAccessor for MBC1 {
                     return;
                 }
                 if self.ram.is_none() {
-                    panic!("no external memory defined");
+                    warn!("no external memory defined but is written to {:#x}", location);
+                    return;
                 }
 
                 let relative_loc = location - 0xa000;

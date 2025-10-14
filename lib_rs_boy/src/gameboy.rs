@@ -54,39 +54,35 @@ pub struct GameBoy {
 
 impl GameBoy {
     pub fn step(&mut self) -> bool {
-         if self.interrupt_step() {
+        if self.interrupt_step() {
             self.cpu_cycles += 20;
-        } else {
+        } else if self.cpu_cycles == 0 {
              self.cpu_step();
         };
 
-        let ticks = self.cpu_cycles;
+        if self.cpu_cycles < 4 {
+            panic!("wrong cpu cycles: {}", self.cpu_cycles);
+        }
 
+        let ticks = 4;
         self.speaker.step(ticks);
 
-        self.timer_step(ticks);
+        let timer_interrupt = self.timer.step_timer(ticks);
+        self.interrupt_flag |= timer_interrupt;
 
-        let (gpu_interrupts, trigger_render) = self.display.gpu_step(self.cpu_cycles);
+
+        let (gpu_interrupts, trigger_render) = self.display.gpu_step(ticks);
         self.interrupt_flag |= gpu_interrupts;
 
-        self.cpu_cycles = 0;
+        self.cpu_cycles -= 4;
         trigger_render
     }
 
-    fn cpu_step(&mut self) -> u32 {
-        let current_cpu_cycles = self.cpu_cycles;
+    fn cpu_step(&mut self) {
         if !self.halt {
             self.run_cpu_instruction();
         } else {
             self.cpu_cycles += 4;
-        }
-        self.cpu_cycles - current_cpu_cycles
-    }
-
-    fn timer_step(&mut self, ticks: u32) {
-        if self.timer.step_timer(ticks) {
-            debug!("enabling timer interrupt");
-            self.interrupt_flag |= interrupts::TIMER;
         }
     }
 

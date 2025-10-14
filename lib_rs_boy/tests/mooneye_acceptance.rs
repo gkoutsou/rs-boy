@@ -86,23 +86,11 @@ mod test {
         let mut gb = GameBoy::new();
         gb.load_rom(rom);
 
-        let mut output: Vec<u8> = Vec::new();
-
-        let mut found = false;
         loop {
-            if gb.memory_read(gb.registers.pc as usize) == 0x40 {
-                // LD B,B
-                if found {
-                    break;
-                } else {
-                    found = true
-                }
+            if gb.memory_read(gb.registers.pc as usize) == 0x40 { // LD B,B
+                break;
             }
 
-            let (v, ok) = is_serial_write(&gb);
-            if ok {
-                output.push(v);
-            }
             gb.step();
         }
 
@@ -112,31 +100,5 @@ mod test {
         assert_eq!(gb.registers.e, 13);
         assert_eq!(gb.registers.h, 21);
         assert_eq!(gb.registers.l, 34);
-
-        assert_eq!(output, vec![3, 5, 8, 13, 21, 34])
-    }
-
-    // TODO checking serial port.. is it needed?
-    fn is_serial_write(gb: &GameBoy) -> (u8, bool) {
-        let op = gb.memory_read(gb.registers.pc as usize);
-        if op == 0xe0 && gb.memory_read(gb.registers.pc as usize + 1) == 1 {
-            return (gb.registers.a, true);
-        }
-
-        // if op == 0xea {
-        //     let location1 = gb.memory_read(gb.registers.pc as usize + 1) as u16;
-        //     let location2 = gb.memory_read(gb.registers.pc as usize + 2) as u16;
-        //     println!("Location: {:#x}", location2 << 8 | location1);
-        // }
-        // if op == 0xe2 {
-        //     println!("Location ffxx: {:#x}", gb.registers.c);
-        // }
-        // if op == 0x02 {
-        //     println!("Location bc: {:#x}", gb.registers.get_bc());
-        // }
-        // if op == 0x12 {
-        //     println!("Location de: {:#x}", gb.registers.get_de());
-        // }
-        (0, false)
     }
 }

@@ -29,7 +29,7 @@ It can function either as a standalone binary, or it can be loaded as a retroarc
 |------------------|--------|---------|
 | cpu_instructions | 11     | 0       |
 | dgm_sound        | 6      | 6       |
-| instr_timing     | 0      | 1       |
+| instr_timing     | 1      | 0       |
 | interrupt_time   | 0      | 1       |
 | memory_timing    | 0      | 3       |
 | memory_timing_2  | 0      | 3       |
