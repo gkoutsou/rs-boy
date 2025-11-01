@@ -86,6 +86,9 @@ pub struct Processor {
     /// used when the LCD is disabled as a cache of the last known state of ly==lyc. This allows us
     /// to 'freeze' that value until the ppu is enabled again
     frozen_compare_bit: bool,
+    /// when ppu is enabled, the gpu mode starts as Zero (but in practice behaves as a Two) for the
+    /// first scanline
+    pub ppu_first_scanline: bool,
 }
 
 impl MemoryAccessor for Processor {
@@ -99,8 +102,10 @@ impl MemoryAccessor for Processor {
                 } else {
                     (self.frozen_compare_bit as u8) << 2
                 };
-                let ppu_mode = if self.lcd_enabled() { self.gpu_mode as u8 } else { 0 };
-                // info!("Read: {:#x}", 1<<7 | self.lcd_status | compare_bit | ppu_mode);
+                let mut ppu_mode = self.gpu_mode as u8;
+                if !self.lcd_enabled() || self.ppu_first_scanline { ppu_mode = 0 }
+
+                info!("Read: {:#x}", 1<<7 | self.lcd_status | compare_bit | ppu_mode);
                 1 << 7 | self.lcd_status | compare_bit | ppu_mode
             }
             0xff42 => self.scy,
@@ -127,14 +132,16 @@ impl MemoryAccessor for Processor {
                     // the comparison bit is frozen when the LCD is disabled since the comparator is
                     // not running.
                     self.frozen_compare_bit = self.ly == self.lyc;
-                    // TODO stat_lyc_onoff.gb (r1 step 3) requires this to be zero. But that feels
-                    //  strange. Need to check more
-                    // self.gpu_mode = Mode::Zero;
                     self.ly = 0;
                 } else if (value & LcdEnabled.to_byte() != 0) && (self.lcd_control & LcdEnabled.to_byte() == 0) {
                     info!("Enabling LCD {:#b}", value);
                     // TODO When re-enabling the LCD, the PPU will immediately start drawing again,
                     //  but the screen will stay blank during the first frame
+                    // Very interestingly, when we enable the PPU it starts in mode 0 instead of two
+                    // then it jumps directly to mode 3. Since it behaves exactly as a mode two, we
+                    // leave the code as is and instead we simply change the STAT register to display
+                    // Zero
+                    self.ppu_first_scanline = true;
                     self.gpu_mode = Mode::Two;
                 }
                 // TODO is this needed?
@@ -261,6 +268,7 @@ impl Processor {
 
             gpu_mode: Mode::Two, // First frame is empty
             frozen_compare_bit: true,
+            ppu_first_scanline: true,
         }
     }
 }

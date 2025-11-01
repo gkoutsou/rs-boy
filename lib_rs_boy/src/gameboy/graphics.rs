@@ -75,6 +75,7 @@ impl Display {
 
                 if self.dots >= 80 {
                     self.dots -= 80;
+                    self.processor.ppu_first_scanline = false;
                     self.set_gpu_mode(Mode::Three);
                 }
             }
