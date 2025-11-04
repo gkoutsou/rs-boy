@@ -14,3 +14,6 @@ build-libretro:
 
 test:
 	cargo test --no-fail-fast
+
+test-report:
+	cargo test --no-fail-fast | egrep "^test.*FAILED$$" | sort | tee FAILING_TESTS
