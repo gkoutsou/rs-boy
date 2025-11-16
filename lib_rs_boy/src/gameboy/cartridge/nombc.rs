@@ -1,5 +1,6 @@
 use super::Cartridge;
 use crate::gameboy::memory_bus::MemoryAccessor;
+use log::warn;
 
 pub struct NoMBC {
     rom: Vec<u8>,
@@ -15,8 +16,9 @@ impl MemoryAccessor for NoMBC {
         }
     }
 
-    fn write(&mut self, _location: usize, _value: u8) {
-        panic!("no cartridge registers")
+    fn write(&mut self, location: usize, _value: u8) {
+        warn!("Can not write to NoMBC ROM: {:#x}", location);
+        return;
     }
 }
 

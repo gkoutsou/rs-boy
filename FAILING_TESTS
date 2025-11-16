@@ -7,7 +7,6 @@ test test::acceptance::call_cc_timing2 ... FAILED
 test test::acceptance::call_timing ... FAILED
 test test::acceptance::call_timing2 ... FAILED
 test test::acceptance::ei_sequence ... FAILED
-test test::acceptance::interrupts_ie_push ... FAILED
 test test::acceptance::jp_cc_timing ... FAILED
 test test::acceptance::jp_timing ... FAILED
 test test::acceptance::ld_hl_sp_e_timing ... FAILED

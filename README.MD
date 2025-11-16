@@ -38,7 +38,7 @@ It can function either as a standalone binary, or it can be loaded as a retroarc
 
 | Passed | Failing | Skipped |
 |--------|---------|---------|
-| 32     | 34      | 9       |
+| 33     | 33      | 9       |
 
 ### [Mealybug Tearoom PPU Test ROMs](https://github.com/mattcurrie/mealybug-tearoom-tests/)
 

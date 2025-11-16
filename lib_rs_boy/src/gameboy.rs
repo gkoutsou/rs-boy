@@ -16,7 +16,7 @@ use audio::Speaker;
 use cartridge::Cartridge;
 use controls::Joypad;
 use graphics::Display;
-use log::{debug, info, trace};
+use log::{debug, info, trace, warn};
 use memory::Memory;
 use memory_bus::MemoryAccessor;
 use registers::operations::Operations;
@@ -92,7 +92,7 @@ impl GameBoy {
             self.set_ei = false;
             return false;
         }
-        let interrupts = self.memory.interrupt_enable & self.interrupt_flag;
+        let interrupts = self.active_interrupt();
         if interrupts == 0 {
             return false;
         }
@@ -102,8 +102,28 @@ impl GameBoy {
             return false;
         }
 
+
+        info!("pushing {:x}", self.registers.pc);
+
+        info!("before interrupt_enable: {:#b}", self.memory.interrupt_enable);
+        info!("before interrupt_flag: {:#b}", self.interrupt_flag);
+        info!("before interrupts is: {:#b}", self.active_interrupt());
+        self.push_stack(self.registers.pc); // This could alter the interrupt_enable (ie_push test as example)
+
+        info!("interrupt_enable: {:#b}", self.memory.interrupt_enable);
+        info!("interrupt_flag: {:#b}", self.interrupt_flag);
+        info!("interrupts is: {:#b}", self.active_interrupt());
+
+        let interrupts = if self.registers.sp == 0xFFFF {
+            // This overwrote 0xFFFF (IE), but on the lower byte push, thus can't skip the interrupt
+            info!("keeping interrupts as is {:#b}", self.memory.interrupt_enable);
+            interrupts
+        } else {
+            // Otherwise just refresh the state in case the above did funky stuff
+            self.active_interrupt()
+        };
+
         self.ime = false;
-        self.push_stack(self.registers.pc);
 
         if interrupts & interrupts::VBLANK > 0 {
             self.interrupt_flag &= !interrupts::VBLANK;
@@ -120,7 +140,7 @@ impl GameBoy {
 
         if interrupts & interrupts::TIMER > 0 {
             self.interrupt_flag &= !interrupts::TIMER;
-            debug!("Timer Interrupt Handler from: {:#x}", self.registers.pc);
+            info!("Timer Interrupt Handler from: {:#x}", self.registers.pc);
             self.registers.set_pc(0x50);
             return true;
         }
@@ -134,7 +154,14 @@ impl GameBoy {
 
         println!("Interrupt enable: {:#8b}", self.memory.interrupt_enable);
         println!("Interrupt flag: {:#8b}", self.interrupt_flag);
-        panic!("found interrupt")
+        warn!("found interrupt, but nothing ran. Did the PC register get altered?");
+
+        self.registers.set_pc(0x00);
+        true // TODO is this a true or a false?
+    }
+
+    fn active_interrupt(&self) -> u8 {
+        self.memory.interrupt_enable & self.interrupt_flag
     }
 
     fn run_cpu_instruction(&mut self) {
@@ -180,7 +207,10 @@ impl GameBoy {
             0xFE00..=0xFE9F => self.display.get(location),
 
             0xff04..=0xff07 => self.timer.get(location),
-            0xff0f => self.interrupt_flag,
+            0xff0f => {
+                info!("Get interrupt flag: {:#b}", self.interrupt_flag);
+                self.interrupt_flag
+            },
 
             controls::REGISTER_LOCATION => self.joypad.get(location),
 
@@ -210,7 +240,10 @@ impl GameBoy {
             0x9800..=0x9FFF => self.display.write(location, value),
 
             0xff04..=0xff07 => self.timer.write(location, value),
-            0xff0f => self.interrupt_flag = value | 0b11100000,
+            0xff0f => {
+                warn!("writing to interrupt flag: {:#b}!", value);
+                self.interrupt_flag = value | 0b11100000;
+            }
 
             0xff10..=0xff3f => self.speaker.write(location, value),
 
@@ -230,9 +263,9 @@ impl GameBoy {
 
     fn push_stack(&mut self, value: u16) {
         let (hs, ls) = u16_to_u8s(value);
-        self.registers.sp -= 1;
+        self.registers.sp = self.registers.sp.wrapping_sub(1);
         self.memory_write(self.registers.sp as usize, hs);
-        self.registers.sp -= 1;
+        self.registers.sp = self.registers.sp.wrapping_sub(1);
         self.memory_write(self.registers.sp as usize, ls);
     }
 
@@ -1374,7 +1407,7 @@ impl GameBoy {
             // Interrupts
             0xf3 => {
                 // This instruction disables interrupts immediately.
-                trace!("Warning: DI");
+                info!("Warning: DI");
                 self.ime = false;
                 self.set_ei = false;
             }
@@ -1383,7 +1416,7 @@ impl GameBoy {
                 // This instruction enables interrupts but not
                 // immediately. Interrupts are enabled after
                 // instruction after EI is executed.
-                trace!("Warning: EI");
+                info!("Warning: EI");
                 self.set_ei = true;
             }
 
