@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-log = "0.4.27"
+log = "0.4.29"
 
 [dev-dependencies]
 test-case = "*"
-image = "0.25.6"
+image = "0.25.10"

@@ -172,7 +172,8 @@ impl Core for RsBoyCore {
     ) -> Result<(), Box<dyn std::error::Error>> {
         ctx.set_pixel_format(PixelFormat::XRGB8888);
         ctx.set_performance_level(0);
-        ctx.enable_frame_time_callback((1000000.0f64 / 60.0).round() as retro_usec_t);
+        // TODO have a look at this
+        ctx.enable_frame_time_callback((1000000.0f64 / FRAMERATE).round() as retro_usec_t);
 
         let rom_size = _info.unwrap().size;
         let rom_data: &[u8] =
@@ -227,9 +228,9 @@ impl Core for RsBoyCore {
 
         let input = ctx.get_joypad_state(0, 0);
 
-        if input.contains(JoypadState::START) && input.contains(JoypadState::SELECT) {
-            return gctx.shutdown();
-        }
+        // if input.contains(JoypadState::START) && input.contains(JoypadState::SELECT) {
+        //     return gctx.shutdown();
+        // }
 
         let mut output: Vec<Key> = Vec::new();
         if input.contains(JoypadState::START) {
