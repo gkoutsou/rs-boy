@@ -227,9 +227,12 @@ impl GameBoy {
                 self.display.write(location, value);
                 let location = (value as u16) << 8;
                 debug!(
-                    "Triggering DMA transfter to OAM! {:#x} --> {:#x}",
+                    "Triggering DMA transfer to OAM! {:#x} --> {:#x}",
                     value, location
                 );
+                // TODO 1. there should be a 2 cycle delay from the copy-start.
+                //      2. the bus should be locked after that.
+                //      3. handle restarts
                 for i in 0..0xA0 {
                     self.display.oam[i] = self.memory_read(location as usize + i);
                 }
