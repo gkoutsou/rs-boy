@@ -29,7 +29,7 @@ mod test {
 
 
         loop {
-            if gb.memory_read(gb.registers.pc as usize) == 0x40 {
+            if gb.memory_read_no_tick(gb.registers.pc as usize) == 0x40 {
                 // LD B,B
                 break;
             }

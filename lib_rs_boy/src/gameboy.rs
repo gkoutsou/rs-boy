@@ -235,7 +235,7 @@ impl GameBoy {
                 //      2. the bus should be locked after that.
                 //      3. handle restarts
                 for i in 0..0xA0 {
-                    self.display.oam[i] = self.memory_read(location as usize + i);
+                    self.display.oam[i] = self.memory_read_no_tick(location as usize + i);
                 }
             }
             0xfe00..=0xfe9f => self.display.write(location, value),
