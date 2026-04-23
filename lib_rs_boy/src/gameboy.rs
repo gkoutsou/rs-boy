@@ -42,7 +42,6 @@ pub struct GameBoy {
     memory: Memory,
     timer: Timer,
 
-    cpu_cycles: u32,
     halt: bool,
 
     // lcd_prev_state: bool,
@@ -50,39 +49,39 @@ pub struct GameBoy {
     ime: bool,
     interrupt_flag: u8,
     set_ei: bool,
+    trigger_render: bool
 }
 
 impl GameBoy {
     pub fn step(&mut self) -> bool {
-        if self.interrupt_step() {
-            self.cpu_cycles += 20;
-        } else if self.cpu_cycles == 0 {
-             self.cpu_step();
+        // let render = self.tick();
+        if !self.interrupt_step() {
+            self.cpu_step();
         };
 
-        if self.cpu_cycles < 4 {
-            panic!("wrong cpu cycles: {}", self.cpu_cycles);
-        }
+        // TODO I really don't like this. Refactor and make it work with some callback?
+        let trigger_render = self.trigger_render;
+        self.trigger_render = false;
+        trigger_render
+    }
 
+    pub fn tick(&mut self) {
         let ticks = 4;
         self.speaker.step(ticks);
 
         let timer_interrupt = self.timer.step_timer(ticks);
         self.interrupt_flag |= timer_interrupt;
 
-
         let (gpu_interrupts, trigger_render) = self.display.gpu_step(ticks);
         self.interrupt_flag |= gpu_interrupts;
-
-        self.cpu_cycles -= 4;
-        trigger_render
+        self.trigger_render |= trigger_render;
     }
 
     fn cpu_step(&mut self) {
         if !self.halt {
             self.run_cpu_instruction();
         } else {
-            self.cpu_cycles += 4;
+            self.tick();
         }
     }
 
@@ -101,22 +100,24 @@ impl GameBoy {
         if !self.ime {
             return false;
         }
+        // CPU does nothing for 2 cycles (one is inside push_stack)
+        self.tick();
+        // self.tick();
 
+        debug!("pushing {:x}", self.registers.pc);
 
-        info!("pushing {:x}", self.registers.pc);
-
-        info!("before interrupt_enable: {:#b}", self.memory.interrupt_enable);
-        info!("before interrupt_flag: {:#b}", self.interrupt_flag);
-        info!("before interrupts is: {:#b}", self.active_interrupt());
+        debug!("before interrupt_enable: {:#b}", self.memory.interrupt_enable);
+        debug!("before interrupt_flag: {:#b}", self.interrupt_flag);
+        debug!("before interrupts is: {:#b}", self.active_interrupt());
         self.push_stack(self.registers.pc); // This could alter the interrupt_enable (ie_push test as example)
 
-        info!("interrupt_enable: {:#b}", self.memory.interrupt_enable);
-        info!("interrupt_flag: {:#b}", self.interrupt_flag);
-        info!("interrupts is: {:#b}", self.active_interrupt());
+        debug!("interrupt_enable: {:#b}", self.memory.interrupt_enable);
+        debug!("interrupt_flag: {:#b}", self.interrupt_flag);
+        debug!("interrupts is: {:#b}", self.active_interrupt());
 
         let interrupts = if self.registers.sp == 0xFFFF {
             // This overwrote 0xFFFF (IE), but on the lower byte push, thus can't skip the interrupt
-            info!("keeping interrupts as is {:#b}", self.memory.interrupt_enable);
+            debug!("keeping interrupts as is {:#b}", self.memory.interrupt_enable);
             interrupts
         } else {
             // Otherwise just refresh the state in case the above did funky stuff
@@ -128,27 +129,27 @@ impl GameBoy {
         if interrupts & interrupts::VBLANK > 0 {
             self.interrupt_flag &= !interrupts::VBLANK;
             debug!("VBlank Interrupt Handler from: {:#x}", self.registers.pc);
-            self.registers.set_pc(0x40);
+            self.set_program_counter(0x40);
             return true;
         }
         if interrupts & interrupts::STAT > 0 {
             self.interrupt_flag &= !interrupts::STAT;
             debug!("Stat Interrupt Handler from: {:#x}", self.registers.pc);
-            self.registers.set_pc(0x48);
+            self.set_program_counter(0x48);
             return true;
         }
 
         if interrupts & interrupts::TIMER > 0 {
             self.interrupt_flag &= !interrupts::TIMER;
-            info!("Timer Interrupt Handler from: {:#x}", self.registers.pc);
-            self.registers.set_pc(0x50);
+            debug!("Timer Interrupt Handler from: {:#x}", self.registers.pc);
+            self.set_program_counter(0x50);
             return true;
         }
 
         if interrupts & interrupts::SERIAL > 0 {
             self.interrupt_flag &= !interrupts::SERIAL;
-            println!("Serial Interrupt Handler from: {:#x}", self.registers.pc);
-            self.registers.set_pc(0x58);
+            debug!("Serial Interrupt Handler from: {:#x}", self.registers.pc);
+            self.set_program_counter(0x58);
             return true;
         }
 
@@ -156,7 +157,7 @@ impl GameBoy {
         println!("Interrupt flag: {:#8b}", self.interrupt_flag);
         warn!("found interrupt, but nothing ran. Did the PC register get altered?");
 
-        self.registers.set_pc(0x00);
+        self.set_program_counter(0x00);
         true // TODO is this a true or a false?
     }
 
@@ -169,21 +170,10 @@ impl GameBoy {
 
         let op = self.memory_read(location);
         debug!("operator: {:#x} ({:#x})", op, location);
-        match op {
-            0xcb => {
-                let cb_op = self.get_u8();
-                self.do_cb(cb_op);
-                self.cpu_cycles += cpu::get_cb_ticks(cb_op);
-            }
-
-            _ => {
-                self.run_instruction(op);
-                self.cpu_cycles += cpu::get_ticks(op);
-            }
-        }
+        self.run_instruction(op);
     }
 
-    pub fn get_ffxx(&self, steps: usize) -> u8 {
+    pub fn get_ffxx(&mut self, steps: usize) -> u8 {
         let location = 0xff00 + steps;
         self.memory_read(location)
     }
@@ -193,7 +183,12 @@ impl GameBoy {
         self.memory_write(location, value);
     }
 
-    pub fn memory_read(&self, location: usize) -> u8 {
+    pub fn memory_read(&mut self, location: usize) -> u8 {
+        self.tick();
+        self.memory_read_no_tick(location)
+    }
+
+    pub fn memory_read_no_tick(&mut self, location: usize) -> u8 {
         match location {
             0x0000..=0x7FFF => self.cartridge.get(location),
 
@@ -217,7 +212,13 @@ impl GameBoy {
             _ => self.memory.get(location),
         }
     }
+
     pub fn memory_write(&mut self, location: usize, value: u8) {
+        self.tick();
+        self.memory_write_no_tick(location, value);
+    }
+
+    pub fn memory_write_no_tick(&mut self, location: usize, value: u8) {
         match location {
             0x0000..=0x7FFF => self.cartridge.write(location, value),
 
@@ -265,11 +266,17 @@ impl GameBoy {
     }
 
     fn push_stack(&mut self, value: u16) {
+        self.tick();
         let (hs, ls) = u16_to_u8s(value);
         self.registers.sp = self.registers.sp.wrapping_sub(1);
         self.memory_write(self.registers.sp as usize, hs);
         self.registers.sp = self.registers.sp.wrapping_sub(1);
         self.memory_write(self.registers.sp as usize, ls);
+    }
+
+    fn set_program_counter(&mut self, value: u16) {
+        self.tick();
+        self.registers.set_pc(value);
     }
 
     fn get_u16(&mut self) -> u16 {
@@ -291,12 +298,13 @@ impl GameBoy {
 
             0xc3 => {
                 let v = self.get_u16();
-                self.registers.set_pc(v);
+                self.set_program_counter(v);
                 trace!("JP nn --> {:#x}", v);
             }
 
             // JR n
             0x18 => {
+                self.tick();
                 let steps = self.get_u8() as i8;
                 let new_location = self.registers.pc as i32 + steps as i32;
                 self.registers.set_pc(new_location as u16);
@@ -309,8 +317,7 @@ impl GameBoy {
                 trace!("JP NZ,nn --> {:#x}", new_loc);
                 if !self.registers.f.has_flag(cpu::Flag::Z) {
                     trace!("Making the jump!");
-                    self.cpu_cycles += 4;
-                    self.registers.set_pc(new_loc);
+                    self.set_program_counter(new_loc);
                 }
             }
             // JP Z,nn CA 12
@@ -319,8 +326,7 @@ impl GameBoy {
                 trace!("JP Z,nn --> {:#x}", new_loc);
                 if self.registers.f.has_flag(cpu::Flag::Z) {
                     trace!("Making the jump!");
-                    self.cpu_cycles += 4;
-                    self.registers.set_pc(new_loc);
+                    self.set_program_counter(new_loc);
                 }
             }
             // JP NC,nn
@@ -329,8 +335,7 @@ impl GameBoy {
                 trace!("JP NC,nn --> {:#x}", new_loc);
                 if !self.registers.f.has_flag(cpu::Flag::C) {
                     trace!("Making the jump!");
-                    self.cpu_cycles += 4;
-                    self.registers.set_pc(new_loc);
+                    self.set_program_counter(new_loc);
                 }
             }
             // JP C,nn
@@ -339,8 +344,7 @@ impl GameBoy {
                 trace!("JP C,nn --> {:#x}", new_loc);
                 if self.registers.f.has_flag(cpu::Flag::C) {
                     trace!("Making the jump!");
-                    self.cpu_cycles += 4;
-                    self.registers.set_pc(new_loc);
+                    self.set_program_counter(new_loc);
                 }
             }
 
@@ -352,16 +356,13 @@ impl GameBoy {
                     steps,
                     self.registers.pc as i32 + steps
                 );
-                trace!("############");
                 if !self.registers.f.has_flag(cpu::Flag::Z) {
                     let new_location = (self.registers.pc as i32 + steps) as u16;
                     debug!(
                         "JUMP - Current location: {:#x}, next: {:#x}",
                         self.registers.pc, new_location
                     );
-                    self.cpu_cycles += 4;
-                    self.registers.set_pc(new_location);
-                    // panic!("untested jump");
+                    self.set_program_counter(new_location);
                 }
             }
             0x28 => {
@@ -374,8 +375,7 @@ impl GameBoy {
                         "Current location: {}, next: {}",
                         self.registers.pc, new_location
                     );
-                    self.cpu_cycles += 4;
-                    self.registers.set_pc(new_location);
+                    self.set_program_counter(new_location);
                 }
             }
             0x30 => {
@@ -387,9 +387,7 @@ impl GameBoy {
                         "Current location: {:#x}, next: {:#x}",
                         self.registers.pc, new_location
                     );
-                    self.cpu_cycles += 4;
-                    self.registers.set_pc(new_location);
-                    // panic!("untested jump NC");
+                    self.set_program_counter(new_location);
                 }
             }
 
@@ -402,9 +400,7 @@ impl GameBoy {
                         "Current location: {:#x}, next: {:#x}",
                         self.registers.pc, new_location
                     );
-                    self.cpu_cycles += 4;
-                    self.registers.set_pc(new_location);
-                    // panic!("untested jump C");
+                    self.set_program_counter(new_location);
                 }
             }
 
@@ -463,6 +459,7 @@ impl GameBoy {
             // LD SP, HL
             0xf9 => {
                 trace!("LD SP, HL");
+                self.tick();
                 self.registers.sp = self.registers.get_hl();
             }
 
@@ -520,6 +517,8 @@ impl GameBoy {
                 let old_val = self.registers.sp;
                 let new_val = old_val.wrapping_add_signed(steps);
                 let steps = steps as u16;
+
+                self.tick();
 
                 let mut f = registers::set_flag(
                     0,
@@ -904,6 +903,7 @@ impl GameBoy {
                     self.registers.get_bc(),
                     self.registers.f,
                 );
+                self.tick();
                 self.registers.set_hl(hl);
             }
             0x19 => {
@@ -914,6 +914,7 @@ impl GameBoy {
                     self.registers.get_de(),
                     self.registers.f,
                 );
+                self.tick();
                 self.registers.set_hl(hl);
             }
             0x29 => {
@@ -924,6 +925,7 @@ impl GameBoy {
                     self.registers.get_hl(),
                     self.registers.f,
                 );
+                self.tick();
                 self.registers.set_hl(hl);
             }
             0x39 => {
@@ -931,12 +933,15 @@ impl GameBoy {
                 let hl;
                 (hl, self.registers.f) =
                     Registers::add(self.registers.get_hl(), self.registers.sp, self.registers.f);
+                self.tick();
                 self.registers.set_hl(hl);
             }
 
             0xe8 => {
                 trace!("ADD SP, n");
                 let n = self.get_u8() as i8;
+                self.tick();
+                self.tick();
                 let old_val = self.registers.sp;
                 self.registers.sp = self.registers.sp.wrapping_add_signed(n as i16);
 
@@ -1132,41 +1137,49 @@ impl GameBoy {
 
             // INC nn
             0x03 => {
+                self.tick();
                 self.registers
                     .set_bc(self.registers.get_bc().wrapping_add(1));
             }
             0x13 => {
+                self.tick();
                 self.registers
                     .set_de(self.registers.get_de().wrapping_add(1));
             }
             0x23 => {
                 trace!("INC HL");
+                self.tick();
                 self.registers
                     .set_hl(self.registers.get_hl().wrapping_add(1));
             }
             0x33 => {
                 trace!("INC SP");
+                self.tick();
                 self.registers.sp = self.registers.sp.wrapping_add(1);
             }
 
             // DEC nn
             0x0B => {
                 trace!("DEC BC");
+                self.tick();
                 self.registers
                     .set_bc(self.registers.get_bc().wrapping_sub(1));
             }
             0x1B => {
                 trace!("DEC DE");
+                self.tick();
                 self.registers
                     .set_de(self.registers.get_de().wrapping_sub(1));
             }
             0x2B => {
                 trace!("DEC HL");
+                self.tick();
                 self.registers
                     .set_hl(self.registers.get_hl().wrapping_sub(1));
             }
             0x3B => {
                 trace!("DEC SP");
+                self.tick();
                 self.registers.sp = self.registers.sp.wrapping_sub(1);
             }
 
@@ -1439,9 +1452,8 @@ impl GameBoy {
                 debug!("CALL NZ,nn --> {:#x}", new_location);
                 if !self.registers.f.has_flag(cpu::Flag::Z) {
                     debug!("Making the jump!");
-                    self.cpu_cycles += 12;
                     self.push_stack(self.registers.pc);
-                    self.registers.set_pc(new_location);
+                    self.registers.pc = new_location;
                 }
             }
             0xcc => {
@@ -1449,9 +1461,8 @@ impl GameBoy {
                 debug!("CALL Z,nn --> {:#x}", new_location);
                 if self.registers.f.has_flag(cpu::Flag::Z) {
                     debug!("Making the jump!");
-                    self.cpu_cycles += 12;
                     self.push_stack(self.registers.pc);
-                    self.registers.set_pc(new_location);
+                    self.registers.pc = new_location;
                 }
             }
             0xd4 => {
@@ -1459,9 +1470,8 @@ impl GameBoy {
                 debug!("CALL NC,nn --> {:#x}", new_location);
                 if !self.registers.f.has_flag(cpu::Flag::C) {
                     debug!("Making the jump!");
-                    self.cpu_cycles += 12;
                     self.push_stack(self.registers.pc);
-                    self.registers.set_pc(new_location);
+                    self.registers.pc = new_location;
                 }
             }
             0xdc => {
@@ -1469,9 +1479,8 @@ impl GameBoy {
                 debug!("CALL C,nn --> {:#x}", new_location);
                 if self.registers.f.has_flag(cpu::Flag::C) {
                     debug!("Making the jump!");
-                    self.cpu_cycles += 12;
                     self.push_stack(self.registers.pc);
-                    self.registers.set_pc(new_location);
+                    self.registers.pc = new_location;
                 }
             }
 
@@ -1479,43 +1488,43 @@ impl GameBoy {
             0xc9 => {
                 let new_loc = self.pop_stack();
                 debug!("RET to: {:#x}", new_loc);
-                self.registers.set_pc(new_loc);
+                self.set_program_counter(new_loc);
             }
 
             0xc0 => {
                 debug!("RET NZ");
+                self.tick();
                 if !self.registers.f.has_flag(cpu::Flag::Z) {
                     let new_loc = self.pop_stack();
                     debug!("Made the jump");
-                    self.cpu_cycles += 12;
-                    self.registers.set_pc(new_loc);
+                    self.set_program_counter(new_loc);
                 }
             }
             0xc8 => {
                 debug!("RET Z");
+                self.tick();
                 if self.registers.f.has_flag(cpu::Flag::Z) {
                     let new_loc = self.pop_stack();
                     debug!("Made the jump");
-                    self.cpu_cycles += 12;
-                    self.registers.set_pc(new_loc);
+                    self.set_program_counter(new_loc);
                 }
             }
             0xd0 => {
                 debug!("RET NC");
+                self.tick();
                 if !self.registers.f.has_flag(cpu::Flag::C) {
                     let new_loc = self.pop_stack();
                     debug!("Made the jump");
-                    self.cpu_cycles += 12;
-                    self.registers.set_pc(new_loc);
+                    self.set_program_counter(new_loc);
                 }
             }
             0xd8 => {
                 debug!("RET C");
+                self.tick();
                 if self.registers.f.has_flag(cpu::Flag::C) {
                     let new_loc = self.pop_stack();
                     debug!("Made the jump");
-                    self.cpu_cycles += 12;
-                    self.registers.set_pc(new_loc);
+                    self.set_program_counter(new_loc);
                 }
             }
 
@@ -1651,7 +1660,7 @@ impl GameBoy {
             0xd9 => {
                 let new_loc = self.pop_stack();
                 debug!("RETI to: {:#x}", new_loc);
-                self.registers.set_pc(new_loc);
+                self.set_program_counter(new_loc);
                 self.ime = true;
             }
 
@@ -1695,12 +1704,12 @@ impl GameBoy {
             }
 
             0xcb => {
-                panic!("cb operation should not run through this");
+                let cb_op = self.get_u8();
+                self.run_cb_instruction(cb_op);
             }
 
             _ => {
                 debug!("Info for debugging");
-
                 let time = time::Duration::from_secs(5);
                 thread::sleep(time);
                 panic!("missing operator {:#x}", op);
@@ -1708,7 +1717,7 @@ impl GameBoy {
         };
     }
 
-    fn do_cb(&mut self, cb_instruction: u8) {
+    fn run_cb_instruction(&mut self, cb_instruction: u8) {
         match cb_instruction {
             // RLC
             0x00 => self.registers.f = self.registers.b.rlc(),
@@ -2102,42 +2111,42 @@ impl GameBoy {
             0x46 => {
                 let value = self.memory_read(self.registers.get_hl() as usize);
                 self.registers.f = value.bit(0, self.registers.f);
-                self.memory_write(self.registers.get_hl() as usize, value);
+                self.memory_write_no_tick(self.registers.get_hl() as usize, value);
             }
             0x4e => {
                 let value = self.memory_read(self.registers.get_hl() as usize);
                 self.registers.f = value.bit(1, self.registers.f);
-                self.memory_write(self.registers.get_hl() as usize, value);
+                self.memory_write_no_tick(self.registers.get_hl() as usize, value);
             }
             0x56 => {
                 let value = self.memory_read(self.registers.get_hl() as usize);
                 self.registers.f = value.bit(2, self.registers.f);
-                self.memory_write(self.registers.get_hl() as usize, value);
+                self.memory_write_no_tick(self.registers.get_hl() as usize, value);
             }
             0x5e => {
                 let value = self.memory_read(self.registers.get_hl() as usize);
                 self.registers.f = value.bit(3, self.registers.f);
-                self.memory_write(self.registers.get_hl() as usize, value);
+                self.memory_write_no_tick(self.registers.get_hl() as usize, value);
             }
             0x66 => {
                 let value = self.memory_read(self.registers.get_hl() as usize);
                 self.registers.f = value.bit(4, self.registers.f);
-                self.memory_write(self.registers.get_hl() as usize, value);
+                self.memory_write_no_tick(self.registers.get_hl() as usize, value);
             }
             0x6e => {
                 let value = self.memory_read(self.registers.get_hl() as usize);
                 self.registers.f = value.bit(5, self.registers.f);
-                self.memory_write(self.registers.get_hl() as usize, value);
+                self.memory_write_no_tick(self.registers.get_hl() as usize, value);
             }
             0x76 => {
                 let value = self.memory_read(self.registers.get_hl() as usize);
                 self.registers.f = value.bit(6, self.registers.f);
-                self.memory_write(self.registers.get_hl() as usize, value);
+                self.memory_write_no_tick(self.registers.get_hl() as usize, value);
             }
             0x7e => {
                 let value = self.memory_read(self.registers.get_hl() as usize);
                 self.registers.f = value.bit(7, self.registers.f);
-                self.memory_write(self.registers.get_hl() as usize, value);
+                self.memory_write_no_tick(self.registers.get_hl() as usize, value);
             }
         }
     }
@@ -2162,9 +2171,9 @@ impl GameBoy {
             interrupt_flag: 0xe1,
             set_ei: false,
 
-            cpu_cycles: 0,
             halt: false,
             display: Display::new(),
+            trigger_render: false,
         }
     }
 }

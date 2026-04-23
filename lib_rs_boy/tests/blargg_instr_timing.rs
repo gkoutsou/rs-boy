@@ -18,13 +18,13 @@ mod test {
         let mut ongoing_transfer = false;
         let mut output = String::new();
         loop {
-            let status = gb.memory_read(SERIAL_TRANSFER_LOCATION);
+            let status = gb.memory_read_no_tick(SERIAL_TRANSFER_LOCATION);
             if (status & (1 << 7)) > 0 && !ongoing_transfer {
                 ongoing_transfer = true;
-                let ascii = gb.memory_read(SERIAL_DATA_LOCATION);
+                let ascii = gb.memory_read_no_tick(SERIAL_DATA_LOCATION);
                 output.push(ascii as char);
                 // Hacky, but if a serial transfer is requested, read and directly flag it as done
-                gb.memory_write(SERIAL_TRANSFER_LOCATION, 1);
+                gb.memory_write_no_tick(SERIAL_TRANSFER_LOCATION, 1);
             } else if status & 1 << 7 == 0 && ongoing_transfer {
                 ongoing_transfer = false;
             }

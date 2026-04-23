@@ -29,7 +29,7 @@ mod test {
 
         let mut found = false;
         loop {
-            let status = gb.memory_read(STATUS_LOCATION);
+            let status = gb.memory_read_no_tick(STATUS_LOCATION);
 
             if !found && status == TEST_RUNNING_VALUE {
                 found = true;
@@ -40,12 +40,12 @@ mod test {
             gb.step();
         }
 
-        assert_eq!(gb.memory_read(0xA001), 0xDE);
-        assert_eq!(gb.memory_read(0xA002), 0xB0);
-        assert_eq!(gb.memory_read(0xA003), 0x61);
+        assert_eq!(gb.memory_read_no_tick(0xA001), 0xDE);
+        assert_eq!(gb.memory_read_no_tick(0xA002), 0xB0);
+        assert_eq!(gb.memory_read_no_tick(0xA003), 0x61);
 
         // Not correct
         // TODO do I need to read the text after each test?
-        assert_eq!(gb.memory_read(STATUS_LOCATION), 0);
+        assert_eq!(gb.memory_read_no_tick(STATUS_LOCATION), 0);
     }
 }
