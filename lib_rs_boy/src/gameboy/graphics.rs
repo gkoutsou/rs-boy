@@ -29,6 +29,7 @@ pub struct Display {
     interrupt: u8,
 
     pub win_y_counter: u8,
+    pub dma_transfer_ongoing: Option<i16>,
 }
 
 impl Display {
@@ -134,6 +135,42 @@ impl Display {
         // TODO this breaks silver :'(
         let interrupt = if !previous_interrupt_state { self.interrupt } else { 0 };
         (interrupt, trigger_render)
+    }
+
+    pub fn is_oam_dma_transfer_ongoing(&self) -> bool {
+        self.dma_transfer_ongoing.is_some()
+    }
+
+    pub fn is_oam_inaccessible(&self) -> bool {
+        if self.dma_transfer_ongoing.is_some() {
+            info!("is_oam_dma_transfer_ongoing: {:?}", self.dma_transfer_ongoing.unwrap());
+        }
+        (self.dma_transfer_ongoing.is_some() && self.dma_transfer_ongoing.unwrap() >= 0) ||
+            ((self.processor.gpu_mode != Mode::One && self.processor.gpu_mode != Mode::Zero) && self.processor.lcd_enabled())
+    }
+    pub fn oam_dma_transfer_next_position(&mut self) -> Option<usize> {
+        if let Some(v) = self.dma_transfer_ongoing && v < 0 {
+            // dma_transfer is delayed by one tick. So the first iteration is treated as it is not
+            // happening in practice
+            self.dma_transfer_ongoing = self.dma_transfer_ongoing.map(|v| v + 1);
+            None
+        } else if let Some(v) = self.dma_transfer_ongoing {
+            let region = self.processor.get(0xff46);
+            Some((region as usize) << 8 | v as usize)
+        } else {
+            panic!("OAM dma_transfer_ongoing is None");
+        }
+    }
+
+    pub(crate) fn write_oam_value(&mut self, value: u8) {
+        let current_pos = self.dma_transfer_ongoing.unwrap();
+        // info!("copy to: {:#x}", current_pos);
+        self.oam[current_pos as usize] = value;
+        if current_pos < 0xA0 - 1 { // 160
+            self.dma_transfer_ongoing = self.dma_transfer_ongoing.map(|v| v + 1);
+        } else {
+            self.dma_transfer_ongoing = None;
+        }
     }
 
     fn draw_sprites(&mut self, line: u8) {
@@ -298,6 +335,7 @@ impl Display {
             oam_memory_check_index: 0,
             oam_collected_sprites: Vec::with_capacity(10),
             win_y_counter: 0,
+            dma_transfer_ongoing: None,
         }
     }
 
@@ -360,7 +398,7 @@ impl MemoryAccessor for Display {
             },
             0xff40..=0xff4b => self.processor.get(location),
             0xFE00..=0xFE9F => {
-                if (self.processor.gpu_mode != Mode::One && self.processor.gpu_mode != Mode::Zero) && self.processor.lcd_enabled() {
+                if self.is_oam_inaccessible() {
                     return 0xFF;
                 }
                 self.oam[location - 0xFE00]
@@ -373,7 +411,7 @@ impl MemoryAccessor for Display {
     fn write(&mut self, location: usize, value: u8) {
         match location {
             0xfe00..=0xfe9f => {
-                if (self.processor.gpu_mode != Mode::One && self.processor.gpu_mode != Mode::Zero) && self.processor.lcd_enabled() {
+                if self.is_oam_inaccessible() {
                     return;
                 }
                 self.oam[location - 0xfe00] = value;

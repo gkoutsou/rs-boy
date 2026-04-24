@@ -105,7 +105,7 @@ impl MemoryAccessor for Processor {
                 let mut ppu_mode = self.gpu_mode as u8;
                 if !self.lcd_enabled() || self.ppu_first_scanline { ppu_mode = 0 }
 
-                info!("Read: {:#x}", 1<<7 | self.lcd_status | compare_bit | ppu_mode);
+                trace!("Read: {:#x}", 1<<7 | self.lcd_status | compare_bit | ppu_mode);
                 1 << 7 | self.lcd_status | compare_bit | ppu_mode
             }
             0xff42 => self.scy,

@@ -72,6 +72,15 @@ impl GameBoy {
         let timer_interrupt = self.timer.step_timer(ticks);
         self.interrupt_flag |= timer_interrupt;
 
+        if self.display.is_oam_dma_transfer_ongoing() {
+            // TODO handle restarts
+            let copy_location_opt = self.display.oam_dma_transfer_next_position();
+            if let Some(copy_location) = copy_location_opt {
+                info!("copy from: {:#x}", copy_location);
+                let value = self.memory_read_no_tick(copy_location);
+                self.display.write_oam_value(value);
+            }
+        }
         let (gpu_interrupts, trigger_render) = self.display.gpu_step(ticks);
         self.interrupt_flag |= gpu_interrupts;
         self.trigger_render |= trigger_render;
@@ -167,9 +176,9 @@ impl GameBoy {
 
     fn run_cpu_instruction(&mut self) {
         let location = self.registers.step_pc();
-
+        // info!("PC: {:#x} SP: {:#x}", location, self.registers.sp);
         let op = self.memory_read(location);
-        debug!("operator: {:#x} ({:#x})", op, location);
+        // info!("operator: {:#x} ({:#x})", op, location);
         self.run_instruction(op);
     }
 
@@ -226,17 +235,12 @@ impl GameBoy {
 
             0xff46 => {
                 self.display.write(location, value);
-                let location = (value as u16) << 8;
-                debug!(
+                let target_location = (value as u16) << 8;
+                info!(
                     "Triggering DMA transfer to OAM! {:#x} --> {:#x}",
-                    value, location
+                    value, target_location
                 );
-                // TODO 1. there should be a 2 cycle delay from the copy-start.
-                //      2. the bus should be locked after that.
-                //      3. handle restarts
-                for i in 0..0xA0 {
-                    self.display.oam[i] = self.memory_read_no_tick(location as usize + i);
-                }
+                self.display.dma_transfer_ongoing = Some(-2);
             }
             0xfe00..=0xfe9f => self.display.write(location, value),
             0xff40..=0xff4b => self.display.write(location, value),
@@ -1189,7 +1193,7 @@ impl GameBoy {
                 self.registers.a.inc(&mut self.registers.f);
             }
             0x04 => {
-                trace!("INC B");
+                info!("INC B");
                 self.registers.b.inc(&mut self.registers.f);
             }
             0x0c => {
@@ -1565,7 +1569,7 @@ impl GameBoy {
                 self.registers.pc = 0x30;
             }
             0xff => {
-                debug!("RST 38");
+                info!("RST 38");
                 self.push_stack(self.registers.pc);
                 self.registers.pc = 0x38;
             }
