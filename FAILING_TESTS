@@ -3,7 +3,6 @@ test test::acceptance::boot_div_dmg_abc_mgb ... FAILED
 test test::acceptance::boot_hwio_dmg_abc_mgb ... FAILED
 test test::acceptance::ei_sequence ... FAILED
 test test::acceptance::oam_dma_sources_gs ... FAILED
-test test::acceptance::oam_dma_start ... FAILED
 test test::acceptance::ppu_hblank_ly_scx_timing_gs ... FAILED
 test test::acceptance::ppu_intr_2_mode0_timing ... FAILED
 test test::acceptance::ppu_intr_2_mode0_timing_sprites ... FAILED

@@ -73,10 +73,9 @@ impl GameBoy {
         self.interrupt_flag |= timer_interrupt;
 
         if self.display.is_oam_dma_transfer_ongoing() {
-            // TODO handle restarts
             let copy_location_opt = self.display.oam_dma_transfer_next_position();
             if let Some(copy_location) = copy_location_opt {
-                info!("copy from: {:#x}", copy_location);
+                // info!("copy from: {:#x}", copy_location);
                 let value = self.memory_read_no_tick(copy_location);
                 self.display.write_oam_value(value);
             }
@@ -236,10 +235,14 @@ impl GameBoy {
             0xff46 => {
                 self.display.write(location, value);
                 let target_location = (value as u16) << 8;
-                info!(
+                debug!(
                     "Triggering DMA transfer to OAM! {:#x} --> {:#x}",
                     value, target_location
                 );
+                if let Some(_) = self.display.dma_transfer_ongoing {
+                    info!("DMA transfer restarted");
+                    self.display.dma_transfer_restart = true;
+                }
                 self.display.dma_transfer_ongoing = Some(-2);
             }
             0xfe00..=0xfe9f => self.display.write(location, value),
@@ -1193,7 +1196,7 @@ impl GameBoy {
                 self.registers.a.inc(&mut self.registers.f);
             }
             0x04 => {
-                info!("INC B");
+                trace!("INC B");
                 self.registers.b.inc(&mut self.registers.f);
             }
             0x0c => {
@@ -1569,7 +1572,7 @@ impl GameBoy {
                 self.registers.pc = 0x30;
             }
             0xff => {
-                info!("RST 38");
+                debug!("RST 38");
                 self.push_stack(self.registers.pc);
                 self.registers.pc = 0x38;
             }

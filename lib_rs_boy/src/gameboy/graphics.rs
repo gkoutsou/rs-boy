@@ -30,6 +30,8 @@ pub struct Display {
 
     pub win_y_counter: u8,
     pub dma_transfer_ongoing: Option<i16>,
+    // used in case there is a DMA transfer while a previous is running, so that the oam remains inaccessible
+    pub dma_transfer_restart: bool,
 }
 
 impl Display {
@@ -142,10 +144,8 @@ impl Display {
     }
 
     pub fn is_oam_inaccessible(&self) -> bool {
-        if self.dma_transfer_ongoing.is_some() {
-            info!("is_oam_dma_transfer_ongoing: {:?}", self.dma_transfer_ongoing.unwrap());
-        }
         (self.dma_transfer_ongoing.is_some() && self.dma_transfer_ongoing.unwrap() >= 0) ||
+            self.dma_transfer_restart ||
             ((self.processor.gpu_mode != Mode::One && self.processor.gpu_mode != Mode::Zero) && self.processor.lcd_enabled())
     }
     pub fn oam_dma_transfer_next_position(&mut self) -> Option<usize> {
@@ -164,12 +164,12 @@ impl Display {
 
     pub(crate) fn write_oam_value(&mut self, value: u8) {
         let current_pos = self.dma_transfer_ongoing.unwrap();
-        // info!("copy to: {:#x}", current_pos);
         self.oam[current_pos as usize] = value;
         if current_pos < 0xA0 - 1 { // 160
             self.dma_transfer_ongoing = self.dma_transfer_ongoing.map(|v| v + 1);
         } else {
             self.dma_transfer_ongoing = None;
+            self.dma_transfer_restart = false;
         }
     }
 
@@ -335,7 +335,9 @@ impl Display {
             oam_memory_check_index: 0,
             oam_collected_sprites: Vec::with_capacity(10),
             win_y_counter: 0,
+
             dma_transfer_ongoing: None,
+            dma_transfer_restart: false,
         }
     }
 
