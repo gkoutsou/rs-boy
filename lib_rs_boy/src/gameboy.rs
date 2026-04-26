@@ -48,7 +48,7 @@ pub struct GameBoy {
     /// Interrupt Master Enable
     ime: bool,
     interrupt_flag: u8,
-    set_ei: bool,
+    set_ei_delay: Option<u8>,
     trigger_render: bool
 }
 
@@ -56,6 +56,7 @@ impl GameBoy {
     pub fn step(&mut self) -> bool {
         // let render = self.tick();
         if !self.interrupt_step() {
+            self.advance_ei_delay();
             self.cpu_step();
         };
 
@@ -92,13 +93,18 @@ impl GameBoy {
             self.tick();
         }
     }
-
-    fn interrupt_step(&mut self) -> bool {
-        if self.set_ei {
-            self.ime = true;
-            self.set_ei = false;
-            return false;
+    fn advance_ei_delay(&mut self) {
+        trace!("set_ei_delay: {:?}", self.set_ei_delay);
+        if let Some(ref mut delay) = self.set_ei_delay {
+            if *delay == 0 {
+                self.ime = true;
+                self.set_ei_delay = None;
+            } else {
+                *delay -= 1;
+            }
         }
+    }
+    fn interrupt_step(&mut self) -> bool {
         let interrupts = self.active_interrupt();
         if interrupts == 0 {
             return false;
@@ -1432,7 +1438,7 @@ impl GameBoy {
                 // This instruction disables interrupts immediately.
                 info!("Warning: DI");
                 self.ime = false;
-                self.set_ei = false;
+                self.set_ei_delay = None;
             }
 
             0xfb => {
@@ -1440,7 +1446,7 @@ impl GameBoy {
                 // immediately. Interrupts are enabled after
                 // instruction after EI is executed.
                 info!("Warning: EI");
-                self.set_ei = true;
+                self.set_ei_delay = Some(0);
             }
 
             // Calls
@@ -2176,7 +2182,7 @@ impl GameBoy {
             timer: Timer::new(),
             ime: false,
             interrupt_flag: 0xe1,
-            set_ei: false,
+            set_ei_delay: None,
 
             halt: false,
             display: Display::new(),
