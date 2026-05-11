@@ -32,12 +32,13 @@ pub struct Display {
     pub dma_transfer_ongoing: Option<i16>,
     // used in case there is a DMA transfer while a previous is running, so that the oam remains inaccessible
     pub dma_transfer_restart: bool,
+    // keeps track of the latest condition for the stat interrupt
+    stat_line: bool
 }
 
 impl Display {
     pub fn gpu_step(&mut self, dots: u32) -> (u8, bool) {
         let mut trigger_render = false;
-        let previous_interrupt_state = self.interrupt > 0;
         self.interrupt = 0;
         if !self.processor.lcd_enabled() {
             trace!("LCD disabled!");
@@ -129,14 +130,15 @@ impl Display {
                 }
             }
         }
-        // TODO moving this to the top passes more tests. But acid2 is broken / a ppu test never ends
-        if self.processor.should_trigger_lyc_stat_interrupt() ||
-            self.processor.should_trigger_mode_stat_interrupt() {
+        let new_stat_line = self.processor.should_trigger_lyc_stat_interrupt() ||
+            self.processor.should_trigger_mode_stat_interrupt();
+
+        if new_stat_line && !self.stat_line {
             self.interrupt |= interrupts::STAT;
         }
-        // TODO this breaks silver :'(
-        let interrupt = if !previous_interrupt_state { self.interrupt } else { 0 };
-        (interrupt, trigger_render)
+        self.stat_line = new_stat_line;
+
+        (self.interrupt, trigger_render)
     }
 
     pub fn is_oam_dma_transfer_ongoing(&self) -> bool {
@@ -338,6 +340,8 @@ impl Display {
 
             dma_transfer_ongoing: None,
             dma_transfer_restart: false,
+
+            stat_line: false,
         }
     }
 

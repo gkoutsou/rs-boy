@@ -214,7 +214,19 @@ impl MemoryAccessor for Timer {
                     self.tima = value
                 }
             }
-            0xFF07 => self.tac = value,
+            0xFF07 => {
+                let old_enabled = self.tima_enabled();
+                self.tac = value | 0xF8;
+                let new_enabled = self.tima_enabled();
+
+                // Falling edge on enable bit: only increment if the selected DIV bit is currently high
+                if old_enabled && !new_enabled {
+                    let bit = self.tima_clock_bit();
+                    if (self.system_clock >> bit) & 1 == 1 {
+                        self.tima_overflow_delay = self.timer_tick();
+                    }
+                }
+            },
             _ => panic!(
                 "timer register location write: {:#x} - {:#x}",
                 location, value
