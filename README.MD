@@ -31,8 +31,8 @@ It can function either as a standalone binary, or it can be loaded as a retroarc
 | dgm_sound        | 6      | 6       |
 | instr_timing     | 1      | 0       |
 | interrupt_time   | 0      | 1       |
-| memory_timing    | 0      | 3       |
-| memory_timing_2  | 0      | 3       |
+| memory_timing    | 3      | 0       |
+| memory_timing_2  | 3      | 0       |
 
 ### [Mooneye Acceptance Test ROMs](https://github.com/Gekkio/mooneye-test-suite/)
 
