@@ -213,16 +213,26 @@ impl MemoryAccessor for Speaker {
 
     fn write(&mut self, location: usize, value: u8) {
         // info!("Writing to speaker Register: {:#x}: {:#b}", location, value);
-
-        //
-        if !self.is_audio_enabled() && (location != 0xff26 || (0xff30..=0xff3f).contains(&location))
+        let mut value = value;
+        let is_wave_address = (0xff30..=0xff3f).contains(&location);
+        let is_master_address = location == 0xff26;
+        // TODO Only for monochrome we can write to NRx1
+        let is_nrx1_monochrome = location == 0xFF11 || location == 0xFF16 || location == 0xFF1B || location == 0xFF20;
+        if !self.is_audio_enabled() && !is_master_address && !is_wave_address && !is_nrx1_monochrome
         {
-            // TODO allow write to NRx1 in monochrome
             // makes them read-only until turned back on, except NR52
             // however, does not affect Wave RAM, which can always be read/written,
-            // nor the DIV-APU counter.
+            // nor the DIV-APU counter. NRx1 are also allowed in monochrome
             return;
         }
+
+        if !self.is_audio_enabled() {
+            match location {
+                0xFF11 | 0xFF16 | 0xFF20 => value = value & 0x3F,
+                _ => {},
+            }
+        }
+
         match location {
             0xff10..=0xff14 => self.channel1.write(location, value),
             0xff15..=0xff19 => self.channel2.write(location, value),
@@ -234,9 +244,10 @@ impl MemoryAccessor for Speaker {
                 let old_state = self.audio_master;
                 self.audio_master = value >> 7 > 0;
                 let enabling_sound = !old_state && self.is_audio_enabled();
+                let disabling_sound = old_state && !self.is_audio_enabled();
 
                 debug!("PowerOff {}", self.audio_master);
-                if !self.is_audio_enabled() {
+                if disabling_sound {
                     self.channel1.reset();
                     self.channel2.reset();
                     self.channel3.reset();

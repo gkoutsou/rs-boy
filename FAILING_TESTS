@@ -14,10 +14,8 @@ test test::acceptance::ppu_vblank_stat_intr_gs ... FAILED
 test test::acceptance::serial_boot_sclk_align_dmg_abc_mgb ... FAILED
 test test::acceptance::timer_rapid_toggle ... FAILED
 test test::blargg_dgm_sound::_10_wave_trigger_while_on ... FAILED
-test test::blargg_dgm_sound::_11_regs_after_power ... FAILED
 test test::blargg_dgm_sound::_12_wave_write_while_on ... FAILED
 test test::blargg_dgm_sound::_5_sweep_details ... FAILED
-test test::blargg_dgm_sound::_8_len_ctr_during_power ... FAILED
 test test::blargg_dgm_sound::_9_wave_read_while_on ... FAILED
 test test::ppu::m2_win_en_toggle ... FAILED
 test test::ppu::m3_bgp_change ... FAILED

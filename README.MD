@@ -28,7 +28,7 @@ It can function either as a standalone binary, or it can be loaded as a retroarc
 | Name             | Passed | Failing |
 |------------------|--------|---------|
 | cpu_instructions | 11     | 0       |
-| dgm_sound        | 6      | 6       |
+| dgm_sound        | 8      | 4       |
 | instr_timing     | 1      | 0       |
 | interrupt_time   | 0      | 1       |
 | memory_timing    | 3      | 0       |
