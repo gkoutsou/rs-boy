@@ -1,6 +1,6 @@
 use super::wave::Wave;
 use crate::gameboy::memory_bus::MemoryAccessor;
-use log::trace;
+use log::{info, trace};
 
 const MAX_ENVELOPE_VOL: f32 = 15.0;
 const MAX_LENGTH: u8 = 64;
@@ -227,18 +227,24 @@ impl Pulse {
         }
 
         let new_period = self.calculate_new_frequency();
-        if new_period >= 2048 {
+        if (!self.sweep_direction && new_period >= 2048) || (self.sweep_direction && new_period == 0) {
+            // this should also be ok (reaches #5)
+            info!("Disabling - 5 {}", new_period);
             self.enabled = false;
             return;
         }
 
+        // TODO why is this check for individual step performed? it makes sense on trigger but not here?
         if self.individual_step > 0 {
             self.sweep_shadow_period = new_period;
             self.period = new_period;
 
             // Perform a new overflow check, but ditch the frequency
-            if self.calculate_new_frequency() >= 2048 {
-                self.enabled = false
+            let _period = self.calculate_new_frequency();
+            // TODO not tested yet
+            if (!self.sweep_direction && _period >= 2048) || (self.sweep_direction && _period == 0) {
+                info!("Disabling - ?? {}", _period);
+                self.enabled = false;
             }
         }
     }
@@ -344,6 +350,24 @@ impl MemoryAccessor for Pulse {
                 // 7	| 6	5 4 | 3	            | 2	1	0
                 //        Pace	  Direction	    Individual step
                 self.individual_step = value & 0x7;
+                if value == 0x1F {
+                    info!("Wrote 1F to NR10");
+                }
+                if value == 0x18 {
+                    info!("Wrote 18 to NR10");
+                }
+                if value == 0x10 {
+                    info!("Wrote 10 to NR10");
+                }
+                if value == 0xF {
+                    info!("Wrote F to NR10");
+                }
+                if value == 0x79 {
+                    info!("Wrote 79 to NR10");
+                }
+                if self.sweep_direction != (value & (1 << 3) > 0) {
+                    info!("changing sweep_direction to {:?}", (value & (1 << 3) > 0));
+                }
                 self.sweep_direction = value & (1 << 3) > 0;
                 // Note that the value written to this field is not re-read by the hardware until a
                 // sweep iteration completes, or the channel is (re)triggered.
@@ -430,8 +454,12 @@ impl MemoryAccessor for Pulse {
                         // The “enabled flag” is set if either the sweep pace or individual step are non-zero, cleared otherwise.
                         self.sweep_enabled = self.sweep_pace != 0 || self.individual_step != 0;
                         // If the individual step is non-zero, frequency calculation and overflow check are performed immediately.
-                        if self.individual_step != 0 && self.calculate_new_frequency() >= 2048 {
-                            self.enabled = false;
+                        if self.individual_step != 0 { // This should be right reaches #6
+                            let _freq = self.calculate_new_frequency();
+                            if (!self.sweep_direction && _freq >= 2048) || (self.sweep_direction && _freq == 0) {
+                                info!("Disabling - 6 {}", _freq);
+                                self.enabled = false;
+                            }
                         }
                     }
                 }
